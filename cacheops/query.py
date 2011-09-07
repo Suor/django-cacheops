@@ -271,7 +271,7 @@ class QuerySetMixin(object):
         kwargs.setdefault('_cache_write_only', self._cache_write_only)
 
         clone = self._no_monkey._clone(self, klass, setup, **kwargs)
-        clone._cloning = self._cloning - 1
+        clone._cloning = self._cloning - 1 if self._cloning else 0
         return clone
 
     def iterator(self):
