@@ -416,10 +416,11 @@ class ManagerMixin(object):
         return self.get_query_set().nocache(*args, **kwargs)
 
 
-def invalidate_m2m(sender=None, instance=None, model=None, pk_set=None, **kwargs):
-    invalidate_model(sender)
-    invalidate_obj(instance)
-    # TODO: возможно следует инвалидировать и добавляемые/удаляемые модели как-то
+def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
+    if action in ('post_add', 'post_remove', 'post_clear'):
+        invalidate_model(sender)
+        invalidate_obj(instance)
+        # TODO: возможно следует инвалидировать и добавляемые/удаляемые модели как-то
 
 
 def install_cacheops():
