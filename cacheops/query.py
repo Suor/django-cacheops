@@ -122,6 +122,7 @@ def _stringify_query():
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.datastructures import RawValue, Date
+    from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
     attrs[WhereNode] = ('connector', 'negated', 'children', 'subtree_parents')
@@ -158,6 +159,8 @@ def _stringify_query():
         elif isinstance(obj, Query):
             # for custom subclasses
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+        elif isinstance(obj, SQLEvaluator):
+            return (obj.__class__, obj.expression.__dict__.items())
         else:
             raise TypeError("Can't encode %s" % repr(obj))
 
