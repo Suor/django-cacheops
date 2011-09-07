@@ -5,7 +5,7 @@ from cacheops.conf import redis_conn
 from cacheops.utils import get_model_name
 
 
-__all__ = ('invalidate_obj', 'invalidate_model', 'clear_model_schemes')
+__all__ = ('invalidate_obj', 'invalidate_model')
 
 
 def serialize_scheme(scheme):
@@ -97,6 +97,14 @@ class ConjSchemes(object):
                 self.versions[model_name] += 1 # здесь добавляем 1, а не ставим что получили от incr,
                                                # т.к. даже наша новая версия может быть уже устаревшей
 
+    def clear(self, model):
+        """
+        Чистит схемы
+        """
+        # Чистим схемы и увеличиваем версию, чтобы все подтянули пустые схемы
+        redis_conn.delete(self.get_lookup_key(model))
+        redis_conn.incr(self.get_version_key(model))
+
 cache_schemes = ConjSchemes()
 
 
@@ -118,7 +126,9 @@ def invalidate_from_dict(model, values):
 
     # Если версия схем устарела, то список запросов для инвалидации может быть неполным и всё нужно переделать
     # Такое будет случаться всё реже по мере заполнения схем
-    if version is not None and int(version) != cache_schemes.version(model):
+    if version is None:
+        version = 0
+    if int(version) != cache_schemes.version(model):
         redis_conn.unwatch()
         cache_schemes.load_schemes(model)
         invalidate_from_dict(model, values)
@@ -151,7 +161,7 @@ def invalidate_obj(obj):
 def invalidate_model(model):
     """
     Инвалидируем все запросы модели.
-    Тяжёлая артилерия, использует релисовый KEYS и поэтому относительно медленна.
+    Тяжёлая артилерия, использует редисовый KEYS и поэтому относительно медленна.
     """
     conjs_keys = redis_conn.keys('conj:%s:*' % get_model_name(model))
     if isinstance(conjs_keys, str):
@@ -161,6 +171,4 @@ def invalidate_model(model):
         queries = redis_conn.sunion(conjs_keys)
         redis_conn.delete(*(list(queries) + conjs_keys))
 
-
-def clear_model_schemes(model):
-    redis_conn.delete(cache_schemes.get_lookup_key(model), cache_schemes.get_version_key(model))
+    cache_schemes.clear(model)
