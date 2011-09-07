@@ -4,16 +4,15 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+import os, time
 
 from django.utils.hashcompat import md5_constructor
-from django.core.cache import get_cache
 from django.conf import settings
 
 from cacheops.conf import redis_conn
 
 
 __all__ = ('cache', 'cached', 'file_cache')
-FILE_CACHE_URI = 'file://%s/tmp/django_cache' % settings.HOME_DIR
 
 
 class BaseCache(object):
@@ -69,14 +68,69 @@ cache = RedisCache(redis_conn)
 cached = cache.cached
 
 
-class DjangoCache(BaseCache):
-    def __init__(self, uri):
-        self.cache = get_cache(uri)
+FILE_CACHE_MAX_ENTRIES = getattr(settings, 'FILE_CACHE_MAX_ENTRIES', 40000)
+FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60)
 
-    def get(self, cache_key):
-        return self.cache.get(cache_key)
+class FileCache(BaseCache):
+    def __init__(self, path, max_entries=FILE_CACHE_MAX_ENTRIES, timeout=FILE_CACHE_TIMEOUT):
+        self._dir = path
+        self._max_entries = max_entries
+        self._default_timeout = timeout
 
-    def set(self, cache_key, data, timeout=None):
-        self.cache.set(cache_key, data, timeout)
+    def _key_to_filename(self, key):
+        """
+        Возвращает имя файла, соответствующее переданному ключу кеша
+        """
+        digest = md5_constructor(key).hexdigest()
+        return os.path.join(self._dir, digest[-2:], digest[:-2])
 
-file_cache = DjangoCache(FILE_CACHE_URI)
+    def get(self, key, default=None):
+        filename = self._key_to_filename(key)
+        try:
+            # Если файл старый, то удаляем его и симулируем промах
+            if time.time() >= os.stat(filename).st_mtime:
+                self.delete(filename)
+                return default
+
+            f = open(filename, 'rb')
+            data = pickle.load(f)
+            f.close()
+            return data
+        except (IOError, OSError, EOFError, pickle.PickleError):
+            return default
+
+    def set(self, key, data, timeout=None):
+        filename = self._key_to_filename(key)
+        dirname = os.path.dirname(filename)
+
+        if timeout is None:
+            timeout = self._default_timeout
+
+        try:
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+
+            # Пишем эксклюзивно, чтобы избежать одновременной записи в файл и порчи данных
+            f = os.open(filename, os.O_EXCL | os.O_WRONLY | os.O_CREAT)
+            try:
+                os.write(f, pickle.dumps(data, pickle.HIGHEST_PROTOCOL))
+            finally:
+                os.close(f)
+
+            # mtime отмечает время устаревания, ставим его в будущее
+            os.utime(filename, (0, time.time() + timeout))
+        except (IOError, OSError):
+            pass
+
+    def delete(self, fname):
+        try:
+            os.remove(fname)
+            # Пытаемся удалить директорию - вдруг пустая?
+            dirname = os.path.dirname(fname)
+            os.rmdir(dirname)
+        except (IOError, OSError):
+            pass
+
+
+cache_dir = os.path.join(settings.HOME_DIR, settings.FILE_CACHE_DIR)
+file_cache = FileCache(cache_dir)
