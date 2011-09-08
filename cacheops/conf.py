@@ -18,7 +18,6 @@ profiles = {
 }
 for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
-model_profiles = {}
 
 # Создаём соединение с редисом
 try:
@@ -27,6 +26,8 @@ except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
 redis_conn = redis.Redis(**redis_conf)
 
+
+model_profiles = {}
 
 def prepare_profiles():
     """
@@ -39,13 +40,10 @@ def prepare_profiles():
 
     ops = getattr(settings, 'CACHEOPS', {})
     for app_model, profile in ops.items():
-        app, model = app_model.rsplit('.', 1)
         profile_name, timeout = profile[:2]
 
-        if app not in model_profiles:
-            model_profiles[app] = {}
         try:
-            model_profiles[app][model] = mp = deepcopy(profiles[profile_name])
+            model_profiles[app_model] = mp = deepcopy(profiles[profile_name])
         except KeyError:
             raise ImproperlyConfigured('Unknown cacheops profile "%s"' % profile_name)
 
@@ -66,8 +64,9 @@ def model_profile(model):
         prepare_profiles()
 
     app, model_name = model._meta.app_label, model._meta.module_name
-    if app not in model_profiles:
-        return None
+    app_model = '%s.%s' % (app, model_name)
+    for guess in (app_model, '%s.*' % app, '*.*'):
+        if guess in model_profiles:
+            return model_profiles[guess]
     else:
-        app_profiles = model_profiles[app]
-        return app_profiles.setdefault(model_name, app_profiles.get('*', None))
+        return None
