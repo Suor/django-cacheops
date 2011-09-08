@@ -35,3 +35,5 @@ CAVEATS:
 from .simple import *
 from .query import *
 from .invalidation import *
+
+install_cacheops()
