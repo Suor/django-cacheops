@@ -31,9 +31,8 @@ model_profiles = {}
 
 def prepare_profiles():
     """
-    Готовит словарь app -> model -> profile, чтобы их быстро заполнять при создании queryset-ов.
+    Готовит словарь 'app.model' -> profile, чтобы их быстро получать при создании queryset-ов.
     Таймаут тоже записываем в профиль.
-    Кроме того, соединяется с редисом.
     """
     if hasattr(settings, 'CACHEOPS_PROFILES'):
         profiles.update(settings.CACHEOPS_PROFILES)
