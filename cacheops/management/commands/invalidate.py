@@ -8,7 +8,7 @@ from cacheops.conf import redis_conn
 
 
 class Command(LabelCommand):
-    help = 'Invalidates cache for models'
+    help = 'Invalidates cache for entire app, model or particular instance'
     args = '(all | <app> | <app>.<model> | <app>.<model>.<pk>) +'
     label = 'app or model or object'
 
