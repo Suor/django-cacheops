@@ -19,7 +19,7 @@ profiles = {
 for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
-# Создаём соединение с редисом
+# Connecting to redis
 try:
     redis_conf = settings.CACHEOPS_REDIS
 except AttributeError:
@@ -31,8 +31,7 @@ model_profiles = {}
 
 def prepare_profiles():
     """
-    Готовит словарь 'app.model' -> profile, чтобы их быстро получать при создании queryset-ов.
-    Таймаут тоже записываем в профиль.
+    Prepares a dict 'app.model' -> profile, for use in model_profile()
     """
     if hasattr(settings, 'CACHEOPS_PROFILES'):
         profiles.update(settings.CACHEOPS_PROFILES)
@@ -57,7 +56,7 @@ def prepare_profiles():
 
 def model_profile(model):
     """
-    Возвращает профиль по переданной модели
+    Returns cacheops profile for a model
     """
     if not model_profiles:
         prepare_profiles()
