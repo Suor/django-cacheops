@@ -8,8 +8,8 @@ from cacheops.conf import redis_conn
 
 
 class Command(LabelCommand):
-    help = 'Invalidates cache for models'
-    args = '(all | <app> | <model> | <model>.<pk>) +'
+    help = 'Invalidates cache for entire app, model or particular instance'
+    args = '(all | <app> | <app>.<model> | <app>.<model>.<pk>) +'
     label = 'app or model or object'
 
     def handle_label(self, label, pk=None, **options):
