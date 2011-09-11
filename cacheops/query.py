@@ -24,40 +24,40 @@ _local_get_cache = {}
 
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
-    Кэширует переданные данные и прописывает требуемые инвалидаторы.
+    Writes data to cache and creates appropriate invalidators.
     """
     if timeout is None:
         profile = model_profile(model)
         timeout = profile['timeout']
 
-    # Познаём новые схемы
+    # Ensure that all schemes of current query are "known"
     schemes = map(conj_scheme, cond_dnf)
     cache_schemes.ensure_known(model, schemes)
 
     txn = redis_conn.pipeline()
 
-    # Пишем в кеш
+    # Write data to cache
     pickled_data = pickle.dumps(data, -1)
     if timeout is not None:
         txn.setex(cache_key, pickled_data, timeout)
     else:
         txn.set(cache_key, pickled_data)
 
-    # Добавляем ссылки на текущую выборку для всех конъюнкций
+    # Add new cache_key to list of dependencies for every conjunction in dnf
     for conj in cond_dnf:
         conj_key = conj_cache_key(model, conj)
         txn.sadd(conj_key, cache_key)
         if timeout is not None:
-            # Таймаут инвалидатора должен быть больше таймаута его элементов
-            # Поэтому берём его из профиля, он максимальный
-            # Добавляем 10 секунд на всякий случай, мало ли как там редис их чистит
+            # Invalidator timeout should be larger than timeout of any key it references
+            # So we take timeout from profile which is our upper limit
+            # Add few extra seconds to be extra safe
             txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
 
     txn.execute()
 
 
 def cacheoped_method(action='fetch', extra=None):
-    # TODO: избавиться от декоратора, метод может использовать локальную функцию с @cacheoped_as
+    # TODO: remove this decorator, use @cacheoped_as on local function instead
     def decorator(func):
         key_extra = extra if extra is not None else '%s.%s' % (func.__module__, func.__name__)
 
@@ -81,10 +81,8 @@ def cacheoped_method(action='fetch', extra=None):
 
 def cacheoped_as(queryset, extra=None, timeout=None):
     """
-    Кэширует результаты функции и инвалидирует как переданный queryset.
-    NOTE: Кэширует всегда игнорируя профиль queryset-а
-    TODO: Можно оптимизировать для того случая когда передаём простой queryset
-          вроде Category.objects.all(), чтобы не ренденрить sql-запрос и не считать ДНФ
+    Caches results of a function and invalidates them same way as given queryset.
+    NOTE: Ignores queryset cached ops settings, just caches.
     """
     queryset._require_cacheprofile()
     if timeout and timeout > queryset._cacheprofile['timeout']:
@@ -100,8 +98,8 @@ def cacheoped_as(queryset, extra=None, timeout=None):
 
         @wraps(func)
         def wrapper(*args):
-            # NOTE: вообще предполагается, что аргументов не будет,
-            #       в том случае если они есть, то результат не должен от них зависеть
+            # NOTE: These args must not effect function result.
+            #       I'm keeping them to cache view functions.
             cache_data = redis_conn.get(cache_key)
             if cache_data is not None:
                 return pickle.loads(cache_data)
@@ -115,6 +113,21 @@ def cacheoped_as(queryset, extra=None, timeout=None):
 
 
 def _stringify_query():
+    """
+    Serializes query object, so that it can be used to create cache key.
+    We can't just do pickle because order of keys in dicts is arbitrary,
+    we can use str(query) which compiles it to SQL, but it's too slow,
+    so we use json.dumps with sort_keys=True and object hooks.
+
+    NOTE: I like this function no more than you, it's messy
+          and pretty hard linked to django internals.
+          I just don't have nicer solution for now.
+
+          Probably the best way out of it is optimizing SQL generation,
+          which would be valuable by itself. The problem with it is that
+          any significant optimization will most likely require a major
+          refactor of sql.Query class, which is a substantial part of ORM.
+    """
     import simplejson as json
     from datetime import datetime, date
     from django.db.models.fields import Field
@@ -157,7 +170,7 @@ def _stringify_query():
         elif isinstance(obj, Aggregate):
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Aggregate]])
         elif isinstance(obj, Query):
-            # for custom subclasses
+            # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
         elif isinstance(obj, SQLEvaluator):
             return (obj.__class__, obj.expression.__dict__.items())
@@ -187,7 +200,8 @@ class QuerySetMixin(object):
 
     def get_or_create(self, **kwargs):
         """
-        Отключаем кеш для get_or_create
+        Disabling cache for get or create
+        TODO: check whether we can use cache (or write_only) here without causing problems
         """
         return self.nocache()._no_monkey.get_or_create(self, **kwargs)
 
@@ -199,28 +213,35 @@ class QuerySetMixin(object):
 
     def _cache_key(self, extra=''):
         """
-        Ключ для кеширования результатов этого запроса
+        Compute a cache key for this queryset
         """
         md5 = md5_constructor()
         md5.update(str(self.__class__))
         md5.update(stringify_query(self.query))
         if extra:
             md5.update(str(extra))
-        # Атрибут flat влияет на выдачу результатов для ValuesQuerySet
+        # 'flat' attribute changes results formatting for ValuesQuerySet
         if hasattr(self, 'flat'):
             md5.update(str(self.flat))
 
         return 'q:%s' % md5.hexdigest()
 
     def _cache_results(self, cache_key, results):
-        # Познаём новые схемы
         cond_dnf = dnf(self.query.where, self.model._meta.db_table)
         cache_thing(self.model, cache_key, results, cond_dnf, timeout=self._cachetimeout)
 
     def cache(self, ops=None, timeout=None, clone=False, write_only=None):
         """
-        Возвращает копию queryset-а с включенным кэшированием.
-        По-умолчанию включаются все доступные операции.
+        Enables caching for given ops
+            ops        - a subset of ['get', 'fetch', 'count'],
+                         ops caching to be turned on, all enabled by default
+            timeout    - override default cache timeout
+            clone      - return modified clone of self, do not change self
+            write_only - don't try fetching from cache, still write result there
+
+        NOTE: you actually can disable caching by omiting corresponding ops,
+              .cache(ops=[]) disables caching for this queryset.
+        TODO: get rid of clone flag, .clone().cache(...) should be used instead
         """
         self._require_cacheprofile()
         if timeout and timeout > self._cacheprofile['timeout']:
@@ -242,9 +263,10 @@ class QuerySetMixin(object):
 
     def nocache(self, clone=False):
         """
-        Метод для удобства, выключает кэширование для queryset-а.
+        Convinience method, turns off caching for this queryset
+        TODO: get rid of clone flag, .clone().nocache(...) should be used instead
         """
-        # Если профиль не настроен, то и выключать ничего не надо
+        # cache profile not present means caching is not enabled for this model
         if self._cacheprofile is None:
             return self.clone() if clone else self
         else:
@@ -281,7 +303,7 @@ class QuerySetMixin(object):
         if cache_this:
             cache_key = self._cache_key()
             if not self._cache_write_only:
-                # Пытаемся загрузить из кеша
+                # Trying get data from cache
                 cache_data = redis_conn.get(cache_key)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
@@ -289,6 +311,7 @@ class QuerySetMixin(object):
                         yield obj
                     raise StopIteration
 
+        # Cache miss - fallback to overriden implementation
         results = []
         for obj in superiter(self):
             if cache_this:
@@ -300,23 +323,26 @@ class QuerySetMixin(object):
         raise StopIteration
 
     def count(self):
-        # Если внутренний кеш queryset-а уже заполнен, то просто посчитаем его
+        # Optmization borrowed from overriden method:
+        # if queryset cache is already filled just return its len
         if self._result_cache is not None and not self._iter:
             return len(self._result_cache)
         return cacheoped_method(action='count', extra='count')(lambda self: self.query.get_count(using=self.db))(self)
 
     def get(self, *args, **kwargs):
-        # Т.к. далее вызовется обычный итератор, который не будет знать, что его вызвали из get()
-        # то здесь нужно сделать клонирование с назначением кэширования операции fetch
-        # NOTE: можно ещё из iterator() смотреть назад по фреймам, но это гораздо больший пиздец
+        # .get() uses the same .iterator() method to fetch data,
+        # so here we add 'fetch' to ops
         if self._cacheprofile is not None and 'get' in self._cacheops:
-            # Используем local_get если так настроено
-            # Не связываемся с Q-объектами, родственниками и фильтрованными кверисетами
+            # NOTE: local_get=True enables caching of simple gets in local memory,
+            #       which is very fast, but not invalidated.
+            # Don't bother with Q-objects, select_related and previous filters,
+            # simple gets - thats what we are really up to here.
             if self._cacheprofile['local_get']    \
                 and not args                      \
                 and not self.query.select_related \
                 and not self.query.where.children:
-
+                # NOTE: We use simpler way to generate a cache key to cut costs.
+                #       Some day it could produce same key for diffrent requests.
                 key = (self.__class__, self.model) + tuple(sorted(kwargs.items()))
                 try:
                     return _local_get_cache[key]
@@ -334,10 +360,12 @@ class QuerySetMixin(object):
 
     def exists(self):
         """
-        Переписываем этот метод, чтобы при выборке по pk он сохранял полученный объект в локальное хранилище.
-        Нужно, чтобы в обработке post_save использовать старые данные.
+        HACK: handling invalidation in post_save signal requires both
+              old and new object data, to get old data without extra db request
+              we use exists() call from django's Model.save_base().
+              Yes, if you use .exists() yourself this can cause memory leak.
         """
-        # TODO: отрефакторить эту функцию
+        # TODO: refactor this one to more understandable something
         if self._cacheprofile is not None:
             query_dnf = dnf(self.query.where, self.model._meta.db_table)
             if len(query_dnf) == 1 and len(query_dnf[0]) == 1 and query_dnf[0][0][0] == self.model._meta.pk.name:
@@ -353,54 +381,56 @@ class ManagerMixin(object):
         self._no_monkey.contribute_to_class(self, cls, name)
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
-            # Устанавливаем сигналы
+            # Setting up signals
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
-            #post_update.connect(self.post_update, sender=cls)
             _old_objs[get_model_name(cls)] = {}
 
     def _post_save(self, sender, instance, **kwargs):
         """
-        Инвалидирует и для старой и для новой версии объекта, старый объект подтягивается
-        когда django делает exists перед апдейтом.
+        Invokes invalidations for both old and new versions of saved object
         """
         old = _old_objs[get_model_name(instance.__class__)].pop(instance.pk, None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
 
-        # Включенный cache_on_save заполняет кеш сразу после сохранения,
-        # используя сохраняемый объект.
+        # Enabled cache_on_save makes us write saved object to cache.
+        # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
+        # <cache_on_save_field> is pk unless specified.
+        # This sweet trick saves a db request and helps with slave lag.
         cache_on_save = instance._cacheprofile.get('cache_on_save')
         if cache_on_save:
-            # В кеш ложится объект, созданный где-то раньше, а не только что выбранный из базы,
-            # как это бывает при обычном кешировании. Объект сериализуется целиком, поэтому
-            # может быть достигнут нежелательный эффект: сохранено некоторое состояние объекта на момент сохранения.
-            # В частности, ForeignKey и его потомки кешируют выбранные связанные объекты в
-            # атрибутах вида _FIELDNAME_cache. Чтобы не сохранять связанные объекты,
-            # перед кешированием нужно изъять все атрибуты вида _FIELDNAME_cache из экземпляра,
-            # а после сохранения — вернуть на место.
-
-            # Изымаем нежелательные атрибуты
+            # HACK: We get this object "from field" so it can contain
+            #       some undesirable attributes or other objects attached.
+            #       RelatedField accessors do that, for example.
+            #
+            #       So we strip down any _FIELDNAME_cache attrs before saving
+            #       and later reassign them
+            # Stripping up undesirable attributes
             unwanted_attrs = [k for k in instance.__dict__.keys() if k.startswith('_') and k.endswith('_cache')]
             unwanted_dict = dict((k, instance.__dict__[k]) for k in unwanted_attrs)
             for k in unwanted_attrs:
                 del instance.__dict__[k]
 
-            # Кешируем
             key = cache_on_save if isinstance(cache_on_save, basestring) else 'pk'
-            # Джанго не позволяет делать запросы типа related_id = 1337,
-            # поэтому нужно срезать _id с конца
+            # Django doesn't allow filters like related_id = 1337.
+            # So we just hacky strip _id from end of a key
+            # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
             cacheoped_as(instance.__class__.objects \
                 .filter(**{filter_key: getattr(instance, key)}), extra='') \
                 (lambda: [instance])()
 
-            # Восстанавливаем нежелательные атрибуты
+            # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)
 
     def _post_delete(self, sender, instance, **kwargs):
-        # NOTE: сработает некорректно если какой-то засранец менял поля прежде чем удалить объект
+        """
+        Invalidation upon object deletion.
+        """
+        # NOTE: this will behave wrong if someone changed object fields
+        #       before deletion (why anyone will do that?)
         invalidate_obj(instance)
 
     def inplace(self):
@@ -417,15 +447,18 @@ class ManagerMixin(object):
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
+    """
+    Invoke invalidation on m2m changes.
+    """
     if action in ('post_add', 'post_remove', 'post_clear'):
-        invalidate_model(sender)
+        invalidate_model(sender) # NOTE: this is harsh, but what's the alternative?
         invalidate_obj(instance)
-        # TODO: возможно следует инвалидировать и добавляемые/удаляемые модели как-то
+        # TODO: we should invalidate referenced objects as well
 
 
 def install_cacheops():
     """
-    Инсталлирует кешопс путём массовых обезьяних патчей
+    Installs cacheops by numerous monkey patches
     """
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
@@ -433,7 +466,7 @@ def install_cacheops():
     monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
 
-    # В админке кеш выключаем
+    # Turn off caching in admin
     from django.contrib.admin.options import ModelAdmin
     def ModelAdmin_queryset(self, request):
         queryset = o_ModelAdmin_queryset(self, request)
@@ -444,5 +477,5 @@ def install_cacheops():
     o_ModelAdmin_queryset = ModelAdmin.queryset
     ModelAdmin.queryset = ModelAdmin_queryset
 
-    # Обработка изменения m2m
+    # bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
