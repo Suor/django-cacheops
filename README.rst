@@ -16,8 +16,8 @@ Requirements
 Installation
 ------------
 
-First you will need `redis <http://redis.io/>`_, you can search for `redis` or
-`redis-server` package in your system packet manager. Or you can
+First you will need `redis <http://redis.io/>`_, you can search for ``redis-server`` 
+or ``redis`` package in your system packet manager. Or you can 
 `install it from source <http://redis.io/download>`_.
 
 Then install python redis client, clone cacheops and symlink it to your python path::
@@ -30,7 +30,7 @@ Then install python redis client, clone cacheops and symlink it to your python p
 Setup
 -----
 
-Add `cacheops` to your `INSTALLED_APPS` first::
+Add ``cacheops`` to your ``INSTALLED_APPS`` first::
 
     INSTALLED_APPS = (
         'cacheops',
@@ -66,7 +66,44 @@ Setup redis connection and enable caching for desired models::
         # Automatically cache count requests for all other models for 15 min
         '*.*': ('count', 60*15),
     }
+    
+Usage
+-----
 
+| **Automatic caching.** It's automatic you just need to `set it up <#setup>`_.
+
+| **Manual caching.** You can force any queryset to use cache by caling it's ``.cache()`` method::
+
+    Article.objects.filter(tag=2).cache()
+    
+You can specify which ops should be cached for queryset, for example, this code::
+
+    qs = Article.objects.filter(tag=2).cache(ops=['count'])
+    paginator = Paginator(objects, ipp)
+    artciles = list(pager.page(page_num)) # hits database
+
+will cache ``.count()`` call in Paginator but not later in articles fetch. There are three
+possible actions - ``get``, ``fetch`` and ``count``. You can pass any subset of ops
+to ``.cache()`` method even empty to turn off caching. There are, however, 
+a shortcut for it::
+
+    qs = Article.objects.filter(visible=True).nocache()
+    qs1 = qs.filter(tag=2)       # hits database
+    qs2 = qs.filter(category=3)  # hits it once more
+    
+It is usefull when you want to disable automatic caching on particular queryset.
+
+| **Function caching.** You can cache and invalidate result of a function same way is queryset::
+
+    from cacheops import cacheoped_as
+    
+    @cacheoped_as(Article.objects.all())
+    def article_stats():
+        return {
+            tags: Article.objects.values('tag').annotate(count=Count('id'))
+            categories: Article.objects.values('category').annotate(count=Count('id'))
+        }
+        
 
 Invalidation
 ------------
