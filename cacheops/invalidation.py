@@ -119,7 +119,11 @@ def invalidate_from_dict(model, values):
     # Заодно выберем версию схем, чтобы подтянуть новые если надо
     version_key = cache_schemes.get_version_key(model)
     pipe = redis_conn.pipeline(transaction=False)
-    pipe.watch(version_key, *conjs_keys)
+    # HACK: обходим ебанутую обработку WATCH в redis-py 2.4.6+
+    if hasattr(pipe, 'pipeline_execute_command'):
+        pipe.pipeline_execute_command('watch', version_key, *conjs_keys)
+    else:
+        pipe.watch(version_key, *conjs_keys)
     pipe.get(version_key)
     pipe.sunion(conjs_keys)
     _, version, cache_keys = pipe.execute()
