@@ -35,7 +35,7 @@ class Command(LabelCommand):
         except ImproperlyConfigured, e:
             raise CommandError(e)
 
-        for model in get_models(app):
+        for model in get_models(app, include_auto_created=True):
             invalidate_model(model)
 
     def handle_model(self, app_name, model_name):
