@@ -15,6 +15,10 @@ from cacheops.conf import redis_conn
 __all__ = ('cache', 'cached', 'file_cache')
 
 
+class CacheMiss(Exception):
+    pass
+
+
 class BaseCache(object):
     """
     Кэширует переданные данные без инвалидации.
@@ -33,11 +37,9 @@ class BaseCache(object):
                     _cache_key = '%s' % md5_constructor('.'.join(parts)).hexdigest()
                 _cache_key = 'c:%s' % _cache_key
 
-                # Берём из кеша
-                result = self.get(_cache_key)
-
-                # Если кеш пуст, считаем по-честному и пишем в кеш
-                if result is None:
+                try:
+                    result = self.get(_cache_key)
+                except CacheMiss:
                     result = func(*args, **kwargs)
                     self.set(_cache_key, result, timeout)
 
@@ -53,9 +55,8 @@ class RedisCache(BaseCache):
     def get(self, cache_key):
         data = self.conn.get(cache_key)
         if data is None:
-            return None
-        else:
-            return pickle.loads(data)
+            raise CacheMiss
+        return pickle.loads(data)
 
     def set(self, cache_key, data, timeout=None):
         pickled_data = pickle.dumps(data, -1)
@@ -84,20 +85,20 @@ class FileCache(BaseCache):
         digest = md5_constructor(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
-    def get(self, key, default=None):
+    def get(self, key):
         filename = self._key_to_filename(key)
         try:
             # Если файл старый, то удаляем его и симулируем промах
             if time.time() >= os.stat(filename).st_mtime:
                 self.delete(filename)
-                return default
+                raise CacheMiss
 
             f = open(filename, 'rb')
             data = pickle.load(f)
             f.close()
             return data
         except (IOError, OSError, EOFError, pickle.PickleError):
-            return default
+            raise CacheMiss
 
     def set(self, key, data, timeout=None):
         filename = self._key_to_filename(key)
@@ -131,6 +132,7 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-
-cache_dir = os.path.join(settings.HOME_DIR, settings.FILE_CACHE_DIR)
+# Не используем os.path.join здесь потому как он сильно хитрожопый:
+# если не первый аргумент начинается на /, то он понимается как абсолютный путь
+cache_dir = settings.HOME_DIR + settings.FILE_CACHE_DIR
 file_cache = FileCache(cache_dir)

@@ -122,7 +122,11 @@ def invalidate_from_dict(model, values):
     pipe = redis_conn.pipeline(transaction=False)
     # Optimistic locking: we hope schemes and invalidators won't change while we remove them
     # Ignoring this could lead to cache key hanging with it's invalidator removed
-    pipe.watch(version_key, *conjs_keys)
+    # HACK: fix for strange WATCH handling in redis-py 2.4.6+
+    if hasattr(pipe, 'pipeline_execute_command'):
+        pipe.pipeline_execute_command('watch', version_key, *conjs_keys)
+    else:
+        pipe.watch(version_key, *conjs_keys)
     pipe.get(version_key)
     pipe.sunion(conjs_keys)
     _, version, cache_keys = pipe.execute()
