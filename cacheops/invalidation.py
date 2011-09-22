@@ -122,7 +122,7 @@ def invalidate_from_dict(model, values):
     pipe.watch(version_key, *conjs_keys)
     pipe.get(version_key)
     pipe.sunion(conjs_keys)
-    _, version, queries = pipe.execute()
+    _, version, cache_keys = pipe.execute()
 
     # Если версия схем устарела, то список запросов для инвалидации может быть неполным и всё нужно переделать
     # Такое будет случаться всё реже по мере заполнения схем
@@ -133,13 +133,13 @@ def invalidate_from_dict(model, values):
         cache_schemes.load_schemes(model)
         invalidate_from_dict(model, values)
 
-    elif queries or conjs_keys:
+    elif cache_keys or conjs_keys:
         # conjs_keys указывают на инвалидируемые запросы, так что они больше не понадобятся
         # Вообще могут быть другие конъюнкции не затронутые текущим объектом,
         # но указывающие на инвалидируемые запросы, они останутся висеть какое-то время
         try:
             txn = redis_conn.pipeline()
-            txn.delete(*(list(queries) + conjs_keys))
+            txn.delete(*(list(cache_keys) + conjs_keys))
             txn.execute()
         except WatchError:
             # пока мы тут крутились множества соотв. conjs_keys могли пополниться
@@ -168,7 +168,7 @@ def invalidate_model(model):
         conjs_keys = conjs_keys.split()
 
     if conjs_keys:
-        queries = redis_conn.sunion(conjs_keys)
-        redis_conn.delete(*(list(queries) + conjs_keys))
+        cache_keys = redis_conn.sunion(conjs_keys)
+        redis_conn.delete(*(list(cache_keys) + conjs_keys))
 
     cache_schemes.clear(model)
