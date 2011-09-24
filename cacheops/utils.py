@@ -25,11 +25,9 @@ class MonkeyProxy(object):
 
 def monkey_mix(cls, mixin, methods=None):
     """
-    Процедура миксина в уже существующий класс в стиле обезьяних патчей.
-    На самом деле не делает обычный миксин, т.е. не использует множественное наследование,
-        а просто переписывает методы класса методами миксина поверх.
-    Методы миксина могут вызывать оригинальные методы с помощью специального прокси хранящегося
-    в классовом аттрибуте _no_monkey:
+    Mixes a mixin into existing class.
+    Does not use actual multi-inheritance mixins, just monkey patches methods.
+    Mixin methods can call copies of original ones stored in `_no_monkey` proxy:
 
     class SomeMixin(object):
         def do_smth(self, arg):
@@ -54,12 +52,11 @@ def monkey_mix(cls, mixin, methods=None):
 
 def dnf(where, alias):
     """
-    Приводит дерево SQL-запроса к дизъюнктивной форме.
-    Как правило, для queryset-а составленого не долбоёбом, получим ДНФ.
+    Converts sql condition tree to DNF.
 
-    Отрицательные условия и условия с lookup отличными от exact и in превращаются
-    в пустые (всегда истинные) конъюнкции. Условия на приджойненые таблицы тоже.
-    Lookup in разворачивается в = or = or = ...
+    Any negations, conditions with lookups other than __exact or __in,
+    conditions on joined models and subrequests are ignored.
+    __in is converted into = or = or = ...
     """
     def negate(el):
         return (el[0], el[1], not el[2])
@@ -90,14 +87,14 @@ def dnf(where, alias):
             elif len(chilren_dnfs) == 1:
                 result = chilren_dnfs[0]
             else:
-                # В случае OR просто объединяем полученные дизъюнкции
+                # Just unite children joined with OR
                 if where.connector == OR:
                     result = reduce(concat, chilren_dnfs)
-                # В случае AND выполняем декртово произведение списков и объединяем конъюнкции
+                # Use Cartesian product to AND children
                 else:
                     result = [reduce(concat, p) for p in product(*chilren_dnfs)]
 
-            # Если у нас стоит отрицание, то выворачиваем форму
+            # Negating and expanding brackets
             if where.negated:
                 result = [map(negate, p) for p in product(*result)]
 
@@ -106,9 +103,11 @@ def dnf(where, alias):
     result = _dnf(where)
     if result is None:
         return [[]]
-    # Вырезаем отрицательные термы и само отрицание
+    # Cutting out negative terms and negation itself
     result = map(strip_negates, result)
-    # Если есть хоть одна пустая конъюнкция она поглощает остальные
+    # Any empty conjunction eats up the rest
+    # NOTE: a more elaborate DNF reduction is not really needed,
+    #       just keep your querysets sane.
     if not all(result):
         return [[]]
     return result
@@ -116,7 +115,7 @@ def dnf(where, alias):
 
 def conj_scheme(conj):
     """
-    Возвращает схему элементарной конъюнкции.
-    В текущей реализации схема - это отсортированная последовательность полей
+    Return a scheme of conjunction.
+    Which is just a sorted tuple of field names.
     """
     return tuple(sorted(imap(itemgetter(0), conj)))

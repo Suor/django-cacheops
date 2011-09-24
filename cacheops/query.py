@@ -405,7 +405,7 @@ class ManagerMixin(object):
             #       some undesirable attributes or other objects attached.
             #       RelatedField accessors do that, for example.
             #
-            #       So we strip down any _FIELDNAME_cache attrs before saving
+            #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
             # Stripping up undesirable attributes
             unwanted_attrs = [k for k in instance.__dict__.keys() if k.startswith('_') and k.endswith('_cache')]

@@ -21,16 +21,16 @@ class CacheMiss(Exception):
 
 class BaseCache(object):
     """
-    Кэширует переданные данные без инвалидации.
+    Simple cache with time-based invalidation
     """
     def cached(self, cache_key=None, timeout=None):
         """
-        Декоратор кеширующий вызовы функции
+        A decorator for caching function calls
         """
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                # Вычисляем ключ кеширования
+                # Calculating cache key based on func module, name and arguments
                 _cache_key = cache_key
                 if _cache_key is None:
                     parts = (func.__module__, func.__name__, repr(args), repr(kwargs))
@@ -69,18 +69,21 @@ cache = RedisCache(redis_conn)
 cached = cache.cached
 
 
-FILE_CACHE_MAX_ENTRIES = getattr(settings, 'FILE_CACHE_MAX_ENTRIES', 40000)
-FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60)
+FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
 
 class FileCache(BaseCache):
-    def __init__(self, path, max_entries=FILE_CACHE_MAX_ENTRIES, timeout=FILE_CACHE_TIMEOUT):
+    """
+    A file cache which fixes bugs and misdesign in django default one.
+    Uses mtimes in the future to designate expire time. This makes unnecessary
+    reading stale files.
+    """
+    def __init__(self, path, timeout=FILE_CACHE_TIMEOUT):
         self._dir = path
-        self._max_entries = max_entries
         self._default_timeout = timeout
 
     def _key_to_filename(self, key):
         """
-        Возвращает имя файла, соответствующее переданному ключу кеша
+        Returns a filename corresponding to cache key
         """
         digest = md5_constructor(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
@@ -88,7 +91,7 @@ class FileCache(BaseCache):
     def get(self, key):
         filename = self._key_to_filename(key)
         try:
-            # Если файл старый, то удаляем его и симулируем промах
+            # Remove file if it's stale
             if time.time() >= os.stat(filename).st_mtime:
                 self.delete(filename)
                 raise CacheMiss
@@ -111,14 +114,14 @@ class FileCache(BaseCache):
             if not os.path.exists(dirname):
                 os.makedirs(dirname)
 
-            # Пишем эксклюзивно, чтобы избежать одновременной записи в файл и порчи данных
+            # Use open with exclusive rights to prevent data corruption
             f = os.open(filename, os.O_EXCL | os.O_WRONLY | os.O_CREAT)
             try:
                 os.write(f, pickle.dumps(data, pickle.HIGHEST_PROTOCOL))
             finally:
                 os.close(f)
 
-            # mtime отмечает время устаревания, ставим его в будущее
+            # Set mtime to expire time
             os.utime(filename, (0, time.time() + timeout))
         except (IOError, OSError):
             pass
@@ -126,13 +129,11 @@ class FileCache(BaseCache):
     def delete(self, fname):
         try:
             os.remove(fname)
-            # Пытаемся удалить директорию - вдруг пустая?
+            # Trying to remove directory in case it's empty
             dirname = os.path.dirname(fname)
             os.rmdir(dirname)
         except (IOError, OSError):
             pass
 
-# Не используем os.path.join здесь потому как он сильно хитрожопый:
-# если не первый аргумент начинается на /, то он понимается как абсолютный путь
 cache_dir = settings.HOME_DIR + settings.FILE_CACHE_DIR
 file_cache = FileCache(cache_dir)
