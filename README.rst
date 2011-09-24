@@ -5,6 +5,9 @@ A slick app that supports automatic or manual queryset caching and automatic
 granular event-driven invalidation. It can also cache results of user functions
 and invalidate them by time or the same way as querysets.
 
+It uses `redis <http://redis.io/>`_ as backend for ORM cache and redis or
+filesystem for simple time-invalidated one.
+
 
 Requirements
 ------------
@@ -16,13 +19,12 @@ Requirements
 Installation
 ------------
 
-First you will need `redis <http://redis.io/>`_, you can search for ``redis-server``
-or ``redis`` package in your system packet manager. Or you can
-`install it from source <http://redis.io/download>`_.
+Using pip::
 
-Then install python redis client, clone cacheops and symlink it to your python path::
+    $ pip install django-cacheops
 
-    $ pip install redis
+Or you can get latest one from github::
+
     $ git clone git://github.com/Suor/django-cacheops.git
     $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/import/path
 
