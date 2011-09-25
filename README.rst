@@ -26,7 +26,7 @@ Using pip::
 Or you can get latest one from github::
 
     $ git clone git://github.com/Suor/django-cacheops.git
-    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/import/path
+    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/your/python/import/path/
 
 
 Setup
@@ -86,7 +86,7 @@ Here you can specify which ops should be cached for queryset, for example, this 
 
     qs = Article.objects.filter(tag=2).cache(ops=['count'])
     paginator = Paginator(objects, ipp)
-    artciles = list(pager.page(page_num)) # hits database
+    articles = list(pager.page(page_num)) # hits database
 
 will cache ``.count()`` call in Paginator but not later in articles fetch.
 There are three possible actions - ``get``, ``fetch`` and ``count``. You can
