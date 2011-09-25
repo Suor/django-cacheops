@@ -69,6 +69,7 @@ cache = RedisCache(redis_conn)
 cached = cache.cached
 
 
+FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/file_cache')
 FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
 
 class FileCache(BaseCache):
@@ -135,5 +136,4 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-cache_dir = settings.HOME_DIR + settings.FILE_CACHE_DIR
-file_cache = FileCache(cache_dir)
+file_cache = FileCache(FILE_CACHE_DIR)
