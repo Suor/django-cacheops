@@ -44,7 +44,9 @@ Setup redis connection and enable caching for desired models::
     CACHEOPS_REDIS = {
         'host': 'localhost', # redis-server is on same machine
         'port': 6379,        # default redis port
-        #'db': 1,            # SELECT non-default redis database
+        'db': 1,             # SELECT non-default redis database
+                             # using separate redis db or redis instance
+                             # is highly recommended
         'socket_timeout': 3,
     }
 
@@ -144,8 +146,59 @@ in ``@cacheoped_as()`` to make invalidation more granular. We also add an
 Invalidation
 ------------
 
-Cacheops uses both time and event-driven invalidation and is fully automatic.
-The event-driven one listens on model signals and invalidates appropriate caches
-on Model.save() and .delete().
+Cacheops uses both time and event-driven invalidation. The event-driven one
+listens on model signals and invalidates appropriate caches on Model.save()
+and .delete().
 
-Usually you won't need to do anything with it.
+Invalidation tries to be granular which means it won't invalidate a queryset
+that cannot be influenced by added/updated/deleted object judjing by query
+conditions. Most time this will do what you want, if it's not you can use one
+of the following::
+
+    from cacheops import invalidate_obj, invalidate_model
+
+    invalidate_obj(some_article)  # invalidates queries affected by some_article
+    invalidate_model(Article)     # invalidates all queries for model
+
+And last there is ``invalidate`` command::
+
+    ./manage.py invalidate articles.Artcile.34  # same as invalidate_obj
+    ./manage.py invalidate articles.Article     # same as invalidate_model
+    ./manage.py invalidate articles   # invalidate all models in articles
+
+And the one that FLUSHES cacheops redis database::
+
+    ./manage.py invalidate all
+
+Don't use that if you share redis database for both cache and something else.
+
+
+CAVEATS
+-------
+
+1. Conditions other than __exact or __in don't provide more granularity for
+   invalidation.
+2. Conditions on related models don't provide it either.
+3. Update of "selected_related" object does not invalidate cache for queryset.
+4. Mass updates don't trigger invalidation.
+5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
+
+7. Conditions on subqueries don't affect invalidation.
+
+9. Aggregates is not implemented yet.
+10. Timeout in queryset and cacheoped_as cannot ne larger that default.
+
+Here 1, 3, 5, 10 are part of design compromise, trying to solve them will make
+things complicated and slow. 2 and 7 can be implemented if needed, but it's
+probably counter-productive since one can just break queries into simple ones,
+which cache better. 4 is a deliberate choice, making it "right" will flush
+cache too much when update conditions are orthogonal to most queries conditions.
+
+
+TODO
+----
+
+- docs about simple cache
+- docs about file cache
+- add .delete(cache_key) method to simple and file cache
+- .invalidate() method on simple cached funcs
