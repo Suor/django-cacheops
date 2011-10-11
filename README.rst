@@ -32,7 +32,7 @@ Or you can get latest one from github::
 Setup
 -----
 
-Add ``cacheops`` to your ``INSTALLED_APPS`` first::
+Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it::
 
     INSTALLED_APPS = (
         'cacheops',

@@ -377,14 +377,17 @@ class QuerySetMixin(object):
 
 
 class ManagerMixin(object):
-    def contribute_to_class(self, cls, name):
-        self._no_monkey.contribute_to_class(self, cls, name)
+    def _install_cacheops(self, cls):
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
             # Setting up signals
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
             _old_objs[get_model_name(cls)] = {}
+
+    def contribute_to_class(self, cls, name):
+        self._no_monkey.contribute_to_class(self, cls, name)
+        self._install_cacheops(cls)
 
     def _post_save(self, sender, instance, **kwargs):
         """
@@ -465,6 +468,11 @@ def install_cacheops():
     monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
+
+    # Install profile and signal handlers for any earlier created models
+    from django.db.models import get_models
+    for model in get_models():
+        model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
     from django.contrib.admin.options import ModelAdmin
