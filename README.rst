@@ -30,7 +30,7 @@ Then install python redis client, clone cacheops and symlink it to your python p
 Setup
 -----
 
-Add `cacheops` to your `INSTALLED_APPS` first::
+Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it::
 
     INSTALLED_APPS = (
         'cacheops',
@@ -42,7 +42,9 @@ Setup redis connection and enable caching for desired models::
     CACHEOPS_REDIS = {
         'host': 'localhost', # redis-server is on same machine
         'port': 6379,        # default redis port
-        #'db': 1,            # SELECT non-default redis database
+        'db': 1,             # SELECT non-default redis database
+                             # using separate redis db or redis instance
+                             # is highly recommended
         'socket_timeout': 3,
     }
 
