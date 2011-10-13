@@ -6,7 +6,7 @@ except ImportError:
 from functools import wraps
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Manager
+from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils.hashcompat import md5_constructor
@@ -79,11 +79,21 @@ def cacheoped_method(action='fetch', extra=None):
     return decorator
 
 
-def cacheoped_as(queryset, extra=None, timeout=None):
+def cacheoped_as(sample, extra=None, timeout=None):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
+    # If we unexpectedly get list instead of queryset return identity decorator.
+    # Paginator could do this when page.object_list is empty.
+    # TODO: think of better way doing this.
+    if isinstance(sample, (list, tuple)):
+        return lambda func: func
+    if isinstance(sample, Model):
+        queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+    else:
+        queryset = sample
+
     queryset._require_cacheprofile()
     if timeout and timeout > queryset._cacheprofile['timeout']:
         raise NotImplementedError('timeout override should be smaller than default')
@@ -280,7 +290,16 @@ class QuerySetMixin(object):
         return self.cloning(0)
 
     def _clone(self, klass=None, setup=False, **kwargs):
-        if self._cloning or klass is not None:
+        if self._cloning:
+            return self.clone(klass, setup, **kwargs)
+        elif klass is not None:
+            # HACK: monkey patch self.query.clone for single call
+            #       to return itself instead of cloning
+            original_query_clone = self.query.clone
+            def query_clone():
+                self.query.clone = original_query_clone
+                return self.query
+            self.query.clone = query_clone
             return self.clone(klass, setup, **kwargs)
         else:
             self.__dict__.update(kwargs)
