@@ -258,7 +258,15 @@ class QuerySetMixin(object):
         return self.cloning(0)
 
     def _clone(self, klass=None, setup=False, **kwargs):
-        if self._cloning or klass is not None:
+        if self._cloning:
+            return self.clone(klass, setup, **kwargs)
+        elif klass is not None:
+            # На один вызов заставим query.clone вернуть оригиальный объект, не выполняя клонирование
+            original_query_clone = self.query.clone
+            def query_clone():
+                self.query.clone = original_query_clone
+                return self.query
+            self.query.clone = query_clone
             return self.clone(klass, setup, **kwargs)
         else:
             self.__dict__.update(kwargs)
