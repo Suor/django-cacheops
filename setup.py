@@ -2,11 +2,11 @@ from setuptools import setup
 
 setup(
     name='django-cacheops',
-    version='0.8.1',
+    version='0.9',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
-    description='slick ORM cache and invalidation for Django',
+    description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
     long_description=open('README.rst').read(),
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
