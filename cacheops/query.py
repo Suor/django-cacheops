@@ -6,7 +6,7 @@ except ImportError:
 from functools import wraps
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Manager
+from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils.hashcompat import md5_constructor
@@ -79,13 +79,21 @@ def cacheoped_method(action='fetch', extra=None):
     return decorator
 
 
-def cacheoped_as(queryset, extra=None, timeout=None):
+def cacheoped_as(sample, extra=None, timeout=None):
     """
     Кэширует результаты функции и инвалидирует как переданный queryset.
     NOTE: Кэширует всегда игнорируя профиль queryset-а
     TODO: Можно оптимизировать для того случая когда передаём простой queryset
           вроде Category.objects.all(), чтобы не ренденрить sql-запрос и не считать ДНФ
     """
+    # TODO: подумать как правильно разрулить ситуацию, когда sample внезапно оказался списком (pager, например, порождает такое)
+    if isinstance(sample, (list, tuple)):
+        return lambda func: func
+    if isinstance(sample, Model):
+        queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+    else:
+        queryset = sample
+
     queryset._require_cacheprofile()
     if timeout and timeout > queryset._cacheprofile['timeout']:
         raise NotImplementedError('timeout override should be smaller than default')
