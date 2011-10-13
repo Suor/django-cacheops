@@ -9,8 +9,8 @@ filesystem for simple time-invalidated one.
 
 And there is more to it:
 
-- decorator to cache any user function
-- extension for jinja2 to cache template fragments
+- decorator to cache any user function as queryset
+- extension for jinja2 to cache template fragments as querysets
 - a couple of hacks to make django faster
 
 
@@ -185,9 +185,9 @@ or
 
 ::
 
-    {% cached queryset [, timeout=<timeout>] [, cache_key=<key addition>] %}
+    {% cached [timeout=<timeout>] [, cache_key=<key addition>] %}
         ...
-    {% cached %}
+    {% endcached %}
 
 
 CAVEATS
