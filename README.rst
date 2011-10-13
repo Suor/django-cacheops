@@ -2,18 +2,22 @@ Cacheops
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
-granular event-driven invalidation. It can also cache results of user functions
-and invalidate them by time or the same way as querysets.
+granular event-driven invalidation.
 
 It uses `redis <http://redis.io/>`_ as backend for ORM cache and redis or
 filesystem for simple time-invalidated one.
 
+And there is more to it:
+
+- decorator to cache any user function
+- extension for jinja2 to cache template fragments
+- a couple of hacks to make django faster
+
 
 Requirements
 ------------
-| Python 2.6, Django 1.2 and Redis 2.2.7.
-| Later djangos not tested but will probably do as well.
-  I'll appreciate any feedback positive or negative.
+
+Python 2.6, Django 1.2 and Redis 2.2.7.
 
 
 Installation
@@ -26,18 +30,13 @@ Using pip::
 Or you can get latest one from github::
 
     $ git clone git://github.com/Suor/django-cacheops.git
-    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/your/python/import/path/
+    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/path/
 
 
 Setup
 -----
 
-Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it::
-
-    INSTALLED_APPS = (
-        'cacheops',
-        ...
-    )
+Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
 Setup redis connection and enable caching for desired models::
 
@@ -173,6 +172,24 @@ And the one that FLUSHES cacheops redis database::
 Don't use that if you share redis database for both cache and something else.
 
 
+Jinja2 extension
+----------------
+
+Add ``cacheops.jinja2.cache`` to your extensions and use::
+
+    {% cacheoped_as queryset [, timeout=<timeout>] [, extra=<key addition>] %}
+        ... some template code ...
+    {% endcacheoped_as %}
+
+or
+
+::
+
+    {% cached queryset [, timeout=<timeout>] [, cache_key=<key addition>] %}
+        ...
+    {% cached %}
+
+
 CAVEATS
 -------
 
@@ -202,3 +219,5 @@ TODO
 - docs about file cache
 - add .delete(cache_key) method to simple and file cache
 - .invalidate() method on simple cached funcs
+- queryset brothers
+- jinja2 tag for "get random of some list" block with lazy rendering
