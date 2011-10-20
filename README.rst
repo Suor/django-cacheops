@@ -185,7 +185,7 @@ or
 
 ::
 
-    {% cached [timeout=<timeout>] [, cache_key=<key addition>] %}
+    {% cached [timeout=<timeout>] [, extra=<key addition>] %}
         ...
     {% endcached %}
 
