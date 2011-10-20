@@ -317,7 +317,9 @@ class QuerySetMixin(object):
 
     def iterator(self):
         superiter = self._no_monkey.iterator
-        cache_this = self._cacheprofile is not None and 'fetch' in self._cacheops
+        cache_this = None
+        if hasattr(self,'_cacheprofile'):
+          cache_this = self._cacheprofile is not None and 'fetch' in self._cacheops
 
         if cache_this:
             cache_key = self._cache_key()
