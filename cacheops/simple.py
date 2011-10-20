@@ -23,25 +23,30 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, cache_key=None, timeout=None):
+    def cached(self, extra=None, timeout=None):
         """
         A decorator for caching function calls
         """
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                # Calculating cache key based on func module, name and arguments
-                _cache_key = cache_key
-                if _cache_key is None:
-                    parts = (func.__module__, func.__name__, repr(args), repr(kwargs))
-                    _cache_key = '%s' % md5_constructor('.'.join(parts)).hexdigest()
-                _cache_key = 'c:%s' % _cache_key
+                # Calculating cache key based on func and arguments
+                md5 = md5_constructor()
+                md5.update('%s.%s' % (func.__module__, func.__name__))
+                if extra is not None:
+                    md5.update(str(extra))
+                if args:
+                    md5.update(repr(args))
+                if kwargs:
+                    md5.update(repr(sorted(kwargs.items())))
+
+                cache_key = 'c:%s' % md5.hexdigest()
 
                 try:
-                    result = self.get(_cache_key)
+                    result = self.get(cache_key)
                 except CacheMiss:
                     result = func(*args, **kwargs)
-                    self.set(_cache_key, result, timeout)
+                    self.set(cache_key, result, timeout)
 
                 return result
             return wrapper

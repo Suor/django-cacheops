@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-
 import re
 
 from django.utils.safestring import mark_safe
@@ -10,17 +9,13 @@ from jinja2.ext import Extension
 import cacheops
 
 
-CACHEOPS_DECORATORS = dict(cacheoped_as=cacheops.cacheoped_as, cached=cacheops.cached)
-CACHE_KEY_ARGS = dict(cacheoped_as='extra', cached='cache_key')
-
-
 class CacheopsExtension(Extension):
-    tags = set(CACHEOPS_DECORATORS.keys())
+    tags = ['cacheoped_as', 'cached']
 
     def parse(self, parser):
         lineno = parser.stream.current.lineno
         tag_name = parser.stream.current.value
-        tag_location = '%s.%s' % (parser.name, lineno)
+        tag_location = '%s:%s' % (parser.name, lineno)
 
         parser.stream.next()
         args, kwargs = self.parse_args(parser)
@@ -35,9 +30,8 @@ class CacheopsExtension(Extension):
     def handle_tag(self, tag_name, tag_location, *args, **kwargs):
         caller = kwargs.pop('caller')
 
-        cacheops_decorator = CACHEOPS_DECORATORS[tag_name]
-        cache_key_arg = CACHE_KEY_ARGS[tag_name]
-        kwargs[cache_key_arg] = str(kwargs.get(cache_key_arg, '')) + tag_location
+        cacheops_decorator = getattr(cacheops, tag_name)
+        kwargs['extra'] = str(kwargs.get('extra', '')) + tag_location
 
         @cacheops_decorator(*args, **kwargs)
         def _handle_tag():
