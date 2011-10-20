@@ -106,9 +106,9 @@ You can cache and invalidate result of a function the same way as a queryset.
 Cache of next function will be invalidated on any Article change, addition
 or deletetion::
 
-    from cacheops import cacheoped_as
+    from cacheops import cached_as
 
-    @cacheoped_as(Article.objects.all())
+    @cached_as(Article.objects.all())
     def article_stats():
         return {
             'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
@@ -124,7 +124,7 @@ you should use a local function::
 
     def articles_block(category, count=5):
 
-        @cacheoped_as(Article.objects.filter(category=category), extra=count)
+        @cached_as(Article.objects.filter(category=category), extra=count)
         def _articles_block():
             qs = Article.objects.filter(category=category)
             articles = list(qs.filter(photo=True)[:count])
@@ -137,7 +137,7 @@ you should use a local function::
         return _articles_block()
 
 Using local function gives additional advantage: we can filter queryset used
-in ``@cacheoped_as()`` to make invalidation more granular. We also add an
+in ``@cached_as()`` to make invalidation more granular. We also add an
 ``extra`` to make diffrent keys for calls with same ``category`` but diffrent
 ``count``.
 
@@ -177,9 +177,9 @@ Jinja2 extension
 
 Add ``cacheops.jinja2.cache`` to your extensions and use::
 
-    {% cacheoped_as queryset [, timeout=<timeout>] [, extra=<key addition>] %}
+    {% cached_as queryset [, timeout=<timeout>] [, extra=<key addition>] %}
         ... some template code ...
-    {% endcacheoped_as %}
+    {% endcached_as %}
 
 or
 
@@ -203,7 +203,7 @@ CAVEATS
 7. Conditions on subqueries don't affect invalidation.
 
 9. Aggregates is not implemented yet.
-10. Timeout in queryset and cacheoped_as cannot ne larger that default.
+10. Timeout in queryset and cached_as cannot be larger than default.
 
 Here 1, 3, 5, 10 are part of design compromise, trying to solve them will make
 things complicated and slow. 2 and 7 can be implemented if needed, but it's

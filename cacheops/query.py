@@ -16,7 +16,7 @@ from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
 
-__all__ = ('cacheoped_method', 'cacheoped_as', 'install_cacheops')
+__all__ = ('cacheoped_method', 'cached_as', 'install_cacheops')
 
 _old_objs = {}
 _local_get_cache = {}
@@ -57,7 +57,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
 
 
 def cacheoped_method(action='fetch', extra=None):
-    # TODO: remove this decorator, use @cacheoped_as on local function instead
+    # TODO: remove this decorator, use @cached_as on local function instead
     def decorator(func):
         key_extra = extra if extra is not None else '%s.%s' % (func.__module__, func.__name__)
 
@@ -79,7 +79,7 @@ def cacheoped_method(action='fetch', extra=None):
     return decorator
 
 
-def cacheoped_as(sample, extra=None, timeout=None):
+def cached_as(sample, extra=None, timeout=None):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
@@ -440,7 +440,7 @@ class ManagerMixin(object):
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
-            cacheoped_as(instance.__class__.objects \
+            cached_as(instance.__class__.objects \
                 .filter(**{filter_key: getattr(instance, key)}), extra='') \
                 (lambda: [instance])()
 

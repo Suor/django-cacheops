@@ -10,7 +10,7 @@ import cacheops
 
 
 class CacheopsExtension(Extension):
-    tags = ['cacheoped_as', 'cached']
+    tags = ['cached_as', 'cached']
 
     def parse(self, parser):
         lineno = parser.stream.current.lineno
