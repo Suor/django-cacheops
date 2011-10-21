@@ -240,18 +240,16 @@ class QuerySetMixin(object):
         cond_dnf = dnf(self.query.where, self.model._meta.db_table)
         cache_thing(self.model, cache_key, results, cond_dnf, timeout=self._cachetimeout)
 
-    def cache(self, ops=None, timeout=None, clone=False, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None):
         """
         Enables caching for given ops
             ops        - a subset of ['get', 'fetch', 'count'],
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
-            clone      - return modified clone of self, do not change self
             write_only - don't try fetching from cache, still write result there
 
         NOTE: you actually can disable caching by omiting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
-        TODO: get rid of clone flag, .clone().cache(...) should be used instead
         """
         self._require_cacheprofile()
         if timeout and timeout > self._cacheprofile['timeout']:
@@ -261,26 +259,24 @@ class QuerySetMixin(object):
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
-        qs = self._clone() if clone else self
 
         if ops is not None:
-            qs._cacheops = set(ops)
+            self._cacheops = set(ops)
         if timeout is not None:
-            qs._cachetimeout = timeout
+            self._cachetimeout = timeout
         if write_only is not None:
-            qs._cache_write_only = write_only
-        return qs
+            self._cache_write_only = write_only
+        return self
 
     def nocache(self, clone=False):
         """
         Convinience method, turns off caching for this queryset
-        TODO: get rid of clone flag, .clone().nocache(...) should be used instead
         """
         # cache profile not present means caching is not enabled for this model
         if self._cacheprofile is None:
-            return self.clone() if clone else self
+            return self
         else:
-            return self.cache(ops=[], clone=clone)
+            return self.cache(ops=[])
 
     def cloning(self, cloning=1000):
         self._cloning = cloning
