@@ -16,7 +16,7 @@ from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
 
-__all__ = ('cacheoped_method', 'cacheoped_as', 'install_cacheops')
+__all__ = ('cached_method', 'cached_as', 'install_cacheops')
 
 _old_objs = {}
 _local_get_cache = {}
@@ -56,30 +56,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     txn.execute()
 
 
-def cacheoped_method(action='fetch', extra=None):
-    # TODO: remove this decorator, use @cacheoped_as on local function instead
-    def decorator(func):
-        key_extra = extra if extra is not None else '%s.%s' % (func.__module__, func.__name__)
-
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            cache_this = self._cacheprofile is not None and action in self._cacheops
-            if cache_this:
-                cache_key = self._cache_key(extra=key_extra)
-                cache_data = redis_conn.get(cache_key)
-                if cache_data is not None:
-                    return pickle.loads(cache_data)
-
-            result = func(self, *args, **kwargs)
-            if cache_this:
-                self._cache_results(cache_key, result)
-            return result
-
-        return wrapper
-    return decorator
-
-
-def cacheoped_as(sample, extra=None, timeout=None):
+def cached_as(sample, extra=None, timeout=None):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
@@ -118,6 +95,18 @@ def cacheoped_as(sample, extra=None, timeout=None):
             cache_thing(queryset.model, cache_key, result, cond_dnf, timeout or queryset._cachetimeout)
             return result
 
+        return wrapper
+    return decorator
+
+
+def cached_method(op='fetch', extra=None):
+    def decorator(method):
+        @wraps(method)
+        def wrapper(self, *args, **kwargs):
+            func = method
+            if self._cacheprofile is not None and op in self._cacheops:
+                func = cached_as(self, extra=extra or op)(func)
+            return func(self, *args, **kwargs)
         return wrapper
     return decorator
 
@@ -240,18 +229,16 @@ class QuerySetMixin(object):
         cond_dnf = dnf(self.query.where, self.model._meta.db_table)
         cache_thing(self.model, cache_key, results, cond_dnf, timeout=self._cachetimeout)
 
-    def cache(self, ops=None, timeout=None, clone=False, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None):
         """
         Enables caching for given ops
             ops        - a subset of ['get', 'fetch', 'count'],
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
-            clone      - return modified clone of self, do not change self
             write_only - don't try fetching from cache, still write result there
 
         NOTE: you actually can disable caching by omiting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
-        TODO: get rid of clone flag, .clone().cache(...) should be used instead
         """
         self._require_cacheprofile()
         if timeout and timeout > self._cacheprofile['timeout']:
@@ -261,26 +248,24 @@ class QuerySetMixin(object):
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
-        qs = self._clone() if clone else self
 
         if ops is not None:
-            qs._cacheops = set(ops)
+            self._cacheops = set(ops)
         if timeout is not None:
-            qs._cachetimeout = timeout
+            self._cachetimeout = timeout
         if write_only is not None:
-            qs._cache_write_only = write_only
-        return qs
+            self._cache_write_only = write_only
+        return self
 
     def nocache(self, clone=False):
         """
         Convinience method, turns off caching for this queryset
-        TODO: get rid of clone flag, .clone().nocache(...) should be used instead
         """
         # cache profile not present means caching is not enabled for this model
         if self._cacheprofile is None:
-            return self.clone() if clone else self
+            return self
         else:
-            return self.cache(ops=[], clone=clone)
+            return self.cache(ops=[])
 
     def cloning(self, cloning=1000):
         self._cloning = cloning
@@ -348,7 +333,7 @@ class QuerySetMixin(object):
         # if queryset cache is already filled just return its len
         if self._result_cache is not None and not self._iter:
             return len(self._result_cache)
-        return cacheoped_method(action='count', extra='count')(lambda self: self.query.get_count(using=self.db))(self)
+        return cached_method(op='count')(self._no_monkey.count)(self)
 
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
@@ -442,7 +427,7 @@ class ManagerMixin(object):
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
-            cacheoped_as(instance.__class__.objects \
+            cached_as(instance.__class__.objects \
                 .filter(**{filter_key: getattr(instance, key)}), extra='') \
                 (lambda: [instance])()
 
