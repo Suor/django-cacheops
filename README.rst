@@ -189,6 +189,7 @@ or
         ...
     {% endcached %}
 
+Tags work the same way as corresponding decorators.
 
 CAVEATS
 -------
@@ -199,7 +200,7 @@ CAVEATS
 3. Update of "selected_related" object does not invalidate cache for queryset.
 4. Mass updates don't trigger invalidation.
 5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
-
+6. Doesn't work with RawQuerySet.
 7. Conditions on subqueries don't affect invalidation.
 
 9. Aggregates is not implemented yet.
@@ -210,7 +211,8 @@ things complicated and slow. 2 and 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simple ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
-
+6 can be cached as SomeModel.objects.all() but @cached_as() someway covers that
+and is more flexible.
 
 TODO
 ----
