@@ -223,3 +223,5 @@ TODO
 - .invalidate() method on simple cached funcs
 - queryset brothers
 - jinja2 tag for "get random of some list" block with lazy rendering
+- make a version of invalidation with scripting
+- shard cache between multiple redises
