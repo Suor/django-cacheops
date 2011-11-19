@@ -481,7 +481,7 @@ def install_cacheops():
 
     # Install profile and signal handlers for any earlier created models
     from django.db.models import get_models
-    for model in get_models():
+    for model in get_models(include_auto_created=True):
         model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
