@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 try:
     import cPickle as pickle
 except ImportError:
@@ -384,10 +385,15 @@ class ManagerMixin(object):
     def _install_cacheops(self, cls):
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
-            # Setting up signals
+            # Set up signals
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
             _old_objs[get_model_name(cls)] = {}
+
+            # Install auto-created models as their module attributes to make them picklable
+            module = sys.modules[cls.__module__]
+            if not hasattr(module, cls.__name__):
+                setattr(module, cls.__name__, cls)
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
