@@ -188,7 +188,8 @@ class QuerySetMixin(object):
     def __init__(self, *args, **kwargs):
         self._no_monkey.__init__(self, *args, **kwargs)
         self._cloning = 1000
-        if not hasattr(self, '_cacheprofile') and self.model:
+        self._cacheprofile = None
+        if self.model:
             self._cacheprofile = model_profile(self.model)
             self._cache_write_only = False
             if self._cacheprofile is not None:
@@ -303,7 +304,7 @@ class QuerySetMixin(object):
 
     def iterator(self):
         superiter = self._no_monkey.iterator
-        cache_this = self._cacheprofile is not None and 'fetch' in self._cacheops
+        cache_this = self._cacheprofile and 'fetch' in self._cacheops
 
         if cache_this:
             cache_key = self._cache_key()
@@ -337,7 +338,7 @@ class QuerySetMixin(object):
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile is not None and 'get' in self._cacheops:
+        if self._cacheprofile and 'get' in self._cacheops:
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
@@ -371,7 +372,7 @@ class QuerySetMixin(object):
               Yes, if you use .exists() yourself this can cause memory leak.
         """
         # TODO: refactor this one to more understandable something
-        if self._cacheprofile is not None:
+        if self._cacheprofile:
             query_dnf = dnf(self.query.where, self.model._meta.db_table)
             if len(query_dnf) == 1 and len(query_dnf[0]) == 1 and query_dnf[0][0][0] == self.model._meta.pk.name:
                 result = len(self.nocache()) > 0
