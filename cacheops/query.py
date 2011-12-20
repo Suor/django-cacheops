@@ -314,6 +314,8 @@ class QuerySetMixin(object):
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:
+                        signals.pre_init.send(sender=obj.__class__, *[], **obj.__dict__)
+                        signals.post_init.send(sender=obj.__class__, instance=obj)
                         yield obj
                     raise StopIteration
 
