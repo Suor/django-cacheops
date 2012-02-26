@@ -467,7 +467,8 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if action in ('post_add', 'post_remove', 'post_clear'):
         invalidate_model(sender) # NOTE: this is harsh, but what's the alternative?
         invalidate_obj(instance)
-        # TODO: we should invalidate referenced objects as well
+        # TODO: more granular invalidation for referenced models
+        invalidate_model(model)
 
 
 def install_cacheops():
