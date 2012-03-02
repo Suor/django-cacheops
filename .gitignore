@@ -3,3 +3,7 @@ dist
 *.egg-info
 build
 
+bin/
+include/
+lib/
+local
