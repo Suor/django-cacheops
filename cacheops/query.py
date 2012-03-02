@@ -487,15 +487,17 @@ def install_cacheops():
         model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
-    from django.contrib.admin.options import ModelAdmin
-    def ModelAdmin_queryset(self, request):
-        queryset = o_ModelAdmin_queryset(self, request)
-        if queryset._cacheprofile is None:
-            return queryset
-        else:
-            return queryset.nocache()
-    o_ModelAdmin_queryset = ModelAdmin.queryset
-    ModelAdmin.queryset = ModelAdmin_queryset
+    from django.conf import settings
+    if 'django.contrib.admin' in settings.INSTALLED_APPS:
+        from django.contrib.admin.options import ModelAdmin
+        def ModelAdmin_queryset(self, request):
+            queryset = o_ModelAdmin_queryset(self, request)
+            if queryset._cacheprofile is None:
+                return queryset
+            else:
+                return queryset.nocache()
+        o_ModelAdmin_queryset = ModelAdmin.queryset
+        ModelAdmin.queryset = ModelAdmin_queryset
 
     # bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
