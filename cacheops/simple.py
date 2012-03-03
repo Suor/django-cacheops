@@ -9,7 +9,7 @@ import os, time
 from django.utils.hashcompat import md5_constructor
 from django.conf import settings
 
-from cacheops.conf import redis_conn
+from cacheops.conf import redis_client
 
 
 __all__ = ('cache', 'cached', 'file_cache')
@@ -70,7 +70,7 @@ class RedisCache(BaseCache):
         else:
             self.conn.set(cache_key, pickled_data)
 
-cache = RedisCache(redis_conn)
+cache = RedisCache(redis_client)
 cached = cache.cached
 
 

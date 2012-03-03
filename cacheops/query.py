@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet,
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils.hashcompat import md5_constructor
 
-from cacheops.conf import model_profile, redis_conn
+from cacheops.conf import model_profile, redis_client
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
@@ -35,7 +35,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     schemes = map(conj_scheme, cond_dnf)
     cache_schemes.ensure_known(model, schemes)
 
-    txn = redis_conn.pipeline()
+    txn = redis_client.pipeline()
 
     # Write data to cache
     pickled_data = pickle.dumps(data, -1)
@@ -88,7 +88,7 @@ def cached_as(sample, extra=None, timeout=None):
         def wrapper(*args):
             # NOTE: These args must not effect function result.
             #       I'm keeping them to cache view functions.
-            cache_data = redis_conn.get(cache_key)
+            cache_data = redis_client.get(cache_key)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -310,7 +310,7 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cache_write_only:
                 # Trying get data from cache
-                cache_data = redis_conn.get(cache_key)
+                cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from redis.exceptions import WatchError
 
-from cacheops.conf import redis_conn
+from cacheops.conf import redis_client
 from cacheops.utils import get_model_name
 
 
@@ -43,7 +43,7 @@ class ConjSchemes(object):
     def load_schemes(self, model):
         model_name = get_model_name(model)
 
-        txn = redis_conn.pipeline()
+        txn = redis_client.pipeline()
         txn.get(self.get_version_key(model))
         txn.smembers(self.get_lookup_key(model_name))
         version, members = txn.execute()
@@ -84,7 +84,7 @@ class ConjSchemes(object):
                 schemes = self.load_schemes(model)
             if new_schemes - schemes:
                 # Write new schemes to redis
-                txn = redis_conn.pipeline()
+                txn = redis_client.pipeline()
                 txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
 
                 lookup_key = self.get_lookup_key(model_name)
@@ -102,8 +102,8 @@ class ConjSchemes(object):
         """
         Clears schemes for models
         """
-        redis_conn.delete(self.get_lookup_key(model))
-        redis_conn.incr(self.get_version_key(model))
+        redis_client.delete(self.get_lookup_key(model))
+        redis_client.incr(self.get_version_key(model))
 
 cache_schemes = ConjSchemes()
 
@@ -142,7 +142,7 @@ def invalidate_from_dict(model, values):
             pipe.multi()
             pipe.delete(*(list(cache_keys) + conjs_keys))
 
-    redis_conn.transaction(_invalidate)
+    redis_client.transaction(_invalidate)
 
 
 def invalidate_obj(obj):
@@ -158,15 +158,15 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    conjs_keys = redis_conn.keys('conj:%s:*' % get_model_name(model))
+    conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
     if isinstance(conjs_keys, str):
         conjs_keys = conjs_keys.split()
 
     if conjs_keys:
-        cache_keys = redis_conn.sunion(conjs_keys)
-        redis_conn.delete(*(list(cache_keys) + conjs_keys))
+        cache_keys = redis_client.sunion(conjs_keys)
+        redis_client.delete(*(list(cache_keys) + conjs_keys))
 
     cache_schemes.clear(model)
 
 def invalidate_all():
-    redis_conn.flushdb()
+    redis_client.flushdb()
