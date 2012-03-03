@@ -3,8 +3,7 @@ from django.core.management.base import LabelCommand, CommandError
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import get_app, get_model, get_models
 
-from cacheops import invalidate_model, invalidate_obj
-from cacheops.conf import redis_conn
+from cacheops.invalidation import *
 
 
 class Command(LabelCommand):
@@ -27,7 +26,7 @@ class Command(LabelCommand):
                 raise CommandError('Wrong model/app name syntax: %s\nType <app_name> or <app_name>.<model_name>' % label)
 
     def handle_all(self):
-        redis_conn.flushdb()
+        invalidate_all()
 
     def handle_app(self, app_name):
         try:

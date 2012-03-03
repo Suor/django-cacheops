@@ -1,13 +1,13 @@
 from django.test import TestCase
 
-from cacheops.conf import redis_conn
+from cacheops import invalidate_all
 from .models import Category, Post
 
 
 class BaseTestCase(TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
-        redis_conn.flushdb()
+        invalidate_all()
 
 
 class BasicTests(BaseTestCase):
