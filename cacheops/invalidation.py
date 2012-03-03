@@ -117,28 +117,28 @@ def invalidate_from_dict(model, values):
         schemes = cache_schemes.schemes(model)
         conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
 
-        # Get a union of all cache keys registered in invalidators
-        # Get schemes version at the same time, hoping it's unchanged
-        version_key = cache_schemes.get_version_key(model)
-
         # Optimistic locking: we hope schemes and invalidators won't change while we remove them
         # Ignoring this could lead to cache key hanging with it's invalidator removed
+        version_key = cache_schemes.get_version_key(model)
         pipe.watch(version_key, *conjs_keys)
 
-        # Check if our version if schemes for model is obsolete, update them and redo if needed
+        # Check if our version of schemes for model is obsolete, update them and redo if needed
         # This shouldn't be happen too often once schemes are filled a bit
         version = pipe.get(version_key)
-        if int(version or None) != cache_schemes.version(model):
+        if int(version or 0) != cache_schemes.version(model):
             cache_schemes.load_schemes(model)
             pipe.reset()
             raise WatchError() # redo
 
+        # Get a union of all cache keys registered in invalidators
         cache_keys = pipe.sunion(conjs_keys)
         if cache_keys or conjs_keys:
             # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
             # so we'll remove them too.
             # NOTE: There could be some other invalidators not matched with current object,
             #       which reference cache keys we delete, they will be hanging out for a while.
+            # A transation will fail if schemes or any of invalidator sets is changed in between,
+            # in that case we redo the whole thing
             pipe.multi()
             pipe.delete(*(list(cache_keys) + conjs_keys))
 
