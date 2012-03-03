@@ -1,0 +1,19 @@
+[
+  {
+    "model": "tests.category",
+    "pk": 1,
+    "fields": {
+      "title": "Django"
+    }
+  },
+
+  {
+    "model": "tests.post",
+    "pk": 1,
+    "fields": {
+      "title": "Cacheops",
+      "category": 1,
+      "visible": true
+    }
+  }
+]
