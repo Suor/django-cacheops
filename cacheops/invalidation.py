@@ -5,7 +5,7 @@ from cacheops.conf import redis_conn
 from cacheops.utils import get_model_name
 
 
-__all__ = ('invalidate_obj', 'invalidate_model')
+__all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
 
 
 def serialize_scheme(scheme):
@@ -167,3 +167,6 @@ def invalidate_model(model):
         redis_conn.delete(*(list(cache_keys) + conjs_keys))
 
     cache_schemes.clear(model)
+
+def invalidate_all():
+    redis_conn.flushdb()
