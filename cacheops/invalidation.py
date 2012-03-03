@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from redis.exceptions import WatchError
 
-from cacheops.conf import redis_conn
+from cacheops.conf import redis_client
 from cacheops.utils import get_model_name
 
 
@@ -43,7 +43,7 @@ class ConjSchemes(object):
     def load_schemes(self, model):
         model_name = get_model_name(model)
 
-        txn = redis_conn.pipeline()
+        txn = redis_client.pipeline()
         txn.get(self.get_version_key(model))
         txn.smembers(self.get_lookup_key(model_name))
         version, members = txn.execute()
@@ -84,7 +84,7 @@ class ConjSchemes(object):
                 schemes = self.load_schemes(model)
             if new_schemes - schemes:
                 # Write new schemes to redis
-                txn = redis_conn.pipeline()
+                txn = redis_client.pipeline()
                 txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
 
                 lookup_key = self.get_lookup_key(model_name)
@@ -102,8 +102,8 @@ class ConjSchemes(object):
         """
         Clears schemes for models
         """
-        redis_conn.delete(self.get_lookup_key(model))
-        redis_conn.incr(self.get_version_key(model))
+        redis_client.delete(self.get_lookup_key(model))
+        redis_client.incr(self.get_version_key(model))
 
 cache_schemes = ConjSchemes()
 
@@ -119,7 +119,7 @@ def invalidate_from_dict(model, values):
     # Get a union of all cache keys registered in invalidators
     # Get schemes version at the same time, hoping it's unchanged
     version_key = cache_schemes.get_version_key(model)
-    pipe = redis_conn.pipeline(transaction=False)
+    pipe = redis_client.pipeline(transaction=False)
     # Optimistic locking: we hope schemes and invalidators won't change while we remove them
     # Ignoring this could lead to cache key hanging with it's invalidator removed
     # HACK: fix for strange WATCH handling in redis-py 2.4.6+
@@ -136,7 +136,7 @@ def invalidate_from_dict(model, values):
     if version is None:
         version = 0
     if int(version) != cache_schemes.version(model):
-        redis_conn.unwatch()
+        redis_client.unwatch()
         cache_schemes.load_schemes(model)
         invalidate_from_dict(model, values)
 
@@ -146,7 +146,7 @@ def invalidate_from_dict(model, values):
         # NOTE: There could be some other invalidators not matched with current object,
         #       which reference cache keys we delete, they will be hanging out for a while.
         try:
-            txn = redis_conn.pipeline()
+            txn = redis_client.pipeline()
             txn.delete(*(list(cache_keys) + conjs_keys))
             txn.execute()
         except WatchError:
@@ -156,7 +156,7 @@ def invalidate_from_dict(model, values):
             invalidate_from_dict(model, values)
 
     else:
-        redis_conn.unwatch()
+        redis_client.unwatch()
 
 
 def invalidate_obj(obj):
@@ -172,16 +172,16 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request, 
           which could be relatively slow on large datasets.
     """
-    conjs_keys = redis_conn.keys('conj:%s:*' % get_model_name(model))
+    conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
     if isinstance(conjs_keys, str):
         conjs_keys = conjs_keys.split()
 
     if conjs_keys:
-        cache_keys = redis_conn.sunion(conjs_keys)
-        redis_conn.delete(*(list(cache_keys) + conjs_keys))
+        cache_keys = redis_client.sunion(conjs_keys)
+        redis_client.delete(*(list(cache_keys) + conjs_keys))
 
     # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
     cache_schemes.clear(model)
 
 def invalidate_all():
-    redis_conn.flushdb()
+    redis_client.flushdb()

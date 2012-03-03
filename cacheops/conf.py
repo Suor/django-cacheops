@@ -24,7 +24,7 @@ try:
     redis_conf = settings.CACHEOPS_REDIS
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
-redis_conn = redis.Redis(**redis_conf)
+redis_client = redis.Redis(**redis_conf)
 
 
 model_profiles = {}
