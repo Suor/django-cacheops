@@ -180,4 +180,5 @@ def invalidate_model(model):
         cache_keys = redis_conn.sunion(conjs_keys)
         redis_conn.delete(*(list(cache_keys) + conjs_keys))
 
+    # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
     cache_schemes.clear(model)
