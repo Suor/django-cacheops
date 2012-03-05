@@ -103,7 +103,7 @@ It is usefull when you want to disable automatic caching on particular queryset.
 | **Function caching.**
 
 You can cache and invalidate result of a function the same way as a queryset.
-Cache of next function will be invalidated on any Article change, addition
+Cache of next function will be invalidated on any ``Article`` change, addition
 or deletetion::
 
     from cacheops import cached_as
@@ -146,8 +146,8 @@ Invalidation
 ------------
 
 Cacheops uses both time and event-driven invalidation. The event-driven one
-listens on model signals and invalidates appropriate caches on Model.save()
-and .delete().
+listens on model signals and invalidates appropriate caches on ``Model.save()``
+and ``.delete()``.
 
 Invalidation tries to be granular which means it won't invalidate a queryset
 that cannot be influenced by added/updated/deleted object judjing by query
@@ -194,7 +194,7 @@ Tags work the same way as corresponding decorators.
 CAVEATS
 -------
 
-1. Conditions other than __exact or __in don't provide more granularity for
+1. Conditions other than ``__exact`` or ``__in`` don't provide more granularity for
    invalidation.
 2. Conditions on related models don't provide it either.
 3. Update of "selected_related" object does not invalidate cache for queryset.
@@ -204,15 +204,40 @@ CAVEATS
 7. Conditions on subqueries don't affect invalidation.
 
 9. Aggregates is not implemented yet.
-10. Timeout in queryset and cached_as cannot be larger than default.
+10. Timeout in queryset and ``@cached_as()`` cannot be larger than default.
 
 Here 1, 3, 5, 10 are part of design compromise, trying to solve them will make
 things complicated and slow. 2 and 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simple ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
-6 can be cached as SomeModel.objects.all() but @cached_as() someway covers that
+6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
 and is more flexible.
+
+
+Performance tips
+----------------
+
+Here come some performance tips to make cacheops and Django ORM faster.
+
+1. When you use cache you pickle and unpickle lots of django model instances, which could be slow.
+You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
+
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone
+self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+
+    items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
+
+You can revert queryset to cloning state using ``.cloning()`` call.
+
+3. More to 2, there is `unfixed bug in django <https://code.djangoproject.com/ticket/16759>`_,
+which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
+
+4. Use template fragment caching when possible, it's way more fast because you don't need to
+generate anything. Also pickling/unpickling a string is much faster than list of model instances.
+Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt
+``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+
 
 TODO
 ----
