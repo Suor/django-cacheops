@@ -6,6 +6,34 @@
       "title": "Django"
     }
   },
+  {
+    "model": "tests.category",
+    "pk": 2,
+    "fields": {
+      "title": "Rails"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 3,
+    "fields": {
+      "title": "Perl"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 4,
+    "fields": {
+      "title": "Python"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 5,
+    "fields": {
+      "title": "Node.js"
+    }
+  },
 
   {
     "model": "tests.post",
