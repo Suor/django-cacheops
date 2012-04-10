@@ -160,7 +160,7 @@ def _stringify_query():
         elif isinstance(obj, (datetime, date)):
             return str(obj)
         elif isinstance(obj, Constraint):
-            return (obj.alias, obj.col)
+            return (obj.alias, obj.field.name)
         elif isinstance(obj, Field):
             return (obj.model, obj.name)
         elif isinstance(obj, QuerySet):
