@@ -5,6 +5,7 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+import simplejson as json
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
@@ -23,6 +24,55 @@ _old_objs = {}
 _local_get_cache = {}
 
 
+
+
+
+
+CACHE_THING = """
+local key = KEYS[1]
+local data = ARGV[1]
+local model = ARGV[2]
+local dnf = cjson.decode(ARGV[3])
+local timeout = ARGV[4]
+local inv_timeout = ARGV[5]
+
+-- TODO: reimplement ensure_known() here
+
+-- Write data to cache
+if timeout then
+    redis.call('setex', key, timeout, data)
+else
+    redis.call('set', key, data)
+end
+
+redis.call('set', '_', 'hi')
+
+function conj_cache_key(model, conj)
+    local s = model .. ':'
+    local parts = {}
+
+    for i, eq in pairs(conj) do
+        parts.push(eq[1] .. '=' .. eq[2])
+    end
+
+    redis.call('set', 'parts', cjson.encode(parts))
+
+    return s .. table.concat(parts, '&')
+end
+
+-- Add new cache_key to list of dependencies for every conjunction in dnf
+for i, conj in pairs(dnf) do
+    local conj_key = conj_cache_key(model, conj)
+    redis.call('sadd', conj_key, cache_key)
+    if timeout then
+        -- Invalidator timeout should be larger than timeout of any key it references
+        -- So we take timeout from profile which is our upper limit
+        -- Add few extra seconds to be extra safe
+        redis.call('expire', conj_key, inv_timeout)
+    end
+end
+"""
+
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
@@ -31,30 +81,35 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         profile = model_profile(model)
         timeout = profile['timeout']
 
-    # Ensure that all schemes of current query are "known"
-    schemes = map(conj_scheme, cond_dnf)
-    cache_schemes.ensure_known(model, schemes)
-
-    txn = redis_client.pipeline()
-
-    # Write data to cache
     pickled_data = pickle.dumps(data, -1)
-    if timeout is not None:
-        txn.setex(cache_key, pickled_data, timeout)
-    else:
-        txn.set(cache_key, pickled_data)
+    redis_client.execute_command('eval', CACHE_THING, 1,
+        cache_key, pickled_data,
+        get_model_name(model), json.dumps(cond_dnf),
+        timeout, model._cacheprofile['timeout'] + 10)
 
-    # Add new cache_key to list of dependencies for every conjunction in dnf
-    for conj in cond_dnf:
-        conj_key = conj_cache_key(model, conj)
-        txn.sadd(conj_key, cache_key)
-        if timeout is not None:
-            # Invalidator timeout should be larger than timeout of any key it references
-            # So we take timeout from profile which is our upper limit
-            # Add few extra seconds to be extra safe
-            txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
+    # # Ensure that all schemes of current query are "known"
+    # schemes = map(conj_scheme, cond_dnf)
+    # cache_schemes.ensure_known(model, schemes)
 
-    txn.execute()
+    # txn = redis_client.pipeline()
+
+    # # Write data to cache
+    # if timeout is not None:
+    #     txn.setex(cache_key, pickled_data, timeout)
+    # else:
+    #     txn.set(cache_key, pickled_data)
+
+    # # Add new cache_key to list of dependencies for every conjunction in dnf
+    # for conj in cond_dnf:
+    #     conj_key = conj_cache_key(model, conj)
+    #     txn.sadd(conj_key, cache_key)
+    #     if timeout is not None:
+    #         # Invalidator timeout should be larger than timeout of any key it references
+    #         # So we take timeout from profile which is our upper limit
+    #         # Add few extra seconds to be extra safe
+    #         txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
+
+    # txn.execute()
 
 
 def cached_as(sample, extra=None, timeout=None):
@@ -128,7 +183,6 @@ def _stringify_query():
           any significant optimization will most likely require a major
           refactor of sql.Query class, which is a substantial part of ORM.
     """
-    import simplejson as json
     from datetime import datetime, date
     from django.db.models.fields import Field
     from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
