@@ -7,4 +7,6 @@ The **PRIMARY AUTHORS** are (and/or have been):
 
 Other **CONTRIBUTORS**:
 
+  - Egor Balyshev
+  - Vladimir Savin
   - Alexander Yakovlev <ayakovlev@rambler.ru>
