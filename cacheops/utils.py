@@ -70,9 +70,9 @@ def dnf(where, alias):
             if constraint.alias != alias or isinstance(value, QuerySet):
                 return [[]]
             elif lookup == 'exact':
-                return [[(constraint.field.name, value, True)]] # колонка, значение, отрицание
+                return [[(constraint.field.attname, value, True)]] # колонка, значение, отрицание
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(constraint.field.name, v, True)] for v in value]
+                return [[(constraint.field.attname, v, True)] for v in value]
             else:
                 return [[]]
         elif isinstance(where, ExtraWhere):
