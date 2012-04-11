@@ -15,3 +15,8 @@ class Post(models.Model):
 
     def __unicode__(self):
         return self.title
+
+
+class Extra(models.Model):
+    post = models.OneToOneField(Post)
+    tag = models.IntegerField()

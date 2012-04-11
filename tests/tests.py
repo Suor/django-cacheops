@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from cacheops import invalidate_all
-from .models import Category, Post
+from .models import Category, Post, Extra
 
 
 class BaseTestCase(TestCase):
@@ -27,3 +27,19 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_post = Post.objects.cache().get(pk=1)
             self.assertEqual(post.title, changed_post.title)
+
+    def test_invalidate_by_foreign_key(self):
+        posts = list(Post.objects.cache().filter(category=1))
+        Post.objects.create(title='New Post', category_id=1)
+
+        with self.assertNumQueries(1):
+            changed_posts = list(Post.objects.cache().filter(category=1))
+            self.assertEqual(len(changed_posts), len(posts) + 1)
+
+    def test_invalidate_by_one_to_one(self):
+        extras = list(Extra.objects.cache().filter(post=1))
+        Extra.objects.create(post_id=1, tag=10)
+
+        with self.assertNumQueries(1):
+            changed_extras = list(Extra.objects.cache().filter(post=1))
+            self.assertEqual(len(changed_extras), len(extras) + 1)
