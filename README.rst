@@ -220,12 +220,6 @@ Performance tips
 
 Here come some performance tips to make cacheops and Django ORM faster.
 
-
-Performance tips
-----------------
-
-Here come some performance tips to make cacheops and Django ORM faster.
-
 1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
 2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
