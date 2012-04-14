@@ -96,7 +96,7 @@ class ConjSchemes(object):
                 self.local[model_name].update(new_schemes)
                 # We increment here instead of using incr result from redis,
                 # because even our updated collection could be already obsolete
-                self.versions[model_name] += 1 
+                self.versions[model_name] += 1
 
     def clear(self, model):
         """
@@ -104,6 +104,12 @@ class ConjSchemes(object):
         """
         redis_client.delete(self.get_lookup_key(model))
         redis_client.incr(self.get_version_key(model))
+
+    def clear_all(self):
+        self.local = {}
+        for model_name in self.versions:
+            self.versions[model_name] += 1
+
 
 cache_schemes = ConjSchemes()
 
@@ -169,7 +175,7 @@ def invalidate_obj(obj):
 def invalidate_model(model):
     """
     Invalidates all caches for given model.
-    NOTE: This is a heavy artilery which uses redis KEYS request, 
+    NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
     conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
@@ -185,3 +191,4 @@ def invalidate_model(model):
 
 def invalidate_all():
     redis_client.flushdb()
+    cache_schemes.clear_all()
