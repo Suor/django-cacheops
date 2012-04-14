@@ -220,24 +220,29 @@ Performance tips
 
 Here come some performance tips to make cacheops and Django ORM faster.
 
-1. When you use cache you pickle and unpickle lots of django model instances, which could be slow.
-You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
-2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone
-self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+Performance tips
+----------------
+
+Here come some performance tips to make cacheops and Django ORM faster.
+
+1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
+
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
 
     items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
 
-You can revert queryset to cloning state using ``.cloning()`` call.
+   You can revert queryset to cloning state using ``.cloning()`` call.
 
-3. More to 2, there is `unfixed bug in django <https://code.djangoproject.com/ticket/16759>`_,
-which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
+3. More to 2, there is `unfixed bug in django <https://code.djangoproject.com/ticket/16759>`_, which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to
-generate anything. Also pickling/unpickling a string is much faster than list of model instances.
-Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt
-``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
 
+5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/topics/persistence>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
+
+6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heurestics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
+
+   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 TODO
 ----
