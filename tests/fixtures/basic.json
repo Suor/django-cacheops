@@ -43,5 +43,24 @@
       "category": 1,
       "visible": true
     }
+  },
+
+  {
+    "model": "tests.post",
+    "pk": 2,
+    "fields": {
+      "title": "Implicit variable as pronoun",
+      "category": 3,
+      "visible": true
+    }
+  },
+
+  {
+    "model": "tests.extra",
+    "pk": 1,
+    "fields": {
+      "post": 1,
+      "tag": 5
+    }
   }
 ]

@@ -20,3 +20,6 @@ class Post(models.Model):
 class Extra(models.Model):
     post = models.OneToOneField(Post)
     tag = models.IntegerField()
+
+    def __unicode__(self):
+        return 'Extra(post_id=%s, tag=%s)' % (self.post_id, self.tag)
