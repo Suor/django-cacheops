@@ -43,3 +43,14 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_extras = list(Extra.objects.cache().filter(post=2))
             self.assertEqual(len(changed_extras), len(extras) + 1)
+
+    def test_invalidate_by_boolean(self):
+        count = Post.objects.cache().filter(visible=True).count()
+
+        post = Post.objects.get(pk=1, visible=True)
+        post.visible = False
+        post.save()
+
+        with self.assertNumQueries(1):
+            new_count = Post.objects.cache().filter(visible=True).count()
+            self.assertEqual(new_count, count - 1)
