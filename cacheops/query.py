@@ -82,7 +82,6 @@ def cached_as(sample, extra=None, timeout=None):
         else:
             key_extra = '%s.%s' % (func.__module__, func.__name__)
         cache_key = queryset._cache_key(extra=key_extra)
-        cond_dnf = dnf(queryset.query.where, queryset.model._meta.db_table)
 
         @wraps(func)
         def wrapper(*args):
@@ -93,7 +92,7 @@ def cached_as(sample, extra=None, timeout=None):
                 return pickle.loads(cache_data)
 
             result = func(*args)
-            cache_thing(queryset.model, cache_key, result, cond_dnf, timeout or queryset._cachetimeout)
+            queryset._cache_results(cache_key, result, timeout)
             return result
 
         return wrapper
@@ -227,9 +226,9 @@ class QuerySetMixin(object):
 
         return 'q:%s' % md5.hexdigest()
 
-    def _cache_results(self, cache_key, results):
+    def _cache_results(self, cache_key, results, timeout=None):
         cond_dnf = dnf(self.query.where, self.model._meta.db_table)
-        cache_thing(self.model, cache_key, results, cond_dnf, timeout=self._cachetimeout)
+        cache_thing(self.model, cache_key, results, cond_dnf, timeout or self._cachetimeout)
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
