@@ -7,10 +7,13 @@ interactive = False
 fixtures = ['basic']
 
 
+from operator import itemgetter
+
+
 def run_benchmarks(tests):
-    for name, test in reversed(tests):
-        elapsed = bench_test(test)
-        print '%s %.2fms' % (name, elapsed * 1000)
+    for name, test in tests:
+        time, clock = bench_test(test)
+        print '%s\ttime: %.2fms\tclock: %.2fms' % (name, time * 1000, clock * 1000)
 
 def bench_test(test):
     if 'prepare_once' in test:
@@ -23,21 +26,28 @@ def bench_test(test):
         l = [bench_once(test) for i in range(n)]
         gc.enable()
 
-        total = sum(l)
-        s = sorted(l)
-        norm = s[n/8:-n/8] if n / 8 else s
-        print [int(x * 1000000) for x in [total / n, min(l), max(l),
-                                          sum(norm) / len(norm), min(norm), max(norm)]]
+        total = sum(map(itemgetter(0), l))
+        # print [int(x * 1000000) for x in [total / n, min(l), max(l),
+        #                                   sum(norm) / len(norm), min(norm), max(norm)]]
         n *= 2
 
-    return total * 2 / n # Or use normalized?
+    # print len(l)
+    s = sorted(l)
+    norm = s[n/8:-n/8] if n / 8 else s
+
+    norm_time = [r[0] for r in l]
+    norm_clock = [r[1] for r in l]
+
+    # return total * 2 / n # Or use normalized?
+    return sum(norm_time) / len(norm_time), sum(norm_clock) / len(norm_clock)
 
 def bench_once(test):
     if 'prepare' in test:
         test['prepare']()
     start = time.time()
+    clock = time.clock()
     test['run']()
-    return time.time() - start
+    return (time.time() - start, time.clock() - clock)
 
 from django.db import connection
 from django.core.management import call_command
