@@ -38,11 +38,11 @@ class BasicTests(BaseTestCase):
             self.assertEqual(len(changed_posts), len(posts) + 1)
 
     def test_invalidate_by_one_to_one(self):
-        extras = list(Extra.objects.cache().filter(post=2))
-        Extra.objects.create(post_id=2, tag=10)
+        extras = list(Extra.objects.cache().filter(post=3))
+        Extra.objects.create(post_id=3, tag=0)
 
         with self.assertNumQueries(1):
-            changed_extras = list(Extra.objects.cache().filter(post=2))
+            changed_extras = list(Extra.objects.cache().filter(post=3))
             self.assertEqual(len(changed_extras), len(extras) + 1)
 
     def test_invalidate_by_boolean(self):
@@ -66,6 +66,7 @@ class BasicTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             Extra.objects.cache().get(to_tag=5)
+
 
 class ContribTests(BaseTestCase):
     def setUp(self):

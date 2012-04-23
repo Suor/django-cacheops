@@ -44,12 +44,20 @@
       "visible": true
     }
   },
-
   {
     "model": "tests.post",
     "pk": 2,
     "fields": {
       "title": "Implicit variable as pronoun",
+      "category": 3,
+      "visible": true
+    }
+  },
+  {
+    "model": "tests.post",
+    "pk": 3,
+    "fields": {
+      "title": "Perl 6 hyperoperator",
       "category": 3,
       "visible": true
     }

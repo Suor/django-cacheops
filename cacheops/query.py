@@ -227,7 +227,7 @@ class QuerySetMixin(object):
         return 'q:%s' % md5.hexdigest()
 
     def _cache_results(self, cache_key, results, timeout=None):
-        cond_dnf = dnf(self.query.where, self.model._meta.db_table)
+        cond_dnf = dnf(self)
         cache_thing(self.model, cache_key, results, cond_dnf, timeout or self._cachetimeout)
 
     def cache(self, ops=None, timeout=None, write_only=None):
@@ -372,7 +372,7 @@ class QuerySetMixin(object):
         """
         # TODO: refactor this one to more understandable something
         if self._cacheprofile:
-            query_dnf = dnf(self.query.where, self.model._meta.db_table)
+            query_dnf = dnf(self)
             if len(query_dnf) == 1 and len(query_dnf[0]) == 1 and query_dnf[0][0][0] == self.model._meta.pk.name:
                 result = len(self.nocache()) > 0
                 if result:

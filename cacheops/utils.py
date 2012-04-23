@@ -50,7 +50,7 @@ def monkey_mix(cls, mixin, methods=None):
 
 
 
-def dnf(where, alias):
+def dnf(qs):
     """
     Converts sql condition tree to DNF.
 
@@ -70,9 +70,9 @@ def dnf(where, alias):
             if constraint.alias != alias or isinstance(value, QuerySet):
                 return [[]]
             elif lookup == 'exact':
-                return [[(constraint.field.attname, value, True)]] # колонка, значение, отрицание
+                return [[(attname_of(model, constraint.col), value, True)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(constraint.field.attname, v, True)] for v in value]
+                return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
                 return [[]]
         elif isinstance(where, ExtraWhere):
@@ -100,6 +100,10 @@ def dnf(where, alias):
 
             return result
 
+    where = qs.query.where
+    model = qs.model
+    alias = model._meta.db_table
+
     result = _dnf(where)
     if result is None:
         return [[]]
@@ -111,6 +115,12 @@ def dnf(where, alias):
     if not all(result):
         return [[]]
     return result
+
+
+def attname_of(model, col, cache={}):
+    if model not in cache:
+        cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
+    return cache[model].get(col, col)
 
 
 def conj_scheme(conj):
