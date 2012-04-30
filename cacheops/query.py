@@ -470,10 +470,17 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         invalidate_model(model)
 
 
+installed = False
+
 def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
+    global installed
+    if installed:
+        return # just return for now, second call is probably done due cycle imports
+    installed = True
+
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
     monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
