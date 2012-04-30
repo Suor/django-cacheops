@@ -118,51 +118,37 @@ def invalidate_from_dict(model, values):
     """
     Invalidates caches that can possibly be influenced by object
     """
-    # Create a list of invalidators from list of schemes and values of object fields
-    schemes = cache_schemes.schemes(model)
-    conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
+    def _invalidate(pipe):
+        # Create a list of invalidators from list of schemes and values of object fields
+        schemes = cache_schemes.schemes(model)
+        conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
 
-    # Get a union of all cache keys registered in invalidators
-    # Get schemes version at the same time, hoping it's unchanged
-    version_key = cache_schemes.get_version_key(model)
-    pipe = redis_client.pipeline(transaction=False)
-    # Optimistic locking: we hope schemes and invalidators won't change while we remove them
-    # Ignoring this could lead to cache key hanging with it's invalidator removed
-    # HACK: fix for strange WATCH handling in redis-py 2.4.6+
-    if hasattr(pipe, 'pipeline_execute_command'):
-        pipe.pipeline_execute_command('watch', version_key, *conjs_keys)
-    else:
+        # Optimistic locking: we hope schemes and invalidators won't change while we remove them
+        # Ignoring this could lead to cache key hanging with it's invalidator removed
+        version_key = cache_schemes.get_version_key(model)
         pipe.watch(version_key, *conjs_keys)
-    pipe.get(version_key)
-    pipe.sunion(conjs_keys)
-    _, version, cache_keys = pipe.execute()
 
-    # Check if our version if schemes for model is obsolete, update them and redo if needed
-    # This shouldn't be happen too often once schemes are filled a bit
-    if version is None:
-        version = 0
-    if int(version) != cache_schemes.version(model):
-        redis_client.unwatch()
-        cache_schemes.load_schemes(model)
-        invalidate_from_dict(model, values)
+        # Check if our version of schemes for model is obsolete, update them and redo if needed
+        # This shouldn't be happen too often once schemes are filled a bit
+        version = pipe.get(version_key)
+        if int(version or 0) != cache_schemes.version(model):
+            cache_schemes.load_schemes(model)
+            pipe.reset()
+            raise WatchError() # redo
 
-    elif cache_keys or conjs_keys:
-        # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
-        # so we'll remove them too.
-        # NOTE: There could be some other invalidators not matched with current object,
-        #       which reference cache keys we delete, they will be hanging out for a while.
-        try:
-            txn = redis_client.pipeline()
-            txn.delete(*(list(cache_keys) + conjs_keys))
-            txn.execute()
-        except WatchError:
-            # Optimistic locking failed: schemes or one of invalidator sets changed.
-            # Just redo everything.
-            # NOTE: Scipting will be a cool alternative to optimistic locking
-            invalidate_from_dict(model, values)
+        # Get a union of all cache keys registered in invalidators
+        cache_keys = pipe.sunion(conjs_keys)
+        if cache_keys or conjs_keys:
+            # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
+            # so we'll remove them too.
+            # NOTE: There could be some other invalidators not matched with current object,
+            #       which reference cache keys we delete, they will be hanging out for a while.
+            # A transation will fail if schemes or any of invalidator sets is changed in between,
+            # in that case we redo the whole thing
+            pipe.multi()
+            pipe.delete(*(list(cache_keys) + conjs_keys))
 
-    else:
-        redis_client.unwatch()
+    redis_client.transaction(_invalidate)
 
 
 def invalidate_obj(obj):
