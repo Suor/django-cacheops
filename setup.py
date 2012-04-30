@@ -14,7 +14,7 @@ setup(
     packages=['cacheops'],
     install_requires=[
         'django>=1.2',
-        'redis>=2.2.4',
+        'redis>=2.4.12',
         'simplejson>=2.1.5',
     ],
 
