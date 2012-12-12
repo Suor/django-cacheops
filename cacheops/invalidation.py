@@ -31,12 +31,12 @@ class ConjSchemes(object):
         self.versions = {}
 
     def get_lookup_key(self, model_or_name):
-        if not isinstance(model_or_name, str):
+        if not isinstance(model_or_name, basestring):
             model_or_name = get_model_name(model_or_name)
         return 'schemes:%s' % model_or_name
 
     def get_version_key(self, model_or_name):
-        if not isinstance(model_or_name, str):
+        if not isinstance(model_or_name, basestring):
             model_or_name = get_model_name(model_or_name)
         return 'schemes:%s:version' % model_or_name
 
