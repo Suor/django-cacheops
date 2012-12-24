@@ -1,3 +1,7 @@
+0.9.3
+- invalidate and cleanfilecache commands added to dist
+- django 1.5 compatability (thanks to jhpinson)
+
 0.9.2
 - compatability with latest redis-py
 - many other bug fixes
