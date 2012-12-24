@@ -11,7 +11,7 @@ setup(
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 
-    packages=['cacheops'],
+    packages=['cacheops', 'cacheops.management', 'cacheops.management.commands'],
     install_requires=[
         'django>=1.2',
         'redis>=2.4.12',
