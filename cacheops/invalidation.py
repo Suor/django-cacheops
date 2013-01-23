@@ -132,9 +132,9 @@ def invalidate_from_dict(model, values):
         # Create a list of invalidators from list of schemes and values of object fields
         conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
 
-
-        # Optimistic locking: we hope schemes and invalidators won't change while we remove them
-        # Ignoring this could lead to cache key hanging with it's invalidator removed
+        # Optimistic locking: we hope schemes version not changes while we delete cache keys.
+        # All invalidators are removed in Redis transaction, so no cache key could be added
+        # in the middle, and no cache key could hang with it's invalidator removed
         def _invalidate_conjs(pipe):
 
             # Starting MULTI block
@@ -152,8 +152,12 @@ def invalidate_from_dict(model, values):
             pipe.delete(*conjs_keys)
 
         version, cache_keys, _ = redis_client.transaction(_invalidate_conjs)
+        # Next two lines are the only where python process crash could lead to
+        # cache keys hang without invalidators.
+        # But it's better than infinite loop caused by numerous WatchErrors.
         if cache_keys:
             redis_client.delete(*cache_keys)
+
         # OK, we invalidated all conjunctions we had in memory, but model schema
         # may have been changed in redis long time ago. If this happened,
         # schema version will not match and we should load new schemes,
