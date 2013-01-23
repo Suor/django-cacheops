@@ -153,6 +153,8 @@ def invalidate_from_dict(model, values):
             redis_client.delete(*cache_keys)
         if int(version or 0) != cache_schemes.version(model):
             cache_schemes.load_schemes(model)
+        else:
+            break
 
 
 def invalidate_obj(obj):
