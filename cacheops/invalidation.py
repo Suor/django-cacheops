@@ -125,20 +125,18 @@ def invalidate_from_dict(model, values):
     # Loading model schemes from local memory (or from redis)
     schemes = cache_schemes.schemes(model)
 
-    try_count = 3
+    try_count = 2
+    # Second try is needed to load updated schemes from redis (if version has changed)
+    # and re-run invalidation for recent schemes.
     while try_count > 0:
         try_count -= 1
 
         # Create a list of invalidators from list of schemes and values of object fields
         conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
 
-        # Optimistic locking: we hope schemes version not changes while we delete cache keys.
-        # All invalidators are removed in Redis transaction, so no cache key could be added
-        # in the middle, and no cache key could hang with it's invalidator removed
+        # Reading scheme version, cache_keys and deleting invalidators in
+        # a single transaction.
         def _invalidate_conjs(pipe):
-
-            # Starting MULTI block
-
             pipe.multi()
             # Check if our version of schemes for model is obsolete, update them and redo if needed
             # This shouldn't be happen too often once schemes are filled a bit
@@ -162,16 +160,13 @@ def invalidate_from_dict(model, values):
         # may have been changed in redis long time ago. If this happened,
         # schema version will not match and we should load new schemes,
         # compute
-        if int(version or 0) == cache_schemes.version(model):
+        if int(version or 0) != cache_schemes.version(model):
+            # Updating schemes with new values from redis.
+            # Hope, this happens rarely :)
+            schemes = cache_schemes.load_schemes(model)
+        else:
             # schemes version is OK, so invalidation completed
-            return
-        # Updating schemes with new values from redis.
-        # Hope, this happens rarely :)
-        schemes = cache_schemes.load_schemes(model)
-
-    # if number of tries exceeds N, we should not go to infinite loop,
-    # raise RuntimeError instead.
-    raise RuntimeError("can't invalidate dict")
+            break
 
 
 def invalidate_obj(obj):
