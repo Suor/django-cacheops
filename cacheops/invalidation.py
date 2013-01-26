@@ -118,19 +118,12 @@ def invalidate_from_dict(model, values):
     """
     Invalidates caches that can possibly be influenced by object
     """
-
-    # Computing version key string from model and application names
-    version_key = cache_schemes.get_version_key(model)
-
     # Loading model schemes from local memory (or from redis)
     schemes = cache_schemes.schemes(model)
 
-    try_count = 2
-    # Second try is needed to load updated schemes from redis (if version has changed)
-    # and re-run invalidation for recent schemes.
-    while try_count > 0:
-        try_count -= 1
-
+    # We hope that our schemes are valid, but if not we will update them and redo invalidation
+    # on second pass
+    for _ in (1, 2):
         # Create a list of invalidators from list of schemes and values of object fields
         conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
 
@@ -138,9 +131,7 @@ def invalidate_from_dict(model, values):
         # a single transaction.
         def _invalidate_conjs(pipe):
             pipe.multi()
-            # Check if our version of schemes for model is obsolete, update them and redo if needed
-            # This shouldn't be happen too often once schemes are filled a bit
-            pipe.get(version_key)
+            pipe.get(cache_schemes.get_version_key(model))
             # Get a union of all cache keys registered in invalidators
             pipe.sunion(conjs_keys)
             # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
@@ -149,23 +140,19 @@ def invalidate_from_dict(model, values):
             #       which reference cache keys we delete, they will be hanging out for a while.
             pipe.delete(*conjs_keys)
 
+        # NOTE: we delete fetched cache_keys later which makes a tiny possibility that something
+        #       will fail in the middle leaving those cache keys hanging without invalidators.
+        #       The alternative WATCH-based optimistic locking proved to be pessimistic.
         version, cache_keys, _ = redis_client.transaction(_invalidate_conjs)
-        # Next two lines are the only where python process crash could lead to
-        # cache keys hang without invalidators.
-        # But it's better than infinite loop caused by numerous WatchErrors.
         if cache_keys:
             redis_client.delete(*cache_keys)
 
         # OK, we invalidated all conjunctions we had in memory, but model schema
         # may have been changed in redis long time ago. If this happened,
-        # schema version will not match and we should load new schemes,
-        # compute
+        # schema version will not match and we should load new schemes and redo our thing
         if int(version or 0) != cache_schemes.version(model):
-            # Updating schemes with new values from redis.
-            # Hope, this happens rarely :)
             schemes = cache_schemes.load_schemes(model)
         else:
-            # schemes version is OK, so invalidation completed
             break
 
 
