@@ -1,3 +1,6 @@
+0.9.4
+- fixed occasional redis 100% cpu use
+
 0.9.3
 - invalidate and cleanfilecache commands added to dist
 - django 1.5 compatability (thanks to jhpinson)
