@@ -80,3 +80,7 @@ class ContribTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             Profile.objects.cache().get(user=1)
+
+    def test_29(self):
+        users = User.objects.filter(username='Suor')
+        profiles = list(Profile.objects.filter(user__in=users).cache())
