@@ -68,11 +68,11 @@ class BasicTests(BaseTestCase):
             Extra.objects.cache().get(to_tag=5)
 
 
-class ContribTests(BaseTestCase):
+class IssueTests(BaseTestCase):
     def setUp(self):
         user = User.objects.create(username='Suor')
         Profile.objects.create(pk=2, user=user, tag=10)
-        super(ContribTests, self).setUp()
+        super(IssueTests, self).setUp()
 
     def test_16(self):
         p = Profile.objects.cache().get(user__id__exact=1)
