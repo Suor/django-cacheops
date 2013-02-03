@@ -1,8 +1,9 @@
+import unittest
 from django.test import TestCase
 from django.contrib.auth.models import User
 
 from cacheops import invalidate_all
-from .models import Category, Post, Extra, Profile
+from .models import *
 
 
 class BaseTestCase(TestCase):
@@ -84,3 +85,27 @@ class IssueTests(BaseTestCase):
     def test_29(self):
         users = User.objects.filter(username='Suor')
         profiles = list(Profile.objects.filter(user__in=users).cache())
+
+
+# Tests for proxy models, see #30
+class ProxyTests(BaseTestCase):
+    def test_30(self):
+        proxies = list(VideoProxy.objects.cache())
+        Video.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(VideoProxy.objects.cache())
+
+    def test_30_reversed(self):
+        proxies = list(Video.objects.cache())
+        VideoProxy.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(Video.objects.cache())
+
+    @unittest.expectedFailure
+    def test_interchange(self):
+        proxies = list(Video.objects.cache())
+
+        with self.assertNumQueries(0):
+            list(VideoProxy.objects.cache())
