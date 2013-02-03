@@ -1,3 +1,6 @@
+0.9.5
+- support for proxy models
+
 0.9.4
 - fixed occasional redis 100% cpu use
 
