@@ -3,6 +3,7 @@ from operator import concat, itemgetter
 from itertools import product, imap
 from inspect import getmembers, ismethod
 
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import ExtraWhere
@@ -10,6 +11,12 @@ from django.db.models.sql.query import ExtraWhere
 
 LONG_DISJUNCTION = 8
 
+
+def non_proxy(model):
+    while model._meta.proxy:
+        # Every proxy model has exactly one non abstract parent model
+        model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
+    return model
 
 def get_model_name(model):
     return '%s.%s' % (model._meta.app_label, model._meta.module_name)
