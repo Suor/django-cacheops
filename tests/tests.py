@@ -109,3 +109,23 @@ class ProxyTests(BaseTestCase):
 
         with self.assertNumQueries(0):
             list(VideoProxy.objects.cache())
+
+
+class MultitableInheritanceTests(BaseTestCase):
+    def test_sub_added(self):
+        media_count = Media.objects.cache().count()
+        Movie.objects.create(name="Matrix", year=1999)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(Media.objects.cache().count(), media_count + 1)
+
+    def test_base_changed(self):
+        matrix = Movie.objects.create(name="Matrix", year=1999)
+        list(Movie.objects.cache())
+
+        media = Media.objects.get(pk=matrix.pk)
+        media.name = "Matrix (original)"
+        media.save()
+
+        with self.assertNumQueries(1):
+            list(Movie.objects.cache())

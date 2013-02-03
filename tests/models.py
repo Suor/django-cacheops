@@ -39,3 +39,11 @@ class Video(models.Model):
 class VideoProxy(Video):
     class Meta:
         proxy = True
+
+
+# Multi-table inheritance
+class Media(models.Model):
+    name = models.CharField(max_length=128)
+
+class Movie(Media):
+    year = models.IntegerField()
