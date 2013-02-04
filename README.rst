@@ -191,6 +191,7 @@ or
 
 Tags work the same way as corresponding decorators.
 
+
 CAVEATS
 -------
 
@@ -202,7 +203,7 @@ CAVEATS
 5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
 6. Doesn't work with RawQuerySet.
 7. Conditions on subqueries don't affect invalidation.
-
+8. Doesn't work right with multi-table inheritance.
 9. Aggregates is not implemented yet.
 10. Timeout in queryset and ``@cached_as()`` cannot be larger than default.
 
@@ -212,7 +213,8 @@ probably counter-productive since one can just break queries into simple ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
 6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
-and is more flexible.
+and is more flexible. 8 is postponed until it will gain more interest or a champion willing to
+implement it emerge.
 
 
 Performance tips
@@ -237,6 +239,7 @@ Here come some performance tips to make cacheops and Django ORM faster.
 6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heurestics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
+
 
 TODO
 ----

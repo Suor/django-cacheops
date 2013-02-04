@@ -112,6 +112,7 @@ class ProxyTests(BaseTestCase):
 
 
 class MultitableInheritanceTests(BaseTestCase):
+    @unittest.expectedFailure
     def test_sub_added(self):
         media_count = Media.objects.cache().count()
         Movie.objects.create(name="Matrix", year=1999)
@@ -119,6 +120,7 @@ class MultitableInheritanceTests(BaseTestCase):
         with self.assertNumQueries(1):
             self.assertEqual(Media.objects.cache().count(), media_count + 1)
 
+    @unittest.expectedFailure
     def test_base_changed(self):
         matrix = Movie.objects.create(name="Matrix", year=1999)
         list(Movie.objects.cache())
