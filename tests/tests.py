@@ -1,8 +1,9 @@
+import unittest
 from django.test import TestCase
 from django.contrib.auth.models import User
 
 from cacheops import invalidate_all
-from .models import Category, Post, Extra, Profile
+from .models import *
 
 
 class BaseTestCase(TestCase):
@@ -84,3 +85,49 @@ class IssueTests(BaseTestCase):
     def test_29(self):
         users = User.objects.filter(username='Suor')
         profiles = list(Profile.objects.filter(user__in=users).cache())
+
+
+# Tests for proxy models, see #30
+class ProxyTests(BaseTestCase):
+    def test_30(self):
+        proxies = list(VideoProxy.objects.cache())
+        Video.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(VideoProxy.objects.cache())
+
+    def test_30_reversed(self):
+        proxies = list(Video.objects.cache())
+        VideoProxy.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(Video.objects.cache())
+
+    @unittest.expectedFailure
+    def test_interchange(self):
+        proxies = list(Video.objects.cache())
+
+        with self.assertNumQueries(0):
+            list(VideoProxy.objects.cache())
+
+
+class MultitableInheritanceTests(BaseTestCase):
+    @unittest.expectedFailure
+    def test_sub_added(self):
+        media_count = Media.objects.cache().count()
+        Movie.objects.create(name="Matrix", year=1999)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(Media.objects.cache().count(), media_count + 1)
+
+    @unittest.expectedFailure
+    def test_base_changed(self):
+        matrix = Movie.objects.create(name="Matrix", year=1999)
+        list(Movie.objects.cache())
+
+        media = Media.objects.get(pk=matrix.pk)
+        media.name = "Matrix (original)"
+        media.save()
+
+        with self.assertNumQueries(1):
+            list(Movie.objects.cache())

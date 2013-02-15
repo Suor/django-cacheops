@@ -30,3 +30,20 @@ class Extra(models.Model):
 class Profile(models.Model):
     user = models.ForeignKey(User)
     tag = models.IntegerField()
+
+
+# Proxy model
+class Video(models.Model):
+    title = models.CharField(max_length=128)
+
+class VideoProxy(Video):
+    class Meta:
+        proxy = True
+
+
+# Multi-table inheritance
+class Media(models.Model):
+    name = models.CharField(max_length=128)
+
+class Movie(Media):
+    year = models.IntegerField()

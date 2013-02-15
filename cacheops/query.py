@@ -13,7 +13,7 @@ from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils.hashcompat import md5_constructor
 
 from cacheops.conf import model_profile, redis_client
-from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name
+from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
 
@@ -27,6 +27,8 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
     """
+    model = non_proxy(model)
+
     if timeout is None:
         profile = model_profile(model)
         timeout = profile['timeout']
