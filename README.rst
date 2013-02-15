@@ -228,7 +228,8 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
    You can revert queryset to cloning state using ``.cloning()`` call.
 
-3. More to 2, there is `unfixed bug in django <https://code.djangoproject.com/ticket/16759>`_, which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
+3. More to 2, there is `unfixed bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
+   which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
 4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
 
