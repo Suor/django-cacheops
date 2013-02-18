@@ -5,6 +5,7 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+from redis import ConnectionError
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
@@ -56,7 +57,10 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
             # Add few extra seconds to be extra safe
             txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
 
-    txn.execute()
+    try:
+        txn.execute()
+    except ConnectionError:
+        pass
 
 
 def cached_as(sample, extra=None, timeout=None):
@@ -89,9 +93,10 @@ def cached_as(sample, extra=None, timeout=None):
         def wrapper(*args):
             # NOTE: These args must not effect function result.
             #       I'm keeping them to cache view functions.
-            cache_data = redis_client.get(cache_key)
-            if cache_data is not None:
-                return pickle.loads(cache_data)
+            if redis_client is not None:
+                cache_data = redis_client.get(cache_key)
+                if cache_data is not None:
+                    return pickle.loads(cache_data)
 
             result = func(*args)
             queryset._cache_results(cache_key, result, timeout)
@@ -311,7 +316,12 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cache_write_only:
                 # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
+                if redis_client is not None:
+                    cache_data = redis_client.get(cache_key)
+                else:
+                    cache_data = None
+
+
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:

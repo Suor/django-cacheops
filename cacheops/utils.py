@@ -136,14 +136,3 @@ def conj_scheme(conj):
     Which is just a sorted tuple of field names.
     """
     return tuple(sorted(imap(itemgetter(0), conj)))
-
-
-def auto_failover(func):
-
-    def _wrap(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except:
-            return False
-
-    return _wrap
