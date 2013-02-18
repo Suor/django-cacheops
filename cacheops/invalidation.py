@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from redis.exceptions import WatchError
 
-from cacheops.conf import redis_client
+from cacheops.conf import redis_client, auto_failover
 from cacheops.utils import get_model_name, non_proxy
 
 
@@ -42,6 +42,9 @@ class ConjSchemes(object):
 
     def load_schemes(self, model):
         model_name = get_model_name(model)
+
+        if redis_client is None:
+            return
 
         txn = redis_client.pipeline()
         txn.get(self.get_version_key(model))
@@ -114,6 +117,7 @@ class ConjSchemes(object):
 cache_schemes = ConjSchemes()
 
 
+@auto_failover
 def invalidate_from_dict(model, values):
     """
     Invalidates caches that can possibly be influenced by object
@@ -163,6 +167,7 @@ def invalidate_obj(obj):
     invalidate_from_dict(non_proxy(obj.__class__), obj.__dict__)
 
 
+@auto_failover
 def invalidate_model(model):
     """
     Invalidates all caches for given model.
@@ -180,6 +185,8 @@ def invalidate_model(model):
     # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
     cache_schemes.clear(model)
 
+
+@auto_failover
 def invalidate_all():
     redis_client.flushdb()
     cache_schemes.clear_all()
