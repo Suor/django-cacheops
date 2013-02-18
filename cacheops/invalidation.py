@@ -86,6 +86,9 @@ class ConjSchemes(object):
             if not loaded:
                 schemes = self.load_schemes(model)
             if new_schemes - schemes:
+                if redis_client is None:
+                    return
+
                 # Write new schemes to redis
                 txn = redis_client.pipeline()
                 txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
@@ -105,6 +108,9 @@ class ConjSchemes(object):
         """
         Clears schemes for models
         """
+        if redis_client is None:
+            return
+
         redis_client.delete(self.get_lookup_key(model))
         redis_client.incr(self.get_version_key(model))
 
@@ -167,13 +173,15 @@ def invalidate_obj(obj):
     invalidate_from_dict(non_proxy(obj.__class__), obj.__dict__)
 
 
-@auto_failover
 def invalidate_model(model):
     """
     Invalidates all caches for given model.
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
+    if redis_client is None:
+        return
+
     conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
     if isinstance(conjs_keys, str):
         conjs_keys = conjs_keys.split()
@@ -186,7 +194,9 @@ def invalidate_model(model):
     cache_schemes.clear(model)
 
 
-@auto_failover
 def invalidate_all():
+    if redis_client is None:
+        return
+
     redis_client.flushdb()
     cache_schemes.clear_all()
