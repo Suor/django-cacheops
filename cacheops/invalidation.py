@@ -2,7 +2,7 @@
 from redis.exceptions import WatchError
 
 from cacheops.conf import redis_client
-from cacheops.utils import get_model_name, non_proxy
+from cacheops.utils import get_model_name, non_proxy, auto_failover
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
@@ -114,6 +114,7 @@ class ConjSchemes(object):
 cache_schemes = ConjSchemes()
 
 
+@auto_failover
 def invalidate_from_dict(model, values):
     """
     Invalidates caches that can possibly be influenced by object
@@ -163,6 +164,7 @@ def invalidate_obj(obj):
     invalidate_from_dict(non_proxy(obj.__class__), obj.__dict__)
 
 
+@auto_failover
 def invalidate_model(model):
     """
     Invalidates all caches for given model.
