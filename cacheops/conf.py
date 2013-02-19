@@ -26,18 +26,6 @@ except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
 
 
-def auto_failover(func):
-
-    def _wrap(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except:
-            return None
-
-    return _wrap
-
-
-@auto_failover
 def get_redis_client():
     """
     Return redis cliend if connection could be established, other wise return None
@@ -49,6 +37,7 @@ redis_client = get_redis_client()
 
 
 model_profiles = {}
+
 
 def prepare_profiles():
     """

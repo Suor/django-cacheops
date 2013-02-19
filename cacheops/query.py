@@ -28,6 +28,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
     """
+
     model = non_proxy(model)
 
     if timeout is None:
@@ -60,7 +61,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     try:
         txn.execute()
     except ConnectionError:
-        pass
+        return
 
 
 def cached_as(sample, extra=None, timeout=None):
@@ -93,10 +94,13 @@ def cached_as(sample, extra=None, timeout=None):
         def wrapper(*args):
             # NOTE: These args must not effect function result.
             #       I'm keeping them to cache view functions.
-            if redis_client is not None:
+            try:
                 cache_data = redis_client.get(cache_key)
-                if cache_data is not None:
-                    return pickle.loads(cache_data)
+            except ConnectionError:
+                cache_data = None
+
+            if cache_data is not None:
+                return pickle.loads(cache_data)
 
             result = func(*args)
             queryset._cache_results(cache_key, result, timeout)
@@ -316,11 +320,10 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cache_write_only:
                 # Trying get data from cache
-                if redis_client is not None:
+                try:
                     cache_data = redis_client.get(cache_key)
-                else:
+                except:
                     cache_data = None
-
 
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
