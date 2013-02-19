@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-import functools
-import redis
-import warnings
-
-from django.conf import settings
-
-from cacheops.conf import redis_client
+from cacheops.conf import redis_client, handle_connection_failure
 from cacheops.utils import get_model_name, non_proxy
 
 
@@ -158,22 +152,6 @@ def invalidate_from_dict(model, values):
             schemes = cache_schemes.load_schemes(model)
         else:
             break
-
-
-def handle_connection_failure(func):
-    @functools.wraps(func)
-    def _inner(*args, **kwargs):
-        degrade = getattr(settings, 'CACHEOPS_DEGRADE', False)
-
-        try:
-            return func(*args, **kwargs)
-        except redis.ConnectionError, e:
-            if degrade:
-                warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
-            else:
-                raise
-
-    return _inner
 
 
 @handle_connection_failure
