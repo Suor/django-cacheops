@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from redis.exceptions import WatchError
+from redis.exceptions import ConnectionError
 
 from cacheops.conf import redis_client
 from cacheops.utils import get_model_name, non_proxy
@@ -46,7 +46,10 @@ class ConjSchemes(object):
         txn = redis_client.pipeline()
         txn.get(self.get_version_key(model))
         txn.smembers(self.get_lookup_key(model_name))
-        version, members = txn.execute()
+        try:
+            version, members = txn.execute()
+        except ConnectionError:
+            return None
 
         self.local[model_name] = set(map(deserialize_scheme, members))
         self.local[model_name].add(()) # Всегда добавляем пустую схему
@@ -75,7 +78,10 @@ class ConjSchemes(object):
         loaded = False
 
         if model_name not in self.local:
-            self.load_schemes(model)
+            result = self.load_schemes(model)
+            if result is None:
+                return
+
             loaded = True
         schemes = self.local[model_name]
 
@@ -83,6 +89,7 @@ class ConjSchemes(object):
             if not loaded:
                 schemes = self.load_schemes(model)
             if new_schemes - schemes:
+
                 # Write new schemes to redis
                 txn = redis_client.pipeline()
                 txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
@@ -90,7 +97,10 @@ class ConjSchemes(object):
                 lookup_key = self.get_lookup_key(model_name)
                 for scheme in new_schemes - schemes:
                     txn.sadd(lookup_key, serialize_scheme(scheme))
-                txn.execute()
+                try:
+                    txn.execute()
+                except ConnectionError:
+                    return None
 
                 # Updating local version
                 self.local[model_name].update(new_schemes)
@@ -102,8 +112,11 @@ class ConjSchemes(object):
         """
         Clears schemes for models
         """
-        redis_client.delete(self.get_lookup_key(model))
-        redis_client.incr(self.get_version_key(model))
+        try:
+            redis_client.delete(self.get_lookup_key(model))
+            redis_client.incr(self.get_version_key(model))
+        except ConnectionError:
+            return
 
     def clear_all(self):
         self.local = {}
@@ -120,6 +133,10 @@ def invalidate_from_dict(model, values):
     """
     # Loading model schemes from local memory (or from redis)
     schemes = cache_schemes.schemes(model)
+
+    # In case when redis is unavailable
+    if schemes is None:
+        return
 
     # We hope that our schemes are valid, but if not we will update them and redo invalidation
     # on second pass
@@ -169,7 +186,11 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
+    try:
+        conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
+    except ConnectionError:
+        return
+
     if isinstance(conjs_keys, str):
         conjs_keys = conjs_keys.split()
 
@@ -180,6 +201,10 @@ def invalidate_model(model):
     # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
     cache_schemes.clear(model)
 
+
 def invalidate_all():
-    redis_client.flushdb()
-    cache_schemes.clear_all()
+    try:
+        redis_client.flushdb()
+        cache_schemes.clear_all()
+    except ConnectionError:
+        return

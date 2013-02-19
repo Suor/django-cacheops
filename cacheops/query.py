@@ -5,6 +5,7 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+from redis import ConnectionError
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
@@ -27,6 +28,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
     """
+
     model = non_proxy(model)
 
     if timeout is None:
@@ -56,7 +58,10 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
             # Add few extra seconds to be extra safe
             txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
 
-    txn.execute()
+    try:
+        txn.execute()
+    except ConnectionError:
+        return
 
 
 def cached_as(sample, extra=None, timeout=None):
@@ -89,7 +94,11 @@ def cached_as(sample, extra=None, timeout=None):
         def wrapper(*args):
             # NOTE: These args must not effect function result.
             #       I'm keeping them to cache view functions.
-            cache_data = redis_client.get(cache_key)
+            try:
+                cache_data = redis_client.get(cache_key)
+            except ConnectionError:
+                cache_data = None
+
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -311,7 +320,11 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cache_write_only:
                 # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
+                try:
+                    cache_data = redis_client.get(cache_key)
+                except:
+                    cache_data = None
+
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:
