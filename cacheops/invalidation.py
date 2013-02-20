@@ -38,6 +38,7 @@ class ConjSchemes(object):
             model_or_name = get_model_name(model_or_name)
         return 'schemes:%s:version' % model_or_name
 
+    @handle_connection_failure
     def load_schemes(self, model):
         model_name = get_model_name(model)
 
@@ -56,7 +57,8 @@ class ConjSchemes(object):
         try:
             return self.local[model_name]
         except KeyError:
-            return self.load_schemes(model)
+            _schemes = self.load_schemes(model)
+            return _schemes or []
 
     def version(self, model):
         try:
