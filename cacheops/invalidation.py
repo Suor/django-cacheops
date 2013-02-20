@@ -75,10 +75,12 @@ class ConjSchemes(object):
         loaded = False
 
         if model_name not in self.local:
-            self.load_schemes(model)
+            schemes = self.load_schemes(model)
+            if not schemes:
+                return
             loaded = True
-        schemes = self.local[model_name]
 
+        schemes = self.local[model_name]
         if new_schemes - schemes:
             if not loaded:
                 schemes = self.load_schemes(model)
