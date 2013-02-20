@@ -56,8 +56,7 @@ class ConjSchemes(object):
         try:
             return self.local[model_name]
         except KeyError:
-            _schemes = self.load_schemes(model)
-            return _schemes or []
+            return self.load_schemes(model)
 
     def version(self, model):
         try:
@@ -74,9 +73,7 @@ class ConjSchemes(object):
         loaded = False
 
         if model_name not in self.local:
-            schemes = self.load_schemes(model)
-            if not schemes:
-                return
+            self.load_schemes(model)
             loaded = True
 
         schemes = self.local[model_name]
