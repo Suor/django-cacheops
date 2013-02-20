@@ -12,7 +12,7 @@ from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet,
 from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.utils.hashcompat import md5_constructor
 
-from cacheops.conf import model_profile, redis_client
+from cacheops.conf import model_profile, redis_client, handle_connection_failure
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
@@ -23,6 +23,7 @@ _old_objs = {}
 _local_get_cache = {}
 
 
+@handle_connection_failure
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
