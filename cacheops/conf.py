@@ -21,22 +21,38 @@ profiles = {
 for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
+
+class SafeRedis(redis.Redis):
+    """
+    Just a thin wrapper to consistently safeguard from crashing the entire application
+    if our cache server is down or there are network communication issues and we cannot
+    retrieve our cache.
+    """
+    def get(self, name):
+        try:
+            return super(SafeRedis, self).get(name)
+        except redis.ConnectionError, e:
+            warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
+            return None
+
+
 # Connecting to redis
 try:
     redis_conf = settings.CACHEOPS_REDIS
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
-redis_client = redis.Redis(**redis_conf)
+
+degrade_on_failure = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
+
+redis_client = SafeRedis(**redis_conf) if degrade_on_failure else redis.Redis(**redis_conf)
 
 def handle_connection_failure(func):
     @functools.wraps(func)
     def _inner(*args, **kwargs):
-        degrade = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
-
         try:
             return func(*args, **kwargs)
         except redis.ConnectionError, e:
-            if degrade:
+            if degrade_on_failure:
                 warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
             else:
                 raise
