@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-from redis.exceptions import WatchError
-
-from cacheops.conf import redis_client
+from cacheops.conf import redis_client, handle_connection_failure
 from cacheops.utils import get_model_name, non_proxy
 
 
@@ -77,8 +75,8 @@ class ConjSchemes(object):
         if model_name not in self.local:
             self.load_schemes(model)
             loaded = True
-        schemes = self.local[model_name]
 
+        schemes = self.local[model_name]
         if new_schemes - schemes:
             if not loaded:
                 schemes = self.load_schemes(model)
@@ -156,13 +154,14 @@ def invalidate_from_dict(model, values):
             break
 
 
+@handle_connection_failure
 def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
     """
     invalidate_from_dict(non_proxy(obj.__class__), obj.__dict__)
 
-
+@handle_connection_failure
 def invalidate_model(model):
     """
     Invalidates all caches for given model.

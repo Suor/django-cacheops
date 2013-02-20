@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
+import functools
 import redis
+import warnings
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -19,12 +21,32 @@ profiles = {
 for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
+degrade_on_failure = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
+
+def handle_connection_failure(func):
+    if not degrade_on_failure:
+        return func
+
+    @functools.wraps(func)
+    def _inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except redis.ConnectionError, e:
+            warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
+
+    return _inner
+
+class SafeRedis(redis.Redis):
+    get = handle_connection_failure(redis.Redis.get)
+
 # Connecting to redis
 try:
     redis_conf = settings.CACHEOPS_REDIS
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
-redis_client = redis.Redis(**redis_conf)
+
+redis_client = SafeRedis(**redis_conf) if degrade_on_failure else redis.Redis(**redis_conf)
+
 
 
 model_profiles = {}
