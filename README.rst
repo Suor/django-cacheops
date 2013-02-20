@@ -70,6 +70,11 @@ Setup redis connection and enable caching for desired models::
         '*.*': ('count', 60*15),
     }
 
+Additionally, you can tell cacheops to degrade gracefully on redis fail with::
+
+    CACHEOPS_DEGRADE_ON_FAILURE=True
+
+
 Usage
 -----
 
