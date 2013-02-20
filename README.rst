@@ -70,6 +70,11 @@ Setup redis connection and enable caching for desired models::
         '*.*': ('count', 60*15),
     }
 
+Additionally, you can tell cacheops to degrade gracefully on redis fail with::
+
+    CACHEOPS_DEGRADE_ON_FAILURE=True
+
+
 Usage
 -----
 
@@ -191,6 +196,7 @@ or
 
 Tags work the same way as corresponding decorators.
 
+
 CAVEATS
 -------
 
@@ -202,7 +208,7 @@ CAVEATS
 5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
 6. Doesn't work with RawQuerySet.
 7. Conditions on subqueries don't affect invalidation.
-
+8. Doesn't work right with multi-table inheritance.
 9. Aggregates is not implemented yet.
 10. Timeout in queryset and ``@cached_as()`` cannot be larger than default.
 
@@ -212,7 +218,8 @@ probably counter-productive since one can just break queries into simple ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
 6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
-and is more flexible.
+and is more flexible. 8 is postponed until it will gain more interest or a champion willing to
+implement it emerge.
 
 
 Performance tips
@@ -220,23 +227,24 @@ Performance tips
 
 Here come some performance tips to make cacheops and Django ORM faster.
 
-1. When you use cache you pickle and unpickle lots of django model instances, which could be slow.
-You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
+1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
-2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone
-self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
 
     items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
 
-You can revert queryset to cloning state using ``.cloning()`` call.
+   You can revert queryset to cloning state using ``.cloning()`` call.
 
-3. More to 2, there is `unfixed bug in django <https://code.djangoproject.com/ticket/16759>`_,
-which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
+3. More to 2, there is `unfixed bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
+   which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to
-generate anything. Also pickling/unpickling a string is much faster than list of model instances.
-Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt
-``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+
+5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/topics/persistence>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
+
+6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heurestics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
+
+   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 
 TODO
@@ -250,3 +258,4 @@ TODO
 - jinja2 tag for "get random of some list" block with lazy rendering
 - make a version of invalidation with scripting
 - shard cache between multiple redises
+- integrate with prefetch_related()

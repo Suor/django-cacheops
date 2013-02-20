@@ -1,4 +1,4 @@
-VERSION = (0, 9, 1)
+VERSION = (0, 9, 5)
 __version__ = '.'.join(map(str, VERSION))
 
 from .simple import *

@@ -1,0 +1,18 @@
+0.9.6
+- support gracefull degradation on redis fail (Beres Botond)
+
+0.9.5
+- support for proxy models
+
+0.9.4
+- fixed occasional redis 100% cpu use (tumb1er)
+
+0.9.3
+- invalidate and cleanfilecache commands added to dist
+- django 1.5 compatability (jhpinson)
+
+0.9.2
+- compatability with latest redis-py
+- many other bug fixes
+- minor optimizations
+- better docs, including PERFORMANCE section

@@ -6,6 +6,34 @@
       "title": "Django"
     }
   },
+  {
+    "model": "tests.category",
+    "pk": 2,
+    "fields": {
+      "title": "Rails"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 3,
+    "fields": {
+      "title": "Perl"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 4,
+    "fields": {
+      "title": "Python"
+    }
+  },
+  {
+    "model": "tests.category",
+    "pk": 5,
+    "fields": {
+      "title": "Node.js"
+    }
+  },
 
   {
     "model": "tests.post",
@@ -14,6 +42,43 @@
       "title": "Cacheops",
       "category": 1,
       "visible": true
+    }
+  },
+  {
+    "model": "tests.post",
+    "pk": 2,
+    "fields": {
+      "title": "Implicit variable as pronoun",
+      "category": 3,
+      "visible": true
+    }
+  },
+  {
+    "model": "tests.post",
+    "pk": 3,
+    "fields": {
+      "title": "Perl 6 hyperoperator",
+      "category": 3,
+      "visible": true
+    }
+  },
+
+  {
+    "model": "tests.extra",
+    "pk": 1,
+    "fields": {
+      "post": 1,
+      "tag": 5,
+      "to_tag": 10
+    }
+  },
+  {
+    "model": "tests.extra",
+    "pk": 2,
+    "fields": {
+      "post": 2,
+      "tag": 10,
+      "to_tag": 5
     }
   }
 ]

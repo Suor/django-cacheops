@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='django-cacheops',
-    version='0.9.1',
+    version='0.9.5',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
@@ -11,10 +11,10 @@ setup(
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 
-    packages=['cacheops'],
+    packages=['cacheops', 'cacheops.management', 'cacheops.management.commands'],
     install_requires=[
         'django>=1.2',
-        'redis>=2.2.4',
+        'redis>=2.4.12',
         'simplejson>=2.1.5',
     ],
 

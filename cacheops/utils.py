@@ -3,6 +3,7 @@ from operator import concat, itemgetter
 from itertools import product, imap
 from inspect import getmembers, ismethod
 
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import ExtraWhere
@@ -10,6 +11,12 @@ from django.db.models.sql.query import ExtraWhere
 
 LONG_DISJUNCTION = 8
 
+
+def non_proxy(model):
+    while model._meta.proxy:
+        # Every proxy model has exactly one non abstract parent model
+        model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
+    return model
 
 def get_model_name(model):
     return '%s.%s' % (model._meta.app_label, model._meta.module_name)
@@ -50,7 +57,7 @@ def monkey_mix(cls, mixin, methods=None):
 
 
 
-def dnf(where, alias):
+def dnf(qs):
     """
     Converts sql condition tree to DNF.
 
@@ -70,9 +77,9 @@ def dnf(where, alias):
             if constraint.alias != alias or isinstance(value, QuerySet):
                 return [[]]
             elif lookup == 'exact':
-                return [[(constraint.col, value, True)]] # колонка, значение, отрицание
+                return [[(attname_of(model, constraint.col), value, True)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(constraint.col, v, True)] for v in value]
+                return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
                 return [[]]
         elif isinstance(where, ExtraWhere):
@@ -100,6 +107,10 @@ def dnf(where, alias):
 
             return result
 
+    where = qs.query.where
+    model = qs.model
+    alias = model._meta.db_table
+
     result = _dnf(where)
     if result is None:
         return [[]]
@@ -111,6 +122,12 @@ def dnf(where, alias):
     if not all(result):
         return [[]]
     return result
+
+
+def attname_of(model, col, cache={}):
+    if model not in cache:
+        cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
+    return cache[model].get(col, col)
 
 
 def conj_scheme(conj):

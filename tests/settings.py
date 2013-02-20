@@ -1,13 +1,18 @@
 INSTALLED_APPS = [
     'cacheops',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
     'tests',
 ]
+
+AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'sqlite.db'
     }
 }
 
