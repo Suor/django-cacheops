@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
-import functools
+from functools import wraps
 import redis
 import warnings
 
@@ -21,13 +21,15 @@ profiles = {
 for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
-degrade_on_failure = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
+
+# Support degradation on redis fail
+DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 def handle_connection_failure(func):
-    if not degrade_on_failure:
+    if not DEGRADE_ON_FAILURE:
         return func
 
-    @functools.wraps(func)
+    @wraps(func)
     def _inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -39,14 +41,14 @@ def handle_connection_failure(func):
 class SafeRedis(redis.Redis):
     get = handle_connection_failure(redis.Redis.get)
 
+
 # Connecting to redis
 try:
     redis_conf = settings.CACHEOPS_REDIS
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
 
-redis_client = SafeRedis(**redis_conf) if degrade_on_failure else redis.Redis(**redis_conf)
-
+redis_client = SafeRedis(**redis_conf) if DEGRADE_ON_FAILURE else redis.Redis(**redis_conf)
 
 
 model_profiles = {}
