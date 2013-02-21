@@ -94,6 +94,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     # cache_schemes.ensure_known(model, schemes)
 
     # txn = redis_client.pipeline()
+        txn.setex(cache_key, timeout, pickled_data)
 
     # # Write data to cache
     # if timeout is not None:
