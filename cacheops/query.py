@@ -43,7 +43,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     # Write data to cache
     pickled_data = pickle.dumps(data, -1)
     if timeout is not None:
-        txn.setex(cache_key, pickled_data, timeout)
+        txn.setex(cache_key, timeout, pickled_data)
     else:
         txn.set(cache_key, pickled_data)
 

@@ -38,8 +38,8 @@ def handle_connection_failure(func):
 
     return _inner
 
-class SafeRedis(redis.Redis):
-    get = handle_connection_failure(redis.Redis.get)
+class SafeRedis(redis.StrictRedis):
+    get = handle_connection_failure(redis.StrictRedis.get)
 
 
 # Connecting to redis
@@ -48,7 +48,7 @@ try:
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
 
-redis_client = SafeRedis(**redis_conf) if DEGRADE_ON_FAILURE else redis.Redis(**redis_conf)
+redis_client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
 
 
 model_profiles = {}
