@@ -15,13 +15,14 @@ from django.utils.hashcompat import md5_constructor
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
-from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
+from cacheops.invalidation import invalidate_obj, invalidate_model
 
 
 __all__ = ('cached_method', 'cached_as', 'install_cacheops')
 
 _old_objs = {}
 _local_get_cache = {}
+
 
 
 
@@ -35,7 +36,17 @@ local dnf = cjson.decode(ARGV[3])
 local timeout = ARGV[4]
 local inv_timeout = ARGV[5]
 
--- TODO: reimplement ensure_known() here
+-- Update schemes
+local schemes = {}
+for _, conj in ipairs(dnf) do
+    local s = {}
+    for _, eq in ipairs(conj) do
+        table.insert(s, eq[1])
+    end
+    table.insert(schemes, table.concat(s, ','))
+end
+redis.call('sadd', 'schemes:' .. model, unpack(schemes))
+redis.call('incr', 'schemes:' .. model .. ':version')
 
 -- Write data to cache
 if timeout then
@@ -44,14 +55,14 @@ else
     redis.call('set', key, data)
 end
 
-redis.call('set', '_', 'hi')
-
-function conj_cache_key(model, conj)
-    local s = model .. ':'
+local conj_cache_key = function (model, conj)
+    local s = 'conj:' .. model .. ':'
     local parts = {}
 
-    for i, eq in pairs(conj) do
-        parts.push(eq[1] .. '=' .. eq[2])
+    redis.call('set', 'conj', cjson.encode(conj))
+
+    for _, eq in ipairs(conj) do
+        table.insert(parts, eq[1] .. '=' .. tostring(eq[2]))
     end
 
     redis.call('set', 'parts', cjson.encode(parts))
@@ -60,9 +71,9 @@ function conj_cache_key(model, conj)
 end
 
 -- Add new cache_key to list of dependencies for every conjunction in dnf
-for i, conj in pairs(dnf) do
+for _, conj in pairs(dnf) do
     local conj_key = conj_cache_key(model, conj)
-    redis.call('sadd', conj_key, cache_key)
+    redis.call('sadd', conj_key, key)
     if timeout then
         -- Invalidator timeout should be larger than timeout of any key it references
         -- So we take timeout from profile which is our upper limit
@@ -94,11 +105,10 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     # cache_schemes.ensure_known(model, schemes)
 
     # txn = redis_client.pipeline()
-        txn.setex(cache_key, timeout, pickled_data)
 
     # # Write data to cache
     # if timeout is not None:
-    #     txn.setex(cache_key, pickled_data, timeout)
+        # txn.setex(cache_key, timeout, pickled_data)
     # else:
     #     txn.set(cache_key, pickled_data)
 
