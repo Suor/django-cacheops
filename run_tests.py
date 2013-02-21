@@ -4,5 +4,8 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 from django.core.management import call_command
 
-names = sys.argv[1] if len(sys.argv) >= 2 else None
-call_command('test', 'tests.' + names if names else 'tests')
+if len(sys.argv) >= 2 and not sys.argv[1].startswith('-'):
+    names = 'tests.' + sys.argv[1]
+else:
+    names = 'tests'
+call_command('test', names, failfast='-x' in sys.argv)
