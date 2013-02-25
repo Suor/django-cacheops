@@ -177,6 +177,46 @@ And the one that FLUSHES cacheops redis database::
 Don't use that if you share redis database for both cache and something else.
 
 
+Simple time-invalidated cache
+-----------------------------
+
+To cache result of a function call for some time use::
+
+    from cacheops import cached
+
+    @cached(timeout=number_of_seconds)
+    def top_articles(category):
+        return ... # Some costly queries
+
+``@cached()`` will generate separate entries for each combination of decorated function and its
+arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions::
+
+    @property
+    def articles_json(self):
+        @cached(timeout=10*60, extra=self.category)
+        def _articles_json():
+            ...
+            return json.dumps(...)
+
+        return _articles_json()
+
+Cacheops also provides get/set primitives for simple cache::
+
+    from cacheops import cache
+
+    cache.set(cache_key, data, timeout=None)
+    cache.get(cache_key)
+
+``cache.get`` will raise ``CacheMiss`` if nothing is stored for given key::
+
+    from cacheops import cache, CacheMiss
+
+    try:
+        result = cache.get(key)
+    except CacheMiss:
+        ... # deal with it
+
+
 Jinja2 extension
 ----------------
 
@@ -250,7 +290,6 @@ Here come some performance tips to make cacheops and Django ORM faster.
 TODO
 ----
 
-- docs about simple cache
 - docs about file cache
 - add .delete(cache_key) method to simple and file cache
 - .invalidate() method on simple cached funcs

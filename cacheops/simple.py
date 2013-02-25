@@ -12,7 +12,7 @@ from django.conf import settings
 from cacheops.conf import redis_client
 
 
-__all__ = ('cache', 'cached', 'file_cache')
+__all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
 
 
 class CacheMiss(Exception):
