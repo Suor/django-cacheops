@@ -290,6 +290,7 @@ Here come some performance tips to make cacheops and Django ORM faster.
 TODO
 ----
 
+- fast mode: store cache in local memory, but check in with redis if it's valid
 - docs about file cache
 - add .delete(cache_key) method to simple and file cache
 - .invalidate() method on simple cached funcs
