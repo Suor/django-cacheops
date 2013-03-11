@@ -25,3 +25,5 @@ CACHEOPS_REDIS = {
 CACHEOPS = {
     '*.*': ('just_enable', 60*60),
 }
+
+SECRET_KEY = 'abc'
