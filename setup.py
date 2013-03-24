@@ -15,7 +15,7 @@ setup(
     install_requires=[
         'django>=1.2',
         'redis>=2.4.12',
-        'simplejson>=2.1.5',
+        'simplejson>=2.2.0',
     ],
 
     classifiers=[
