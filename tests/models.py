@@ -47,3 +47,8 @@ class Media(models.Model):
 
 class Movie(Media):
     year = models.IntegerField()
+
+
+# Decimals
+class Point(models.Model):
+    x = models.DecimalField(decimal_places=6, max_digits=8, blank=True, default=0.0)

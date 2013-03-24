@@ -86,6 +86,9 @@ class IssueTests(BaseTestCase):
         users = User.objects.filter(username='Suor')
         profiles = list(Profile.objects.filter(user__in=users).cache())
 
+    def test_39(self):
+        list(Point.objects.filter(x=7).cache())
+
 
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
