@@ -180,7 +180,13 @@ def _stringify_query():
             raise TypeError("Can't encode %s" % repr(obj))
 
     def stringify_query(query):
-        return json.dumps(query, default=encode_object, skipkeys=True, sort_keys=True, separators=(',',':'))
+        # HACK: Catch TypeError and reraise it as ValueError
+        #       since django hides it and behave weird when gets a TypeError in Queryset.iterator()
+        try:
+            return json.dumps(query, default=encode_object, skipkeys=True,
+                                     sort_keys=True, separators=(',',':'))
+        except TypeError as e:
+            raise ValueError(*e.args)
 
     return stringify_query
 stringify_query = _stringify_query()
