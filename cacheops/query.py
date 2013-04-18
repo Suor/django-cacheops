@@ -161,6 +161,8 @@ def _stringify_query():
             return sorted(obj)
         elif isinstance(obj, type):
             return '%s.%s' % (obj.__module__, obj.__name__)
+        elif hasattr(obj, '__uniq_key__'):
+            return (obj.__class__, obj.__uniq_key__())
         elif isinstance(obj, (datetime, date)):
             return str(obj)
         elif isinstance(obj, Constraint):

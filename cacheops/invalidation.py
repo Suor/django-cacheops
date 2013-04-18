@@ -15,8 +15,9 @@ def deserialize_scheme(scheme):
 def conj_cache_key(model, conj):
     return 'conj:%s:' % get_model_name(model) + '&'.join('%s=%s' % t for t in sorted(conj))
 
-def conj_cache_key_from_scheme(model, scheme, values):
-    return 'conj:%s:' % get_model_name(model) + '&'.join('%s=%s' % (f, values[f]) for f in scheme)
+def conj_cache_key_from_scheme(model, scheme, obj):
+    return 'conj:%s:' % get_model_name(model) \
+         + '&'.join('%s=%s' % (f, getattr(obj, f)) for f in scheme)
 
 
 class ConjSchemes(object):
@@ -112,10 +113,13 @@ class ConjSchemes(object):
 cache_schemes = ConjSchemes()
 
 
-def invalidate_from_dict(model, values):
+@handle_connection_failure
+def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
     """
+    model = non_proxy(obj.__class__)
+
     # Loading model schemes from local memory (or from redis)
     schemes = cache_schemes.schemes(model)
 
@@ -123,7 +127,7 @@ def invalidate_from_dict(model, values):
     # on second pass
     for _ in (1, 2):
         # Create a list of invalidators from list of schemes and values of object fields
-        conjs_keys = [conj_cache_key_from_scheme(model, scheme, values) for scheme in schemes]
+        conjs_keys = [conj_cache_key_from_scheme(model, scheme, obj) for scheme in schemes]
 
         # Reading scheme version, cache_keys and deleting invalidators in
         # a single transaction.
@@ -152,14 +156,6 @@ def invalidate_from_dict(model, values):
             schemes = cache_schemes.load_schemes(model)
         else:
             break
-
-
-@handle_connection_failure
-def invalidate_obj(obj):
-    """
-    Invalidates caches that can possibly be influenced by object
-    """
-    invalidate_from_dict(non_proxy(obj.__class__), obj.__dict__)
 
 @handle_connection_failure
 def invalidate_model(model):
