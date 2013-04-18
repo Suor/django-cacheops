@@ -77,6 +77,7 @@ def dnf(qs):
             if constraint.alias != alias or isinstance(value, QuerySet):
                 return [[]]
             elif lookup == 'exact':
+                # attribute, value, negation
                 return [[(attname_of(model, constraint.col), value, True)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
                 return [[(attname_of(model, constraint.col), v, True)] for v in value]
