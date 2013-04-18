@@ -70,7 +70,7 @@ class RedisCache(BaseCache):
     def set(self, cache_key, data, timeout=None):
         pickled_data = pickle.dumps(data, -1)
         if timeout is not None:
-            self.conn.setex(cache_key, pickled_data, timeout)
+            self.conn.setex(cache_key, timeout, pickled_data)
         else:
             self.conn.set(cache_key, pickled_data)
 
