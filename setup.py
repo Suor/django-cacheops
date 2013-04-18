@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='django-cacheops',
-    version='0.9.6',
+    version='0.9.7',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
