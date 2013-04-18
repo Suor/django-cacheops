@@ -1,3 +1,8 @@
+- support for flex models
+- support @cached_as(SomeModel)
+- file cache default dir changed to /tmp/cacheops_file_cache
+- better support for tuples in extra param in @cached and jinja2 tags
+
 0.9.6
 - support gracefull degradation on redis fail (Beres Botond)
 
