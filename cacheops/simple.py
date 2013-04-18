@@ -33,8 +33,12 @@ class BaseCache(object):
                 # Calculating cache key based on func and arguments
                 md5 = md5_constructor()
                 md5.update('%s.%s' % (func.__module__, func.__name__))
+                # TODO: make it more civilized
                 if extra is not None:
-                    md5.update(str(extra))
+                    if isinstance(extra, (list, tuple)):
+                        md5.update(':'.join(map(str, extra)))
+                    else:
+                        md5.update(str(extra))
                 if args:
                     md5.update(repr(args))
                 if kwargs:

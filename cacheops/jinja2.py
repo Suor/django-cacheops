@@ -31,7 +31,11 @@ class CacheopsExtension(Extension):
         caller = kwargs.pop('caller')
 
         cacheops_decorator = getattr(cacheops, tag_name)
-        kwargs['extra'] = str(kwargs.get('extra', '')) + tag_location
+        kwargs.setdefault('extra', '')
+        if isinstance(kwargs['extra'], tuple):
+            kwargs['extra'] += (tag_location,)
+        else:
+            kwargs['extra'] = str(kwargs['extra']) + tag_location
 
         @cacheops_decorator(*args, **kwargs)
         def _handle_tag():
