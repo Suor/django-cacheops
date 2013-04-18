@@ -132,7 +132,7 @@ def invalidate_obj(obj):
         # Reading scheme version, cache_keys and deleting invalidators in
         # a single transaction.
         def _invalidate_conjs(pipe):
-            pipe.multi()
+            # get schemes version to check later that it's not obsolete
             pipe.get(cache_schemes.get_version_key(model))
             # Get a union of all cache keys registered in invalidators
             pipe.sunion(conjs_keys)
