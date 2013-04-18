@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
 from functools import wraps
-import redis
 import warnings
+import redis
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured

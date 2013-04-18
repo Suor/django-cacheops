@@ -6,9 +6,9 @@ from django.core.exceptions import ImproperlyConfigured
 
 from cacheops.simple import file_cache, FILE_CACHE_DIR
 
+
 class Command(BaseCommand):
     help = 'Clean filebased cache'
 
     def handle(self, **options):
-        self.verbose = options.get('verbosity', 0)
         os.system('find %s -type f \! -iname "\." -mmin +0 -delete' % FILE_CACHE_DIR)
