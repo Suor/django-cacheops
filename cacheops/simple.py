@@ -78,7 +78,7 @@ cache = RedisCache(redis_client)
 cached = cache.cached
 
 
-FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/file_cache')
+FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
 FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
 
 class FileCache(BaseCache):
