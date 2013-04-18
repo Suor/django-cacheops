@@ -70,8 +70,10 @@ def cached_as(sample, extra=None, timeout=None):
     # TODO: think of better way doing this.
     if isinstance(sample, (list, tuple)):
         return lambda func: func
-    if isinstance(sample, Model):
+    elif isinstance(sample, Model):
         queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+    elif isinstance(sample, type) and issubclass(sample, Model):
+        queryset = sample.objects.all()
     else:
         queryset = sample
 
