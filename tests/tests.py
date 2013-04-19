@@ -83,8 +83,14 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        users = User.objects.filter(username='Suor')
-        profiles = list(Profile.objects.filter(user__in=users).cache())
+        list(Work.objects.filter(
+            needs_answer=True
+        ).exclude(
+            student__userprofile__grading_priority=0
+        ).order_by(
+            '-student__userprofile__grading_priority',
+            "-created"
+        ).cache())
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())

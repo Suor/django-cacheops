@@ -52,3 +52,19 @@ class Movie(Media):
 # Decimals
 class Point(models.Model):
     x = models.DecimalField(decimal_places=6, max_digits=8, blank=True, default=0.0)
+
+
+
+# 29
+class UserProfile(models.Model):
+    grading_priority = models.IntegerField()
+
+class Student(models.Model):
+    userprofile = models.ForeignKey(UserProfile)
+
+class Work(models.Model):
+    student = models.ForeignKey(Student)
+    needs_answer = models.BooleanField()
+    created = models.DateTimeField()
+
+
