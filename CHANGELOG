@@ -1,3 +1,5 @@
+- fixed 'Query' has no len()
+
 0.9.7
 - support for flex models
 - support @cached_as(SomeModel)
