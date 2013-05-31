@@ -1,3 +1,4 @@
+0.9.8
 - support isnull lookup for better invalidation
 - fixed 'Query' has no len()
 - dumped django.utils.hashcompat in favor of hashlib
