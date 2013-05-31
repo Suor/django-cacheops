@@ -4,9 +4,8 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import os, time
+import os, time, hashlib
 
-from django.utils.hashcompat import md5_constructor
 from django.conf import settings
 
 from cacheops.conf import redis_client
@@ -31,7 +30,7 @@ class BaseCache(object):
             @wraps(func)
             def wrapper(*args, **kwargs):
                 # Calculating cache key based on func and arguments
-                md5 = md5_constructor()
+                md5 = hashlib.md5()
                 md5.update('%s.%s' % (func.__module__, func.__name__))
                 # TODO: make it more civilized
                 if extra is not None:

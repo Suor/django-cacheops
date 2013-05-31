@@ -1,5 +1,6 @@
 - support isnull lookup for better invalidation
 - fixed 'Query' has no len()
+- dumped django.utils.hashcompat in favor of hashlib
 
 0.9.7
 - support for flex models

@@ -5,12 +5,12 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+import hashlib
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
-from django.utils.hashcompat import md5_constructor
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
@@ -228,7 +228,7 @@ class QuerySetMixin(object):
         """
         Compute a cache key for this queryset
         """
-        md5 = md5_constructor()
+        md5 = hashlib.md5()
         md5.update(str(self.__class__))
         md5.update(stringify_query(self.query))
         if extra:
