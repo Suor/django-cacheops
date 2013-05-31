@@ -56,15 +56,8 @@ class Point(models.Model):
 
 
 # 29
-class UserProfile(models.Model):
-    grading_priority = models.IntegerField()
+class Category(models.Model):
+    label = models.CharField(max_length=127, blank=True, default='')
 
-class Student(models.Model):
-    userprofile = models.ForeignKey(UserProfile)
-
-class Work(models.Model):
-    student = models.ForeignKey(Student)
-    needs_answer = models.BooleanField()
-    created = models.DateTimeField()
-
-
+class MachineBrand(models.Model):
+    categories = models.ManyToManyField(Category)
