@@ -38,7 +38,9 @@ Setup
 
 Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
-Setup redis connection and enable caching for desired models::
+Setup redis connection and enable caching for desired models:
+
+.. code:: python
 
     CACHEOPS_REDIS = {
         'host': 'localhost', # redis-server is on same machine
@@ -70,7 +72,10 @@ Setup redis connection and enable caching for desired models::
         '*.*': ('count', 60*15),
     }
 
-Additionally, you can tell cacheops to degrade gracefully on redis fail with::
+
+Additionally, you can tell cacheops to degrade gracefully on redis fail with:
+
+.. code:: python
 
     CACHEOPS_DEGRADE_ON_FAILURE=True
 
@@ -84,24 +89,33 @@ It's automatic you just need to set it up.
 
 | **Manual caching.**
 
-You can force any queryset to use cache by calling it's ``.cache()`` method::
+You can force any queryset to use cache by calling it's ``.cache()`` method:
+
+.. code:: python
 
     Article.objects.filter(tag=2).cache()
 
-Here you can specify which ops should be cached for queryset, for example, this code::
+
+Here you can specify which ops should be cached for queryset, for example, this code:
+
+.. code:: python
 
     qs = Article.objects.filter(tag=2).cache(ops=['count'])
     paginator = Paginator(objects, ipp)
     articles = list(pager.page(page_num)) # hits database
 
+
 will cache ``.count()`` call in Paginator but not later in articles fetch.
 There are three possible actions - ``get``, ``fetch`` and ``count``. You can
 pass any subset of this ops to ``.cache()`` method even empty to turn off caching.
-There are, however, a shortcut for it::
+There are, however, a shortcut for it:
+
+.. code:: python
 
     qs = Article.objects.filter(visible=True).nocache()
     qs1 = qs.filter(tag=2)       # hits database
     qs2 = qs.filter(category=3)  # hits it once more
+
 
 It is usefull when you want to disable automatic caching on particular queryset.
 
@@ -109,7 +123,9 @@ It is usefull when you want to disable automatic caching on particular queryset.
 
 You can cache and invalidate result of a function the same way as a queryset.
 Cache of next function will be invalidated on any ``Article`` change, addition
-or deletetion::
+or deletetion:
+
+.. code:: python
 
     from cacheops import cached_as
 
@@ -120,12 +136,15 @@ or deletetion::
             'categories': list( Article.objects.values('category').annotate(count=Count('id')) )
         }
 
+
 Note that we are using list on both querysets here, it's because we don't want
 to cache queryset objects but their result.
 
 Also note that cache key does not depend on arguments of a function, so it's result
 should not, either. This is done to enable caching of view functions. Instead
-you should use a local function::
+you should use a local function:
+
+.. code:: python
 
     def articles_block(category, count=5):
 
@@ -140,6 +159,7 @@ you should use a local function::
             return articles
 
         return _articles_block()
+
 
 Using local function gives additional advantage: we can filter queryset used
 in ``@cached_as()`` to make invalidation more granular. We also add an
@@ -157,12 +177,15 @@ and ``.delete()``.
 Invalidation tries to be granular which means it won't invalidate a queryset
 that cannot be influenced by added/updated/deleted object judjing by query
 conditions. Most time this will do what you want, if it's not you can use one
-of the following::
+of the following:
+
+.. code:: python
 
     from cacheops import invalidate_obj, invalidate_model
 
     invalidate_obj(some_article)  # invalidates queries affected by some_article
     invalidate_model(Article)     # invalidates all queries for model
+
 
 And last there is ``invalidate`` command::
 
@@ -180,7 +203,9 @@ Don't use that if you share redis database for both cache and something else.
 Simple time-invalidated cache
 -----------------------------
 
-To cache result of a function call for some time use::
+To cache result of a function call for some time use:
+
+.. code:: python
 
     from cacheops import cached
 
@@ -188,8 +213,11 @@ To cache result of a function call for some time use::
     def top_articles(category):
         return ... # Some costly queries
 
+
 ``@cached()`` will generate separate entries for each combination of decorated function and its
-arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions::
+arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions:
+
+.. code:: python
 
     @property
     def articles_json(self):
@@ -200,14 +228,20 @@ arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most usef
 
         return _articles_json()
 
-Cacheops also provides get/set primitives for simple cache::
+
+Cacheops also provides get/set primitives for simple cache:
+
+.. code:: python
 
     from cacheops import cache
 
     cache.set(cache_key, data, timeout=None)
     cache.get(cache_key)
 
-``cache.get`` will raise ``CacheMiss`` if nothing is stored for given key::
+
+``cache.get`` will raise ``CacheMiss`` if nothing is stored for given key:
+
+.. code:: python
 
     from cacheops import cache, CacheMiss
 
