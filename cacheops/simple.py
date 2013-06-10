@@ -94,7 +94,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = md5_constructor(key).hexdigest()
+        digest = hashlib.md5(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

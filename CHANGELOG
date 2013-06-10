@@ -1,3 +1,6 @@
+0.9.9
+- fixed file cache md5 reference
+
 0.9.8
 - support isnull lookup for better invalidation
 - fixed 'Query' has no len()
