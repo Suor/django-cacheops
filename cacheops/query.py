@@ -367,7 +367,11 @@ class QuerySetMixin(object):
                 except KeyError:
                     _local_get_cache[key] = self._no_monkey.get(self, *args, **kwargs)
                     return _local_get_cache[key]
-            elif 'fetch' in self._cacheops:
+                except TypeError:
+                    pass # If some arg is unhashable we can't save it to dict key,
+                         # we just skip local cache in that case
+
+            if 'fetch' in self._cacheops:
                 qs = self
             else:
                 qs = self._clone().cache()

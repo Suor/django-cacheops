@@ -89,6 +89,15 @@ class IssueTests(BaseTestCase):
         list(Point.objects.filter(x=7).cache())
 
 
+class LocalGetTests(BaseTestCase):
+    def setUp(self):
+        Local.objects.create(pk=1)
+        super(LocalGetTests, self).setUp()
+
+    def test_unhashable_args(self):
+        Local.objects.cache().get(pk__in=[1, 2])
+
+
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
     def test_30(self):

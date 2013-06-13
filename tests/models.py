@@ -60,3 +60,7 @@ class Label(models.Model):
 
 class MachineBrand(models.Model):
     labels = models.ManyToManyField(Label)
+
+# local_get
+class Local(models.Model):
+    tag = models.IntegerField(null=True)
