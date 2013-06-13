@@ -56,8 +56,8 @@ class Point(models.Model):
 
 
 # 29
-class Category(models.Model):
-    label = models.CharField(max_length=127, blank=True, default='')
+class Label(models.Model):
+    text = models.CharField(max_length=127, blank=True, default='')
 
 class MachineBrand(models.Model):
-    categories = models.ManyToManyField(Category)
+    labels = models.ManyToManyField(Label)

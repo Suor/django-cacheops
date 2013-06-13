@@ -83,7 +83,7 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(categories__in=[1,2,3]).cache().count()
+        MachineBrand.objects.exclude(labels__in=[1,2,3]).cache().count()
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
