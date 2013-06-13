@@ -2,12 +2,12 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+# For basic tests and bench
 class Category(models.Model):
     title = models.CharField(max_length=128)
 
     def __unicode__(self):
         return self.title
-
 
 class Post(models.Model):
     title = models.CharField(max_length=128)
@@ -17,7 +17,6 @@ class Post(models.Model):
     def __unicode__(self):
         return self.title
 
-
 class Extra(models.Model):
     post = models.OneToOneField(Post)
     tag = models.IntegerField(db_column='custom_column_name', unique=True)
@@ -26,7 +25,7 @@ class Extra(models.Model):
     def __unicode__(self):
         return 'Extra(post_id=%s, tag=%s)' % (self.post_id, self.tag)
 
-
+# 16
 class Profile(models.Model):
     user = models.ForeignKey(User)
     tag = models.IntegerField()
