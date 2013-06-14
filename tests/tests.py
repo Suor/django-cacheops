@@ -68,6 +68,20 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             Extra.objects.cache().get(to_tag=5)
 
+    def test_expression_node(self):
+        """Test applies only to Django 1.5 and above"""
+        import django
+        from django.db.models import F
+
+        if django.VERSION[1] != 5:
+            return
+
+        e = Extra.objects.cache().get(to_tag=F('to_tag').bitand(5))
+        e.save()
+
+        with self.assertNumQueries(1):
+            Extra.objects.cache().get(to_tag=F('to_tag').bitor(5))
+
 
 class IssueTests(BaseTestCase):
     def setUp(self):

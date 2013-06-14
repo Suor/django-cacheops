@@ -134,6 +134,8 @@ def _stringify_query():
     """
     import simplejson as json
     from datetime import datetime, date
+    import django
+    from django.db.models import F
     from django.db.models.fields import Field
     from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
     from django.db.models.sql import Query
@@ -147,6 +149,8 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[RawValue] = ('value',)
     attrs[Date] = ('col', 'lookup_type')
+    if django.VERSION[1] == 5:
+        attrs[F] = ('name',)
 
     q = Query(None)
     q_keys = q.__dict__.keys()
