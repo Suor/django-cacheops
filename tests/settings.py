@@ -6,6 +6,8 @@ INSTALLED_APPS = [
 ]
 
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
+# Django 1.5 requires this
+SECRET_KEY = 'key'
 
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
