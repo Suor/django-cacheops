@@ -145,7 +145,7 @@ def _stringify_query():
     attrs[WhereNode] = ('connector', 'negated', 'children', 'subtree_parents')
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
-    attrs[RawValue] = ('value')
+    attrs[RawValue] = ('value',)
     attrs[Date] = ('col', 'lookup_type')
 
     q = Query(None)
