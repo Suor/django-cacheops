@@ -134,6 +134,7 @@ def _stringify_query():
     """
     import simplejson as json
     from datetime import datetime, date
+    from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
     from django.db.models.sql import Query
@@ -142,11 +143,12 @@ def _stringify_query():
     from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
-    attrs[WhereNode] = ('connector', 'negated', 'children', 'subtree_parents')
+    attrs[WhereNode] = attrs[ExpressionNode] = ('connector', 'negated', 'children', 'subtree_parents')
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[RawValue] = ('value',)
     attrs[Date] = ('col', 'lookup_type')
+    attrs[F] = ('name',)
 
     q = Query(None)
     q_keys = q.__dict__.keys()

@@ -68,6 +68,27 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             Extra.objects.cache().get(to_tag=5)
 
+    def test_expressions(self):
+        from django.db.models import F
+        queries = (
+            {'tag': F('tag')},
+            {'tag': F('to_tag')},
+            {'tag': F('to_tag') * 2},
+            {'tag': F('to_tag') + (F('tag') / 2)},
+        )
+        if hasattr(F, 'bitor'):
+            queries += (
+                {'tag': F('tag').bitor(5)},
+                {'tag': F('to_tag').bitor(5)},
+                {'tag': F('tag').bitor(5) + 1},
+                {'tag': F('tag').bitor(5) * F('to_tag').bitor(5)}
+            )
+        count = len(queries)
+        for c in (count, 0):
+            with self.assertNumQueries(c):
+                for q in queries:
+                    Extra.objects.cache().filter(**q).count()
+
 
 class IssueTests(BaseTestCase):
     def setUp(self):
