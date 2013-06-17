@@ -144,6 +144,7 @@ def _stringify_query():
 
     attrs = {}
     attrs[WhereNode] = attrs[ExpressionNode] = ('connector', 'negated', 'children', 'subtree_parents')
+    attrs[SQLEvaluator] = ('expression',)
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[RawValue] = ('value',)
@@ -171,17 +172,15 @@ def _stringify_query():
             return (obj.alias, obj.col)
         elif isinstance(obj, Field):
             return (obj.model, obj.name)
-        elif isinstance(obj, QuerySet):
-            return (obj.__class__, obj.query)
         elif obj.__class__ in attrs:
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[obj.__class__]])
+        elif isinstance(obj, QuerySet):
+            return (obj.__class__, obj.query)
         elif isinstance(obj, Aggregate):
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Aggregate]])
         elif isinstance(obj, Query):
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
-        elif isinstance(obj, SQLEvaluator):
-            return (obj.__class__, obj.expression.__dict__.items())
         else:
             raise TypeError("Can't encode %s" % repr(obj))
 
