@@ -1,4 +1,6 @@
+- support F-expressions (Yuego)
 - fixed local_get with unhashable arg TypeError
+- fixed caching of raw queries (Yuego)
 
 0.9.9
 - fixed file cache md5 reference
