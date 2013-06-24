@@ -1,6 +1,7 @@
 import unittest
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.db import connection
 
 from cacheops import invalidate_all
 from .models import *  # noqa
@@ -10,6 +11,7 @@ class BaseTestCase(TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
+        print('\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\invalidation done///////////////////////////////////////////////')
 
 
 class BasicTests(BaseTestCase):
@@ -58,11 +60,26 @@ class BasicTests(BaseTestCase):
             self.assertEqual(new_count, count - 1)
 
     def test_invalidate_by_m2m(self):
-        mb = MachineBrand.objects.cache().get(id=1)
-        mb = MachineBrand.objects.cache().get(id=1)
-        cat = Category.objects.get(id=1)
-        mb.categories.remove(cat)
-        print(mb.categories.all())
+        with self.assertNumQueries(1):
+            mb = MachineBrand.objects.cache().get(id=1)
+
+        with self.assertNumQueries(1):
+            cat = Category.objects.cache().get(id=1)
+        with self.assertNumQueries(0):
+            cat = Category.objects.cache().get(id=1)
+
+        with self.assertNumQueries(1):
+            cat = Category.objects.cache().get(id=2)
+
+#        with self.assertNumQueries(0):
+#            cat = Category.objects.cache().get(id=2)
+
+        with self.assertNumQueries(2):
+            mb.categories.remove(cat)
+        with self.assertNumQueries(1):
+            print(mb.categories.cache().all())
+        with self.assertNumQueries(0):
+            print(mb.categories.cache().all())
 
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)
