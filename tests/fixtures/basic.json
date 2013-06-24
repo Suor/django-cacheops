@@ -34,7 +34,13 @@
       "title": "Node.js"
     }
   },
-
+  {
+    "model": "tests.machinebrand",
+    "pk": 1,
+    "fields": {
+      "categories": [1,2,3]
+    }
+  },
   {
     "model": "tests.post",
     "pk": 1,

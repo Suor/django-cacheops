@@ -124,6 +124,7 @@ def dnf(qs):
     #       just keep your querysets sane.
     if not all(result):
         return [[]]
+#    print(where, model, alias, result)
     return result
 
 

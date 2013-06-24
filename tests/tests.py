@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 
 from cacheops import invalidate_all
-from .models import *
+from .models import *  # noqa
 
 
 class BaseTestCase(TestCase):
@@ -57,6 +57,13 @@ class BasicTests(BaseTestCase):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
 
+    def test_invalidate_by_m2m(self):
+        mb = MachineBrand.objects.cache().get(id=1)
+        mb = MachineBrand.objects.cache().get(id=1)
+        cat = Category.objects.get(id=1)
+        mb.categories.remove(cat)
+        print(mb.categories.all())
+
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)
         e.save()
@@ -83,7 +90,7 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(categories__in=[1,2,3]).cache().count()
+        MachineBrand.objects.exclude(categories__in=[1, 2, 3]).cache().count()
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
@@ -92,14 +99,14 @@ class IssueTests(BaseTestCase):
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
     def test_30(self):
-        proxies = list(VideoProxy.objects.cache())
+        proxies = list(VideoProxy.objects.cache())  # noqa
         Video.objects.create(title='Pulp Fiction')
 
         with self.assertNumQueries(1):
             list(VideoProxy.objects.cache())
 
     def test_30_reversed(self):
-        proxies = list(Video.objects.cache())
+        proxies = list(Video.objects.cache())  # noqa
         VideoProxy.objects.create(title='Pulp Fiction')
 
         with self.assertNumQueries(1):
@@ -107,7 +114,7 @@ class ProxyTests(BaseTestCase):
 
     @unittest.expectedFailure
     def test_interchange(self):
-        proxies = list(Video.objects.cache())
+        proxies = list(Video.objects.cache())  # noqa
 
         with self.assertNumQueries(0):
             list(VideoProxy.objects.cache())
