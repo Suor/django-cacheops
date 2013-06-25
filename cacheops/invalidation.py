@@ -164,13 +164,18 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
+    set_key = 'conj:%s' % get_model_name(model)
+    conjs_keys = redis_client.smembers(set_key)
     if isinstance(conjs_keys, str):
         conjs_keys = conjs_keys.split()
+    if isinstance(conjs_keys, set):
+        conjs_keys = list(conjs_keys)
 
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
+        for k in conjs_keys:
+            redis_client.srem(set_key, k)
 
     # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
     cache_schemes.clear(model)

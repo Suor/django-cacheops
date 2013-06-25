@@ -50,6 +50,8 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     # Add new cache_key to list of dependencies for every conjunction in dnf
     for conj in cond_dnf:
         conj_key = conj_cache_key(model, conj)
+        conj_base = conj_key.rsplit(':', 1)[0]
+        txn.sadd(conj_base, conj_key)
         txn.sadd(conj_key, cache_key)
         if timeout is not None:
             # Invalidator timeout should be larger than timeout of any key it references

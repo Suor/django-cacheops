@@ -67,7 +67,6 @@ class BasicTests(BaseTestCase):
             cat = Category.objects.cache().get(id=1)
         with self.assertNumQueries(0):
             cat = Category.objects.cache().get(id=1)
-
         with self.assertNumQueries(1):
             cat = Category.objects.cache().get(id=2)
 
@@ -76,10 +75,47 @@ class BasicTests(BaseTestCase):
 
         with self.assertNumQueries(2):
             mb.categories.remove(cat)
+
+        with self.assertNumQueries(1):
+            cat = Category.objects.cache().get(id=1)
+        with self.assertNumQueries(0):
+            cat = Category.objects.cache().get(id=1)
+
+#        with self.assertNumQueries(1):
+#            cat = Category.objects.cache().get(id=2)
+#        with self.assertNumQueries(0):
+#            cat = Category.objects.cache().get(id=2)
+
+        with self.assertNumQueries(2):
+            mb.categories.remove(cat)
+
         with self.assertNumQueries(1):
             print(mb.categories.cache().all())
         with self.assertNumQueries(0):
+            cats = mb.categories.cache().all()
+            print(cats)
+
+        with self.assertNumQueries(3):
+            mb.categories.remove(cats[0])
+
+        with self.assertNumQueries(1):
             print(mb.categories.cache().all())
+        with self.assertNumQueries(0):
+            cats = mb.categories.cache().all()
+            print(cats)
+
+        with self.assertNumQueries(1):
+            cat = Category.objects.cache().create(title='Erlang')
+
+        with self.assertNumQueries(2):
+            mb.categories.add(cat)
+
+        with self.assertNumQueries(1):
+            print(mb.categories.cache().all())
+        with self.assertNumQueries(0):
+            cats = mb.categories.cache().all()
+            print(cats)
+
 
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)
