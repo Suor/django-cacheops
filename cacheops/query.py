@@ -13,7 +13,7 @@ from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet,
 from django.db.models.signals import post_save, post_delete, m2m_changed
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
-from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
+from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
 
@@ -231,6 +231,7 @@ class QuerySetMixin(object):
         """
         md5 = hashlib.md5()
         md5.update(str(self.__class__))
+        md5.update(stamp_fields(self.model))
         md5.update(stringify_query(self.query))
         if extra:
             md5.update(str(extra))
