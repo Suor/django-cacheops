@@ -64,3 +64,13 @@ class MachineBrand(models.Model):
 # local_get
 class Local(models.Model):
     tag = models.IntegerField(null=True)
+
+
+# Model migration support
+class MigrantModel(models.Model):
+    text = models.CharField(max_length=16, blank=True, default="")
+
+
+class DonorModel(models.Model):
+    text = models.TextField()
+    num = models.IntegerField()

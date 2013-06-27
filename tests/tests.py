@@ -1,3 +1,4 @@
+from copy import copy
 import unittest
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -163,3 +164,33 @@ class MultitableInheritanceTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             list(Movie.objects.cache())
+
+
+class ModelMigrationSupportTests(BaseTestCase):
+    """ Checks that two versions of one model cached with different keys. """
+
+    def setUp(self):
+        super(ModelMigrationSupportTests, self).setUp()
+        self.initial_fields = copy(MigrantModel._meta.fields)
+        list(MigrantModel.objects.cache())
+
+    def test_new_field_affect_cache_key(self):
+        with self.assertNumQueries(0):
+           list(MigrantModel.objects.cache())
+
+        MigrantModel._meta.fields.append(DonorModel._meta.get_field_by_name("num")[0])
+        self.assertNotEqual(str(self.initial_fields), str(MigrantModel._meta.fields))
+
+        with self.assertNumQueries(1):
+           list(MigrantModel.objects.cache())
+
+    def test_change_field_type_affect_cache_key(self):
+        with self.assertNumQueries(0):
+            list(MigrantModel.objects.cache())
+
+        i = MigrantModel._meta.fields.index(MigrantModel._meta.get_field_by_name("text")[0])
+        MigrantModel._meta.fields[i] = DonorModel._meta.get_field_by_name("text")[0]
+        self.assertNotEqual(str(self.initial_fields), str(MigrantModel._meta.fields))
+
+        with self.assertNumQueries(1):
+            list(MigrantModel.objects.cache())
