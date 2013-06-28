@@ -139,3 +139,15 @@ def conj_scheme(conj):
     Which is just a sorted tuple of field names.
     """
     return tuple(sorted(imap(itemgetter(0), conj)))
+
+
+def stamp_fields(model, cache={}):
+    """
+    Returns serialized description of model fields.
+    Calculates stamp of fields just one time for each model, stores result to
+    local cache and returns it on the next calls.
+    """
+    if model not in cache:
+        cache[model] = str(sorted((f.name, f.attname, f.db_column, f.__class__)
+                           for f in model._meta.fields))
+    return cache[model]
