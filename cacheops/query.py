@@ -231,16 +231,12 @@ class QuerySetMixin(object):
         Compute a cache key for this queryset
         """
         md5 = hashlib.md5()
-#        print('md5', str(self.__class__))
         md5.update(str(self.__class__))
-#        print('md5', stringify_query(self.query))
         md5.update(stringify_query(self.query))
         if extra:
-#            print('md5', str(extra))
             md5.update(str(extra))
         # 'flat' attribute changes results formatting for ValuesQuerySet
         if hasattr(self, 'flat'):
-#            print('md5', str(self.flat))
             md5.update(str(self.flat))
 
         return 'q:%s' % md5.hexdigest()
@@ -321,7 +317,6 @@ class QuerySetMixin(object):
         return clone
 
     def iterator(self):
-        print('iterator')
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheops
 
@@ -331,13 +326,11 @@ class QuerySetMixin(object):
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
-                    print('cache hit')
                     results = pickle.loads(cache_data)
                     for obj in results:
                         yield obj
                     raise StopIteration
 
-        print('cache miss')
         # Cache miss - fallback to overriden implementation
         results = []
         for obj in superiter(self):
