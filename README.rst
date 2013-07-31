@@ -214,7 +214,7 @@ To cache result of a function call for some time use:
         return ... # Some costly queries
 
 
-``@cached()`` will generate separate entries for each combination of decorated function and its
+``@cached()`` will generate separate entry for each combination of decorated function and its
 arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions:
 
 .. code:: python
@@ -249,6 +249,27 @@ Cacheops also provides get/set primitives for simple cache:
         result = cache.get(key)
     except CacheMiss:
         ... # deal with it
+
+
+File Cache
+----------
+
+File based cache can be used the same way as simple time-invalidated one.
+
+.. code:: python
+
+    from cacheops import file_cache
+
+    @file_cache.cached(timeout=number_of_seconds)
+    def top_articles(category):
+        return ... # Some costly queries
+
+    file_cache.set(cache_key, data, timeout=None)
+    file_cache.get(cache_key)
+
+It have several improvements upon django built-in file cache, both about highload. First, it is safe against concurrent writes. Second, it's invalidation is done as separate task, you'll need to call this from crontab for that to work::
+
+    /path/manage.py cleanfilecache
 
 
 Jinja2 extension
@@ -325,7 +346,6 @@ TODO
 ----
 
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- docs about file cache
 - add .delete(cache_key) method to simple and file cache
 - .invalidate() method on simple cached funcs
 - queryset brothers
