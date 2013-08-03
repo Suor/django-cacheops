@@ -127,6 +127,7 @@ class ManyToManyTests(BaseTestCase):
         PhotoLike.objects.create(user=self.suor, photo=self.photo)
         super(ManyToManyTests, self).setUp()
 
+    @unittest.expectedFailure
     def test_44(self):
         make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
         self.assertEqual(make_query(), [self.suor])
