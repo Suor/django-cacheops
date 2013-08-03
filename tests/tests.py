@@ -119,6 +119,22 @@ class LocalGetTests(BaseTestCase):
         Local.objects.cache().get(pk__in=[1, 2])
 
 
+class ManyToManyTests(BaseTestCase):
+    def setUp(self):
+        self.suor = User.objects.create(username='Suor')
+        self.peterdds = User.objects.create(username='peterdds')
+        self.photo = Photo.objects.create()
+        PhotoLike.objects.create(user=self.suor, photo=self.photo)
+        super(ManyToManyTests, self).setUp()
+
+    def test_44(self):
+        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
+        self.assertEqual(make_query(), [self.suor])
+
+        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
+        self.assertEqual(make_query(), [self.suor, self.peterdds])
+
+
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
     def test_30(self):
