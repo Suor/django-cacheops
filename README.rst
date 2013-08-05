@@ -360,8 +360,6 @@ TODO
 ----
 
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- queryset brothers
-- jinja2 tag for "get random of some list" block with lazy rendering
 - make a version of invalidation with scripting
 - shard cache between multiple redises
 - integrate with prefetch_related()
