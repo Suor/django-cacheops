@@ -1,3 +1,6 @@
+- .delete() method for simple cache
+- .invalidate() method for @cached() and file_cache.cached() functions
+
 1.0.0
 - defend against model changes corrupting cache (ttyS15)
 - support F-expressions (Yuego)

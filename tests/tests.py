@@ -1,8 +1,8 @@
-import unittest
+import unittest, random
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from cacheops import invalidate_all
+from cacheops import invalidate_all, cached
 from .models import *
 
 
@@ -180,3 +180,20 @@ class MultitableInheritanceTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             list(Movie.objects.cache())
+
+
+class SimpleCacheTests(BaseTestCase):
+    def test_cached(self):
+        calls = [0]
+
+        @cached(timeout=100)
+        def get_calls(x):
+            calls[0] += 1
+            return calls[0]
+
+        self.assertEqual(get_calls(1), 1)
+        self.assertEqual(get_calls(1), 1)
+        self.assertEqual(get_calls(2), 2)
+        get_calls.invalidate(2)
+        self.assertEqual(get_calls(2), 3)
+

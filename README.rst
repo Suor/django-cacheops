@@ -346,8 +346,6 @@ TODO
 ----
 
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- add .delete(cache_key) method to simple and file cache
-- .invalidate() method on simple cached funcs
 - queryset brothers
 - jinja2 tag for "get random of some list" block with lazy rendering
 - make a version of invalidation with scripting
