@@ -73,6 +73,9 @@ class RedisCache(BaseCache):
         else:
             self.conn.set(cache_key, pickled_data)
 
+    def delete(self, cache_key):
+        self.conn.delete(cache_key)
+
 cache = RedisCache(redis_client)
 cached = cache.cached
 
