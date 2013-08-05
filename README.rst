@@ -229,6 +229,13 @@ arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most usef
         return _articles_json()
 
 
+You can manually invalidate cached function result this way:
+
+.. code:: python
+
+    top_articles.invalidate(some_category)
+
+
 Cacheops also provides get/set primitives for simple cache:
 
 .. code:: python
@@ -237,6 +244,7 @@ Cacheops also provides get/set primitives for simple cache:
 
     cache.set(cache_key, data, timeout=None)
     cache.get(cache_key)
+    cache.delete(cache_key)
 
 
 ``cache.get`` will raise ``CacheMiss`` if nothing is stored for given key:
@@ -264,8 +272,14 @@ File based cache can be used the same way as simple time-invalidated one.
     def top_articles(category):
         return ... # Some costly queries
 
+    # later, on appropriate event
+    top_articles.invalidate(some_category)
+
+    # primitives
     file_cache.set(cache_key, data, timeout=None)
     file_cache.get(cache_key)
+    file_cache.delete(cache_key)
+
 
 It have several improvements upon django built-in file cache, both about highload. First, it is safe against concurrent writes. Second, it's invalidation is done as separate task, you'll need to call this from crontab for that to work::
 
