@@ -1,3 +1,4 @@
+1.0.1
 - .delete() method for simple cache
 - .invalidate() method for @cached() and file_cache.cached() functions
 
