@@ -454,9 +454,11 @@ class ManagerMixin(object):
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
-            cached_as(instance.__class__.objects \
-                .filter(**{filter_key: getattr(instance, key)}), extra='') \
-                (lambda: [instance])()
+
+            qs = instance.__class__.objects.filter(**{filter_key: getattr(instance, key)}) \
+                                           .order_by()
+            cache_key = qs._cache_key()
+            qs._cache_results(cache_key, [instance])
 
             # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)
