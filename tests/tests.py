@@ -109,6 +109,13 @@ class IssueTests(BaseTestCase):
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
 
+    def test_45(self):
+        m = CacheOnSaveModel(title="test")
+        m.save()
+
+        with self.assertNumQueries(0):
+            CacheOnSaveModel.objects.cache().get(pk=m.pk)
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
