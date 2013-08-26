@@ -75,3 +75,8 @@ class PhotoLike(models.Model):
     user = models.ForeignKey(User)
     photo = models.ForeignKey(Photo)
     timestamp = models.DateTimeField(auto_now_add=True)
+
+
+# 45
+class CacheOnSaveModel(models.Model):
+    title = models.CharField(max_length=32)
