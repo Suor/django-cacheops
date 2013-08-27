@@ -356,6 +356,21 @@ Here come some performance tips to make cacheops and Django ORM faster.
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 
+Writing a test
+--------------
+
+Writing a test for an issue you are having can speed up it's resolution a lot. Here is how you do that. I am supposing you have some application code causing it.
+
+1. Make a fork.
+2. Install all from `test_requirements.txt`.
+3. Ensure you can run tests with `./run_tests.py`.
+4. Copy relevant models code to https://github.com/Suor/django-cacheops/blob/master/tests/models.py
+5. Go to https://github.com/Suor/django-cacheops/blob/master/tests/tests.py and paste code causing exception to `IssueTests.test_{issue_number}`.
+6. Execute `./run_tests.py IssueTests.test_{issue_number}` and see it failing.
+7. Cut down model and test code until error disappears and make a step back.
+8. Commit changes and make a pull request.
+
+
 TODO
 ----
 
