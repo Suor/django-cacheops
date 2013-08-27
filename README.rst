@@ -129,7 +129,7 @@ or deletetion:
 
     from cacheops import cached_as
 
-    @cached_as(Article.objects.all())
+    @cached_as(Article)
     def article_stats():
         return {
             'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
@@ -138,7 +138,7 @@ or deletetion:
 
 
 Note that we are using list on both querysets here, it's because we don't want
-to cache queryset objects but their result.
+to cache queryset objects but their results.
 
 Also note that cache key does not depend on arguments of a function, so it's result
 should not, either. This is done to enable caching of view functions. Instead
