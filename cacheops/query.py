@@ -154,7 +154,8 @@ def _stringify_query():
 
     q = Query(None)
     q_keys = q.__dict__.keys()
-    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache']
+    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
+                 'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
     for k, v in attrs.items():

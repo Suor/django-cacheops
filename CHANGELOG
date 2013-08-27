@@ -1,4 +1,5 @@
 - fixed cached_on_save
+- fixed .inplace() altering cache key
 
 1.0.1
 - .delete() method for simple cache
