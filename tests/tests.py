@@ -204,3 +204,15 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.invalidate(2)
         self.assertEqual(get_calls(2), 3)
 
+
+class ClusterSupportTests(BaseTestCase):
+
+    def test_cached_by_alias(self):
+
+        list(ClusterSupportModel.objects.cache())
+
+        with self.assertNumQueries(0):
+            list(ClusterSupportModel.objects.cache())
+
+        with self.assertNumQueries(1, using="slave"):
+            list(ClusterSupportModel.objects.using("slave").cache())

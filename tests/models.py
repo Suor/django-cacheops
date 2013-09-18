@@ -80,3 +80,7 @@ class PhotoLike(models.Model):
 # 45
 class CacheOnSaveModel(models.Model):
     title = models.CharField(max_length=32)
+
+
+class ClusterSupportModel(models.Model):
+    pass

@@ -235,6 +235,7 @@ class QuerySetMixin(object):
         md5 = hashlib.md5()
         md5.update(str(self.__class__))
         md5.update(stamp_fields(self.model)) # Protect from field list changes in model
+        md5.update(self.db)  # Results can be differ for different aliases
         md5.update(stringify_query(self.query))
         if extra:
             md5.update(str(extra))
