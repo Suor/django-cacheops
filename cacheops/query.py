@@ -143,7 +143,8 @@ def _stringify_query():
     from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
-    attrs[WhereNode] = attrs[ExpressionNode] = ('connector', 'negated', 'children', 'subtree_parents')
+    attrs[WhereNode] = attrs[ExpressionNode] \
+        = ('connector', 'negated', 'children', 'subtree_parents')
     attrs[SQLEvaluator] = ('expression',)
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
@@ -153,7 +154,8 @@ def _stringify_query():
 
     q = Query(None)
     q_keys = q.__dict__.keys()
-    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache']
+    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
+                 'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
     for k, v in attrs.items():
@@ -221,9 +223,10 @@ class QuerySetMixin(object):
 
     def _require_cacheprofile(self):
         if self._cacheprofile is None:
-            raise ImproperlyConfigured('Cacheops is not enabled for %s model.\n'
-                                       'If you don\'t want to cache anything by default you can "just_enable" it.'
-                                        % get_model_name(self.model))
+            raise ImproperlyConfigured(
+                'Cacheops is not enabled for %s model.\n'
+                'If you don\'t want to cache anything by default you can "just_enable" it.'
+                    % get_model_name(self.model))
 
     def _cache_key(self, extra=''):
         """
@@ -231,7 +234,7 @@ class QuerySetMixin(object):
         """
         md5 = hashlib.md5()
         md5.update(str(self.__class__))
-        md5.update(stamp_fields(self.model))
+        md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
         if extra:
             md5.update(str(extra))
@@ -392,7 +395,8 @@ class QuerySetMixin(object):
         # TODO: refactor this one to more understandable something
         if self._cacheprofile:
             query_dnf = dnf(self)
-            if len(query_dnf) == 1 and len(query_dnf[0]) == 1 and query_dnf[0][0][0] == self.model._meta.pk.name:
+            if len(query_dnf) == 1 and len(query_dnf[0]) == 1 \
+               and query_dnf[0][0][0] == self.model._meta.pk.name:
                 result = len(self.nocache()) > 0
                 if result:
                     _old_objs[get_model_name(self.model)][query_dnf[0][0][1]] = self._result_cache[0]
@@ -440,7 +444,8 @@ class ManagerMixin(object):
             #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
             # Stripping up undesirable attributes
-            unwanted_attrs = [k for k in instance.__dict__.keys() if k.startswith('_') and k.endswith('_cache')]
+            unwanted_attrs = [k for k in instance.__dict__.keys()
+                                if k.startswith('_') and k.endswith('_cache')]
             unwanted_dict = dict((k, instance.__dict__[k]) for k in unwanted_attrs)
             for k in unwanted_attrs:
                 del instance.__dict__[k]
@@ -450,9 +455,10 @@ class ManagerMixin(object):
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
-            cached_as(instance.__class__.objects \
-                .filter(**{filter_key: getattr(instance, key)}), extra='') \
-                (lambda: [instance])()
+
+            cond = {filter_key: getattr(instance, key)}
+            qs = instance.__class__.objects.inplace().filter(**cond).order_by()
+            qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)

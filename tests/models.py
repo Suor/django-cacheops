@@ -61,6 +61,22 @@ class Label(models.Model):
 class MachineBrand(models.Model):
     labels = models.ManyToManyField(Label)
 
+
 # local_get
 class Local(models.Model):
     tag = models.IntegerField(null=True)
+
+
+# 44
+class Photo(models.Model):
+    liked_user = models.ManyToManyField(User, through="PhotoLike")
+
+class PhotoLike(models.Model):
+    user = models.ForeignKey(User)
+    photo = models.ForeignKey(Photo)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+
+# 45
+class CacheOnSaveModel(models.Model):
+    title = models.CharField(max_length=32)

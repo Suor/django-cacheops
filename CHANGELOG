@@ -1,3 +1,13 @@
+1.0.2
+- fixed cached_on_save
+- fixed .inplace() altering cache key
+
+1.0.1
+- .delete() method for simple cache
+- .invalidate() method for @cached() and file_cache.cached() functions
+
+1.0.0
+- defend against model changes corrupting cache (ttyS15)
 - support F-expressions (Yuego)
 - fixed local_get with unhashable arg TypeError
 - fixed caching of raw queries (Yuego)

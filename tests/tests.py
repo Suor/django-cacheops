@@ -1,8 +1,8 @@
-import unittest
+import unittest, random
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from cacheops import invalidate_all
+from cacheops import invalidate_all, cached
 from .models import *
 
 
@@ -109,6 +109,13 @@ class IssueTests(BaseTestCase):
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
 
+    def test_45(self):
+        m = CacheOnSaveModel(title="test")
+        m.save()
+
+        with self.assertNumQueries(0):
+            CacheOnSaveModel.objects.cache().get(pk=m.pk)
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
@@ -117,6 +124,23 @@ class LocalGetTests(BaseTestCase):
 
     def test_unhashable_args(self):
         Local.objects.cache().get(pk__in=[1, 2])
+
+
+class ManyToManyTests(BaseTestCase):
+    def setUp(self):
+        self.suor = User.objects.create(username='Suor')
+        self.peterdds = User.objects.create(username='peterdds')
+        self.photo = Photo.objects.create()
+        PhotoLike.objects.create(user=self.suor, photo=self.photo)
+        super(ManyToManyTests, self).setUp()
+
+    @unittest.expectedFailure
+    def test_44(self):
+        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
+        self.assertEqual(make_query(), [self.suor])
+
+        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
+        self.assertEqual(make_query(), [self.suor, self.peterdds])
 
 
 # Tests for proxy models, see #30
@@ -163,3 +187,20 @@ class MultitableInheritanceTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             list(Movie.objects.cache())
+
+
+class SimpleCacheTests(BaseTestCase):
+    def test_cached(self):
+        calls = [0]
+
+        @cached(timeout=100)
+        def get_calls(x):
+            calls[0] += 1
+            return calls[0]
+
+        self.assertEqual(get_calls(1), 1)
+        self.assertEqual(get_calls(1), 1)
+        self.assertEqual(get_calls(2), 2)
+        get_calls.invalidate(2)
+        self.assertEqual(get_calls(2), 3)
+

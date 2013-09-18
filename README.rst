@@ -129,7 +129,7 @@ or deletetion:
 
     from cacheops import cached_as
 
-    @cached_as(Article.objects.all())
+    @cached_as(Article)
     def article_stats():
         return {
             'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
@@ -138,7 +138,7 @@ or deletetion:
 
 
 Note that we are using list on both querysets here, it's because we don't want
-to cache queryset objects but their result.
+to cache queryset objects but their results.
 
 Also note that cache key does not depend on arguments of a function, so it's result
 should not, either. This is done to enable caching of view functions. Instead
@@ -214,7 +214,7 @@ To cache result of a function call for some time use:
         return ... # Some costly queries
 
 
-``@cached()`` will generate separate entries for each combination of decorated function and its
+``@cached()`` will generate separate entry for each combination of decorated function and its
 arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions:
 
 .. code:: python
@@ -229,6 +229,13 @@ arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most usef
         return _articles_json()
 
 
+You can manually invalidate cached function result this way:
+
+.. code:: python
+
+    top_articles.invalidate(some_category)
+
+
 Cacheops also provides get/set primitives for simple cache:
 
 .. code:: python
@@ -237,6 +244,7 @@ Cacheops also provides get/set primitives for simple cache:
 
     cache.set(cache_key, data, timeout=None)
     cache.get(cache_key)
+    cache.delete(cache_key)
 
 
 ``cache.get`` will raise ``CacheMiss`` if nothing is stored for given key:
@@ -249,6 +257,33 @@ Cacheops also provides get/set primitives for simple cache:
         result = cache.get(key)
     except CacheMiss:
         ... # deal with it
+
+
+File Cache
+----------
+
+File based cache can be used the same way as simple time-invalidated one:
+
+.. code:: python
+
+    from cacheops import file_cache
+
+    @file_cache.cached(timeout=number_of_seconds)
+    def top_articles(category):
+        return ... # Some costly queries
+
+    # later, on appropriate event
+    top_articles.invalidate(some_category)
+
+    # primitives
+    file_cache.set(cache_key, data, timeout=None)
+    file_cache.get(cache_key)
+    file_cache.delete(cache_key)
+
+
+It have several improvements upon django built-in file cache, both about highload. First, it is safe against concurrent writes. Second, it's invalidation is done as separate task, you'll need to call this from crontab for that to work::
+
+    /path/manage.py cleanfilecache
 
 
 Jinja2 extension
@@ -309,7 +344,7 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
    You can revert queryset to cloning state using ``.cloning()`` call.
 
-3. More to 2, there is `unfixed bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
+3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
    which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
 4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
@@ -321,15 +356,25 @@ Here come some performance tips to make cacheops and Django ORM faster.
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 
+Writing a test
+--------------
+
+Writing a test for an issue you are having can speed up it's resolution a lot. Here is how you do that. I am supposing you have some application code causing it.
+
+1. Make a fork.
+2. Install all from `test_requirements.txt`.
+3. Ensure you can run tests with `./run_tests.py`.
+4. Copy relevant models code to https://github.com/Suor/django-cacheops/blob/master/tests/models.py
+5. Go to https://github.com/Suor/django-cacheops/blob/master/tests/tests.py and paste code causing exception to `IssueTests.test_{issue_number}`.
+6. Execute `./run_tests.py IssueTests.test_{issue_number}` and see it failing.
+7. Cut down model and test code until error disappears and make a step back.
+8. Commit changes and make a pull request.
+
+
 TODO
 ----
 
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- docs about file cache
-- add .delete(cache_key) method to simple and file cache
-- .invalidate() method on simple cached funcs
-- queryset brothers
-- jinja2 tag for "get random of some list" block with lazy rendering
 - make a version of invalidation with scripting
 - shard cache between multiple redises
 - integrate with prefetch_related()

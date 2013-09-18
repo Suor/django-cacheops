@@ -40,7 +40,8 @@ class CacheopsExtension(Extension):
         @cacheops_decorator(*args, **kwargs)
         def _handle_tag():
             content = caller()
-            return _carefully_strip_whitespace(content) # TODO: make this cache preparation configurable
+            # TODO: make this cache preparation configurable
+            return _carefully_strip_whitespace(content)
 
         return _handle_tag()
 
@@ -61,7 +62,8 @@ class CacheopsExtension(Extension):
                 kwargs.append(nodes.Keyword(key, value, lineno=value.lineno))
             else:
                 if kwargs:
-                    parser.fail('Invalid argument syntax for CacheopsExtension tag', parser.stream.current.lineno)
+                    parser.fail('Invalid argument syntax for CacheopsExtension tag',
+                                parser.stream.current.lineno)
                 args.append(parser.parse_expression())
 
             require_comma = True

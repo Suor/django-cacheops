@@ -2,6 +2,7 @@
 from operator import concat, itemgetter
 from itertools import product, imap
 from inspect import getmembers, ismethod
+import hashlib
 
 from django.db.models import Model
 from django.db.models.query import QuerySet
@@ -144,10 +145,8 @@ def conj_scheme(conj):
 def stamp_fields(model, cache={}):
     """
     Returns serialized description of model fields.
-    Calculates stamp of fields just one time for each model, stores result to
-    local cache and returns it on the next calls.
     """
     if model not in cache:
-        cache[model] = str(sorted((f.name, f.attname, f.db_column, f.__class__)
-                           for f in model._meta.fields))
+        stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
+        cache[model] = hashlib.md5(stamp).hexdigest()
     return cache[model]

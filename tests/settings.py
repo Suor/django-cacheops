@@ -24,6 +24,7 @@ CACHEOPS_REDIS = {
 }
 CACHEOPS = {
     'tests.local': ('just_enable', 60*60, {'local_get': True}),
+    'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
     '*.*': ('just_enable', 60*60),
 }
 
