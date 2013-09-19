@@ -205,14 +205,33 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 3)
 
 
-class ClusterSupportTests(BaseTestCase):
+class DatabaseClusterSupportTests(BaseTestCase):
 
-    def test_cached_by_alias(self):
+    @classmethod
+    def setUpClass(cls):
+        cls.qs = DatabaseClusterSupportModel.objects.cache()
+        cls.default_cache_profile = cls.qs._cacheprofile.copy()
 
-        list(ClusterSupportModel.objects.cache())
+    def setUp(self):
+        super(DatabaseClusterSupportTests, self).setUp()
+        self.qs._cacheprofile = self.default_cache_profile.copy()
+
+    def test_disable_by_default(self):
+        list(self.qs.all())
 
         with self.assertNumQueries(0):
-            list(ClusterSupportModel.objects.cache())
+            list(self.qs.all())
+        with self.assertNumQueries(0, using="slave"):
+            list(self.qs.using("slave").all())
 
+    def test_enable_by_cache_profile(self):
+        self.qs._cacheprofile.update(fidelity=True)
+        list(self.qs.all())
+
+        with self.assertNumQueries(0):
+            list(self.qs.all())
         with self.assertNumQueries(1, using="slave"):
-            list(ClusterSupportModel.objects.using("slave").cache())
+            list(self.qs.using("slave").all())
+        # Ensure that cache worked
+        with self.assertNumQueries(0, using="slave"):
+            list(self.qs.using("slave").all())

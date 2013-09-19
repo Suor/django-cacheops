@@ -82,5 +82,6 @@ class CacheOnSaveModel(models.Model):
     title = models.CharField(max_length=32)
 
 
-class ClusterSupportModel(models.Model):
+# 47
+class DatabaseClusterSupportModel(models.Model):
     pass
