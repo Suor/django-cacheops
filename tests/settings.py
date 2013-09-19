@@ -13,6 +13,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': 'sqlite.db'
+    },
+    'slave': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'sqlite.db'
     }
 }
 
