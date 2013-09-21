@@ -1,3 +1,5 @@
+- added db_agnostic option to cache profile
+
 1.0.2
 - fixed cached_on_save
 - fixed .inplace() altering cache key

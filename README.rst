@@ -200,6 +200,19 @@ And the one that FLUSHES cacheops redis database::
 Don't use that if you share redis database for both cache and something else.
 
 
+Multiple database support
+-------------------------
+
+By default cacheops considers query result is same for same query, not depending on database queried. That could be changed with ``db_agnostic`` cache profile option:
+
+.. code:: python
+
+    CACHEOPS = {
+        'some.model': ('get', TIMEOUT, {'db_agnostic': False}),
+        # ...
+    }
+
+
 Simple time-invalidated cache
 -----------------------------
 
