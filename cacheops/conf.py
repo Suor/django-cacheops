@@ -10,7 +10,8 @@ from django.core.exceptions import ImproperlyConfigured
 
 profile_defaults = {
     'ops': (),
-    'local_get': False
+    'local_get': False,
+    'db_agnostic': True,
 }
 profiles = {
     'just_enable': {},
