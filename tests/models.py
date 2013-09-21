@@ -83,5 +83,9 @@ class CacheOnSaveModel(models.Model):
 
 
 # 47
-class DatabaseClusterSupportModel(models.Model):
+class DbAgnostic(models.Model):
     pass
+
+class DbBinded(models.Model):
+    pass
+

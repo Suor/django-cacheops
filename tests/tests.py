@@ -205,33 +205,15 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 3)
 
 
-class DatabaseClusterSupportTests(BaseTestCase):
+class DbAgnosticTests(BaseTestCase):
+    def test_db_agnostic_by_default(self):
+        list(DbAgnostic.objects.cache())
 
-    @classmethod
-    def setUpClass(cls):
-        cls.qs = DatabaseClusterSupportModel.objects.cache()
-        cls.default_cache_profile = cls.qs._cacheprofile.copy()
+        with self.assertNumQueries(0, using='slave'):
+            list(DbAgnostic.objects.cache().using('slave'))
 
-    def setUp(self):
-        super(DatabaseClusterSupportTests, self).setUp()
-        self.qs._cacheprofile = self.default_cache_profile.copy()
+    def test_db_agnostic_disabled(self):
+        list(DbBinded.objects.cache())
 
-    def test_disable_by_default(self):
-        list(self.qs.all())
-
-        with self.assertNumQueries(0):
-            list(self.qs.all())
-        with self.assertNumQueries(0, using="slave"):
-            list(self.qs.using("slave").all())
-
-    def test_enable_by_cache_profile(self):
-        self.qs._cacheprofile.update(fidelity=True)
-        list(self.qs.all())
-
-        with self.assertNumQueries(0):
-            list(self.qs.all())
-        with self.assertNumQueries(1, using="slave"):
-            list(self.qs.using("slave").all())
-        # Ensure that cache worked
-        with self.assertNumQueries(0, using="slave"):
-            list(self.qs.using("slave").all())
+        with self.assertNumQueries(1, using='slave'):
+            list(DbBinded.objects.cache().using('slave'))
