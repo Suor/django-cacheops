@@ -139,16 +139,23 @@ def _stringify_query():
     from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
-    from django.db.models.sql.datastructures import RawValue, Date
+    from django.db.models.sql.datastructures import Date
     from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
+
+    # RawValue removed in Django 1.7
+    try:
+        from django.db.models.sql.datastructures import RawValue
+        attrs[RawValue] = ('value',)
+    except ImportError:
+        pass
+
     attrs[WhereNode] = attrs[ExpressionNode] \
         = ('connector', 'negated', 'children', 'subtree_parents')
     attrs[SQLEvaluator] = ('expression',)
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
-    attrs[RawValue] = ('value',)
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
 
