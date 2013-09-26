@@ -191,7 +191,7 @@ def _stringify_query():
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
         else:
-            raise TypeError("Can't encode %s" % repr(obj))
+            raise TypeError("Can't stringify %s" % repr(obj))
 
     def stringify_query(query):
         # HACK: Catch TypeError and reraise it as ValueError
