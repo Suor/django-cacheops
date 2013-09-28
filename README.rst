@@ -189,7 +189,7 @@ of the following:
 
 And last there is ``invalidate`` command::
 
-    ./manage.py invalidate articles.Artcile.34  # same as invalidate_obj
+    ./manage.py invalidate articles.Article.34  # same as invalidate_obj
     ./manage.py invalidate articles.Article     # same as invalidate_model
     ./manage.py invalidate articles   # invalidate all models in articles
 
