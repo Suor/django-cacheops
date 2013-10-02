@@ -1,4 +1,5 @@
 - added db_agnostic option to cache profile
+- partial support for Django 1.6+
 
 1.0.2
 - fixed cached_on_save
