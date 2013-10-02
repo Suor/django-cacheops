@@ -34,6 +34,9 @@ def prepare_obj():
 def do_invalidate_obj(obj):
     invalidate_obj(obj)
 
+def do_save_obj(obj):
+    obj.save()
+
 
 TESTS = [
     ('count_no_cache', {'run': do_count_no_cache}),
@@ -44,4 +47,5 @@ TESTS = [
     ('fetch_hit',  {'prepare_once': do_fetch, 'run': do_fetch}),
     ('fetch_miss', {'prepare': invalidate_fetch, 'run': do_fetch}),
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),
+    ('save_obj', {'prepare': prepare_obj, 'run': do_save_obj}),
 ]
