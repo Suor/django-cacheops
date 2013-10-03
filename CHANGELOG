@@ -1,3 +1,4 @@
+1.0.3
 - added db_agnostic option to cache profile
 - partial support for Django 1.6+
 
