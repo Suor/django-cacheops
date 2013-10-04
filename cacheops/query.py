@@ -13,6 +13,11 @@ from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
 
+try:
+    from django.db.models.query import MAX_GET_RESULTS
+except ImportError:
+    MAX_GET_RESULTS = None
+
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
@@ -471,6 +476,8 @@ class ManagerMixin(object):
 
             cond = {filter_key: getattr(instance, key)}
             qs = instance.__class__.objects.inplace().filter(**cond).order_by()
+            if MAX_GET_RESULTS:
+                qs = qs[:MAX_GET_RESULTS + 1]
             qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
