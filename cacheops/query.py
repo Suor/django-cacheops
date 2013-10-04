@@ -11,7 +11,7 @@ import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
-from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
 try:
     from django.db.models.query import MAX_GET_RESULTS
@@ -427,6 +427,10 @@ class ManagerMixin(object):
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
             # Set up signals
+            if not getattr(cls._meta, 'select_on_save', True):
+                # Django 1.6+ doesn't make select on save by default,
+                # which we use to fetch old state, so we fetch it ourselves in pre_save handler
+                pre_save.connect(self._pre_save, sender=cls)
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
             _old_objs[get_model_name(cls)] = {}
@@ -439,6 +443,13 @@ class ManagerMixin(object):
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
         self._install_cacheops(cls)
+
+    def _pre_save(self, sender, instance, **kwargs):
+        cls = instance.__class__
+        try:
+            _old_objs[get_model_name(cls)][instance.pk] = cls.objects.get(pk=instance.pk)
+        except cls.DoesNotExist:
+            pass
 
     def _post_save(self, sender, instance, **kwargs):
         """
