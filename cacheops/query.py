@@ -417,7 +417,7 @@ class QuerySetMixin(object):
                and query_dnf[0][0][0] == self.model._meta.pk.name:
                 result = len(self.nocache()) > 0
                 if result:
-                    _old_objs[get_model_name(self.model)][query_dnf[0][0][1]] = self._result_cache[0]
+                    _old_objs[self.model][query_dnf[0][0][1]] = self._result_cache[0]
                 return result
         return self._no_monkey.exists(self)
 
@@ -425,7 +425,7 @@ class QuerySetMixin(object):
 class ManagerMixin(object):
     def _install_cacheops(self, cls):
         cls._cacheprofile = model_profile(cls)
-        if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
+        if cls._cacheprofile is not None and cls not in _old_objs:
             # Set up signals
             if not getattr(cls._meta, 'select_on_save', True):
                 # Django 1.6+ doesn't make select on save by default,
@@ -433,7 +433,7 @@ class ManagerMixin(object):
                 pre_save.connect(self._pre_save, sender=cls)
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
-            _old_objs[get_model_name(cls)] = {}
+            _old_objs[cls] = {}
 
             # Install auto-created models as their module attributes to make them picklable
             module = sys.modules[cls.__module__]
@@ -445,17 +445,16 @@ class ManagerMixin(object):
         self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
-        cls = instance.__class__
         try:
-            _old_objs[get_model_name(cls)][instance.pk] = cls.objects.get(pk=instance.pk)
-        except cls.DoesNotExist:
+            _old_objs[sender][instance.pk] = sender.objects.get(pk=instance.pk)
+        except sender.DoesNotExist:
             pass
 
     def _post_save(self, sender, instance, **kwargs):
         """
         Invokes invalidations for both old and new versions of saved object
         """
-        old = _old_objs[get_model_name(instance.__class__)].pop(instance.pk, None)
+        old = _old_objs[sender].pop(instance.pk, None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
@@ -486,7 +485,7 @@ class ManagerMixin(object):
             filter_key = key[:-3] if key.endswith('_id') else key
 
             cond = {filter_key: getattr(instance, key)}
-            qs = instance.__class__.objects.inplace().filter(**cond).order_by()
+            qs = sender.objects.inplace().filter(**cond).order_by()
             if MAX_GET_RESULTS:
                 qs = qs[:MAX_GET_RESULTS + 1]
             qs._cache_results(qs._cache_key(), [instance])
