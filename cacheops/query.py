@@ -7,6 +7,7 @@ except ImportError:
 from functools import wraps
 import hashlib
 
+import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
@@ -483,17 +484,21 @@ class ManagerMixin(object):
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance)
 
+    # Django 1.5- compatability
+    if django.VERSION < (1, 6):
+        get_queryset = Manager.get_query_set
+
     def inplace(self):
-        return self.get_query_set().inplace()
+        return self.get_queryset().inplace()
 
     def get(self, *args, **kwargs):
-        return self.get_query_set().inplace().get(*args, **kwargs)
+        return self.get_queryset().inplace().get(*args, **kwargs)
 
     def cache(self, *args, **kwargs):
-        return self.get_query_set().cache(*args, **kwargs)
+        return self.get_queryset().cache(*args, **kwargs)
 
     def nocache(self, *args, **kwargs):
-        return self.get_query_set().nocache(*args, **kwargs)
+        return self.get_queryset().nocache(*args, **kwargs)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):

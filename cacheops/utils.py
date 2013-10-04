@@ -4,6 +4,7 @@ from itertools import product, imap
 from inspect import getmembers, ismethod
 import hashlib
 
+import django
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
@@ -19,8 +20,13 @@ def non_proxy(model):
         model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
     return model
 
-def get_model_name(model):
-    return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+
+if django.VERSION < (1, 6):
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+else:
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.model_name)
 
 
 class MonkeyProxy(object):

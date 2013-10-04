@@ -86,7 +86,9 @@ def model_profile(model):
     if not model_profiles:
         prepare_profiles()
 
-    app, model_name = model._meta.app_label, model._meta.module_name
+    app = model._meta.app_label
+    # module_name is fallback for Django 1.5-
+    model_name = getattr(model._meta, 'model_name', None) or model._meta.module_name
     app_model = '%s.%s' % (app, model_name)
     for guess in (app_model, '%s.*' % app, '*.*'):
         if guess in model_profiles:
