@@ -3,3 +3,4 @@ dist
 *.egg-info
 build
 sqlite.db
+.idea
