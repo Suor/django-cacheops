@@ -198,6 +198,8 @@ def _stringify_query():
         elif isinstance(obj, Query):
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+        elif hasattr(obj, '__repr__'):
+            return "%s" % repr(obj)
         else:
             raise TypeError("Can't stringify %s" % repr(obj))
 
