@@ -366,7 +366,8 @@ class QuerySetMixin(object):
     def count(self):
         # Optmization borrowed from overriden method:
         # if queryset cache is already filled just return its len
-        if self._result_cache is not None and not self._iter:
+        # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
+        if self._result_cache is not None and not getattr(self, '_iter', None):
             return len(self._result_cache)
         return cached_method(op='count')(self._no_monkey.count)(self)
 
