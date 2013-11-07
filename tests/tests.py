@@ -117,14 +117,9 @@ class IssueTests(BaseTestCase):
             CacheOnSaveModel.objects.cache().get(pk=m.pk)
 
     def test_54(self):
-        issues = Issue.objects.all()
-
-        # force load objects to _result_cache
-        for issue in issues:
-            pass
-
-        # call count() via len() on _result_cache
-        issues.count()
+        qs = Category.objects.all()
+        list(qs) # force load objects to quesryset cache
+        qs.count()
 
 
 class LocalGetTests(BaseTestCase):
