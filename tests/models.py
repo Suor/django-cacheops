@@ -89,3 +89,7 @@ class DbAgnostic(models.Model):
 class DbBinded(models.Model):
     pass
 
+
+# 54
+class Issue(models.Model):
+    pass

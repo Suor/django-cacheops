@@ -1,4 +1,4 @@
-import unittest, random
+import unittest
 from django.test import TestCase
 from django.contrib.auth.models import User
 
@@ -104,7 +104,7 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(labels__in=[1,2,3]).cache().count()
+        MachineBrand.objects.exclude(labels__in=[1, 2, 3]).cache().count()
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
@@ -115,6 +115,16 @@ class IssueTests(BaseTestCase):
 
         with self.assertNumQueries(0):
             CacheOnSaveModel.objects.cache().get(pk=m.pk)
+
+    def test_54(self):
+        issues = Issue.objects.all()
+
+        # force load objects to _result_cache
+        for issue in issues:
+            pass
+
+        # call count() via len() on _result_cache
+        issues.count()
 
 
 class LocalGetTests(BaseTestCase):
