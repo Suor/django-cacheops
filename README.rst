@@ -387,7 +387,8 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
+- faster .get() handling for simple cases such as get by pk/id, with simple key calculation
+- integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - make a version of invalidation with scripting
 - shard cache between multiple redises
-- integrate with prefetch_related()
