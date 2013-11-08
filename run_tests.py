@@ -1,11 +1,19 @@
 #!/usr/bin/env python
-import os, sys
+import os, sys, re
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 from django.core.management import call_command
 
-if len(sys.argv) >= 2 and not sys.argv[1].startswith('-'):
-    names = 'tests.' + sys.argv[1]
+print sys.argv
+
+
+names = next((a for a in sys.argv[1:] if not a.startswith('-')), None)
+
+if names and re.search(r'^\d+$', names):
+    names = 'tests.tests.IssueTests.test_' + names
+elif names and not names.startswith('tests.'):
+    names = 'tests.tests.' + names
 else:
-    names = 'tests'
+    names = 'tests.tests'
+
 call_command('test', names, failfast='-x' in sys.argv)
