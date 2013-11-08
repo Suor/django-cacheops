@@ -121,6 +121,9 @@ class IssueTests(BaseTestCase):
         list(qs) # force load objects to quesryset cache
         qs.count()
 
+    def test_56(self):
+        Post.objects.exclude(extra__in=[1, 2]).cache().count()
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
