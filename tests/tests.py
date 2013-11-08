@@ -91,6 +91,8 @@ class BasicTests(BaseTestCase):
 
 
 class IssueTests(BaseTestCase):
+    fixtures = ['basic']
+
     def setUp(self):
         user = User.objects.create(username='Suor')
         Profile.objects.create(pk=2, user=user, tag=10)
@@ -123,6 +125,9 @@ class IssueTests(BaseTestCase):
 
     def test_56(self):
         Post.objects.exclude(extra__in=[1, 2]).cache().count()
+
+    def test_57(self):
+        list(Post.objects.filter(category__in=Category.objects.nocache()).cache())
 
 
 class LocalGetTests(BaseTestCase):

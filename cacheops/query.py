@@ -151,6 +151,13 @@ def _stringify_query():
 
     attrs = {}
 
+    # A new thing in Django 1.6
+    try:
+        from django.db.models.sql.where import SubqueryConstraint
+        attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
+    except ImportError:
+        pass
+
     # RawValue removed in Django 1.7
     try:
         from django.db.models.sql.datastructures import RawValue

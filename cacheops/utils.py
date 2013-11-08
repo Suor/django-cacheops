@@ -63,6 +63,13 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, method.im_func)
 
 
+# A new thing in Django 1.6 that should be ignored for dnf purposes
+try:
+    from django.db.models.sql.where import SubqueryConstraint
+    dnfless_subconds = (ExtraWhere, SubqueryConstraint)
+except ImportError:
+    dnfless_subconds = ExtraWhere
+
 
 def dnf(qs):
     """
@@ -92,7 +99,7 @@ def dnf(qs):
                 return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
                 return [[]]
-        elif isinstance(where, ExtraWhere):
+        elif isinstance(where, dnfless_subconds):
             return [[]]
         elif len(where) == 0:
             return None
