@@ -129,6 +129,8 @@ class IssueTests(BaseTestCase):
     def test_57(self):
         list(Post.objects.filter(category__in=Category.objects.nocache()).cache())
 
+    def test_58(self):
+        list(Post.objects.cache().none())
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
