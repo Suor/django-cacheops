@@ -166,3 +166,15 @@ def stamp_fields(model, cache={}):
         stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
         cache[model] = hashlib.md5(stamp).hexdigest()
     return cache[model]
+
+
+import re
+from django.utils.safestring import mark_safe
+
+NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
+SPACE_BETWEEN_TAGS = mark_safe('> <')
+
+def carefully_strip_whitespace(text):
+    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
+    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
+    return text

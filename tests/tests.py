@@ -1,8 +1,8 @@
-import unittest
+import unittest, re
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from cacheops import invalidate_all, cached
+from cacheops import invalidate_all, invalidate_model, cached
 from .models import *
 
 
@@ -95,6 +95,58 @@ class BasicTests(BaseTestCase):
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEquals(list(qs.cache()), list(qs))
+
+
+class TemplateTests(BaseTestCase):
+    def test_cached(self):
+        from django.template import Context, Template
+
+        counts = {'a': 0, 'b': 0}
+        def inc_a():
+            counts['a'] += 1
+            return ''
+        def inc_b():
+            counts['b'] += 1
+            return ''
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached 60 'a' %}.a{{ a }}{% endcached %}
+            {% cached 60 'a' %}.a{{ a }}{% endcached %}
+            {% cached 60 'a' 'variant' %}.a{{ a }}{% endcached %}
+            {% cached timeout=60 fragment_name='b' %}.b{{ b }}{% endcached %}
+        """)
+
+        s = t.render(Context({'a': inc_a, 'b': inc_b}))
+        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a.b')
+        self.assertEquals(counts, {'a': 2, 'b': 1})
+
+    def test_cached_as(self):
+        from django.template import Context, Template
+
+        counts = {'a': 0}
+        def inc_a():
+            counts['a'] += 1
+            return ''
+
+        qs = Post.objects.all()
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached_as qs 60 'a' %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs timeout=60 fragment_name='a' %}.a{{ a }}{% endcached_as %}
+        """)
+
+        s = t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEquals(re.sub(r'\s+', '', s), '.a.a')
+        self.assertEquals(counts['a'], 1)
+
+        t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEquals(counts['a'], 1)
+
+        invalidate_model(Post)
+        t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEquals(counts['a'], 2)
 
 
 class IssueTests(BaseTestCase):
