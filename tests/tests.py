@@ -89,6 +89,13 @@ class BasicTests(BaseTestCase):
                 for q in queries:
                     Extra.objects.cache().filter(**q).count()
 
+    def test_combine(self):
+        qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
+        self.assertEquals(list(qs.cache()), list(qs))
+
+        qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
+        self.assertEquals(list(qs.cache()), list(qs))
+
 
 class IssueTests(BaseTestCase):
     fixtures = ['basic']

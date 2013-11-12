@@ -63,13 +63,16 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, method.im_func)
 
 
+# Some special subconditions that don't provide dnf narrowing
+from django.db.models.sql.where import EverythingNode, NothingNode
+dnfless_subconds = (ExtraWhere, EverythingNode, NothingNode)
+
 # A new thing in Django 1.6 that should be ignored for dnf purposes
 try:
     from django.db.models.sql.where import SubqueryConstraint
-    dnfless_subconds = (ExtraWhere, SubqueryConstraint)
+    dnfless_subconds += (SubqueryConstraint,)
 except ImportError:
-    dnfless_subconds = ExtraWhere
-
+    pass
 
 def dnf(qs):
     """

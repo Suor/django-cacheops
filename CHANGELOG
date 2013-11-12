@@ -1,4 +1,5 @@
 - Django 1.6+ support
+- fixed caching querysets combined with | and & operators
 
 1.0.3
 - added db_agnostic option to cache profile

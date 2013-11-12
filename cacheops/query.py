@@ -143,7 +143,8 @@ def _stringify_query():
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
-    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
+    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
+                                           EverythingNode, NothingNode
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.datastructures import Date
@@ -173,8 +174,8 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
-    attrs[ManyToOneRel] = ('field',)
-    attrs[OneToOneRel] = ('field',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
     q_keys = q.__dict__.keys()
