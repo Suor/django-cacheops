@@ -132,6 +132,7 @@ class IssueTests(BaseTestCase):
     def test_58(self):
         list(Post.objects.cache().none())
 
+
 class LocalGetTests(BaseTestCase):
     def setUp(self):
         Local.objects.create(pk=1)

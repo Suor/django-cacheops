@@ -151,9 +151,10 @@ def _stringify_query():
 
     attrs = {}
 
-    # A new thing in Django 1.6
+    # A new things in Django 1.6
     try:
-        from django.db.models.sql.where import SubqueryConstraint
+        from django.db.models.sql.where import EmptyWhere, SubqueryConstraint
+        attrs[EmptyWhere] = ()
         attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
     except ImportError:
         pass
@@ -346,6 +347,7 @@ class QuerySetMixin(object):
         return clone
 
     def iterator(self):
+        # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheops
 
