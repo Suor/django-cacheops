@@ -299,12 +299,30 @@ It have several improvements upon django built-in file cache, both about high lo
     /path/manage.py cleanfilecache
 
 
+Django templates integration
+----------------------------
+
+Cacheops provides tags to cache template fragments. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment::
+
+    {% load cacheops %}
+
+    {% cached_as <queryset> <timeout> <fragment_name> [<extra1> <extra2> ...] %}
+        ... some template code ...
+    {% endcached_as %}
+
+    {% cached <timeout> <fragment_name> [<extra1> <extra2> ...] %}
+        ... some template code ...
+    {% endcached %}
+
+You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
+
+
 Jinja2 extension
 ----------------
 
 Add ``cacheops.jinja2.cache`` to your extensions and use::
 
-    {% cached_as queryset [, timeout=<timeout>] [, extra=<key addition>] %}
+    {% cached_as <queryset> [, timeout=<timeout>] [, extra=<key addition>] %}
         ... some template code ...
     {% endcached_as %}
 
@@ -360,7 +378,7 @@ Here come some performance tips to make cacheops and Django ORM faster.
 3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
    which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances.
 
 5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/topics/persistence>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
 
