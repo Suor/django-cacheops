@@ -49,10 +49,8 @@ def cached(context, nodelist, timeout, fragment_name, *extra):
     return _handle_tag()
 
 @tag_helper
-def cached_as(context, nodelist, qs, timeout, fragment_name, *extra):
-    full_extra = None if fragment_name is None else (fragment_name,) + extra
-
-    @cacheops.cached_as(qs, timeout=timeout, extra=full_extra)
+def cached_as(context, nodelist, queryset, timeout, fragment_name, *extra):
+    @cacheops.cached_as(queryset, timeout=timeout, extra=(fragment_name,) + extra)
     def _handle_tag():
         # TODO: make this cache preparation configurable
         return carefully_strip_whitespace(nodelist.render(context))

@@ -1,6 +1,8 @@
 import unittest, re
+
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.template import Context, Template
 
 from cacheops import invalidate_all, invalidate_model, cached
 from .models import *
@@ -99,8 +101,6 @@ class BasicTests(BaseTestCase):
 
 class TemplateTests(BaseTestCase):
     def test_cached(self):
-        from django.template import Context, Template
-
         counts = {'a': 0, 'b': 0}
         def inc_a():
             counts['a'] += 1
@@ -122,8 +122,6 @@ class TemplateTests(BaseTestCase):
         self.assertEquals(counts, {'a': 2, 'b': 1})
 
     def test_cached_as(self):
-        from django.template import Context, Template
-
         counts = {'a': 0}
         def inc_a():
             counts['a'] += 1
@@ -133,12 +131,13 @@ class TemplateTests(BaseTestCase):
 
         t = Template("""
             {% load cacheops %}
-            {% cached_as qs 60 'a' %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs 0 'a' %}.a{{ a }}{% endcached_as %}
             {% cached_as qs timeout=60 fragment_name='a' %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs fragment_name='a' timeout=60 %}.a{{ a }}{% endcached_as %}
         """)
 
         s = t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(re.sub(r'\s+', '', s), '.a.a')
+        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a')
         self.assertEquals(counts['a'], 1)
 
         t.render(Context({'a': inc_a, 'qs': qs}))
