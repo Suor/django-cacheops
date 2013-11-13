@@ -302,7 +302,9 @@ It have several improvements upon django built-in file cache, both about high lo
 Django templates integration
 ----------------------------
 
-Cacheops provides tags to cache template fragments. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment::
+Cacheops provides tags to cache template fragments. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment:
+
+.. code:: django
 
     {% load cacheops %}
 
@@ -320,7 +322,9 @@ You can use ``0`` for timeout in ``@cached_as`` to use it's default value for mo
 Jinja2 extension
 ----------------
 
-Add ``cacheops.jinja2.cache`` to your extensions and use::
+Add ``cacheops.jinja2.cache`` to your extensions and use:
+
+.. code:: jinja
 
     {% cached_as <queryset> [, timeout=<timeout>] [, extra=<key addition>] %}
         ... some template code ...
@@ -328,7 +332,7 @@ Add ``cacheops.jinja2.cache`` to your extensions and use::
 
 or
 
-::
+.. code:: jinja
 
     {% cached [timeout=<timeout>] [, extra=<key addition>] %}
         ...
