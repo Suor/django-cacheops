@@ -515,7 +515,8 @@ class ManagerMixin(object):
 
     # Django 1.5- compatability
     if django.VERSION < (1, 6):
-        get_queryset = Manager.get_query_set
+        def get_queryset(self):
+            return self.get_query_set()
 
     def inplace(self):
         return self.get_queryset().inplace()
