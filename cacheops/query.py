@@ -513,7 +513,7 @@ class ManagerMixin(object):
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance)
 
-    # Django 1.5- compatability
+    # Django 1.6- compatability
     if django.VERSION < (1, 6):
         def get_queryset(self):
             return self.get_query_set()
