@@ -1,3 +1,5 @@
+- fixed Django 1.5- compatibility (aykutozat)
+
 1.1
 - Django 1.6+ support
 - added Django template tags
