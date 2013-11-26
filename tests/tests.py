@@ -154,11 +154,6 @@ class IssueTests(BaseTestCase):
     def setUp(self):
         user = User.objects.create(username='Suor')
         Profile.objects.create(pk=2, user=user, tag=10)
-        # begin issue 62
-        product = Product.objects.create(name='62')
-        ProductReview.objects.create(product=product, status=0)
-        Product.objects.create(name='62-2')
-        # end issue 62
         super(IssueTests, self).setUp()
 
     def test_16(self):
@@ -196,10 +191,14 @@ class IssueTests(BaseTestCase):
         list(Post.objects.cache().none())
 
     def test_62(self):
-        p=Product.objects.filter(name='62')[0]
-        p.reviews.get(status=0)  # quires to all table without putting condition for product at where clause.
-        p2=Product.objects.filter(name='62-2')[0]
-        p2.reviews.get(status=0)  # returns the same result with p.reviews.get(status=0)
+        # setup
+        product = Product.objects.create(name='62')
+        ProductReview.objects.create(product=product, status=0)
+        ProductReview.objects.create(product=None, status=0)
+
+        # Test related manager filtering works, .get() will throw MultipleObjectsReturned if not
+        # The bug is related manager not respected when .get() is called
+        product.reviews.get(status=0)
 
 
 class LocalGetTests(BaseTestCase):
