@@ -1,3 +1,4 @@
+1.1
 - Django 1.6+ support
 - added Django template tags
 - fixed caching querysets combined with | and & operators
