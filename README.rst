@@ -17,7 +17,7 @@ And there is more to it:
 Requirements
 ------------
 
-Python 2.6, Django 1.2 and Redis 2.2.7.
+Python 2.6 or 3.3, Django 1.2 and Redis 2.2.7.
 
 
 Installation
