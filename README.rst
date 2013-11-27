@@ -302,7 +302,7 @@ It have several improvements upon django built-in file cache, both about high lo
 Django templates integration
 ----------------------------
 
-Cacheops provides tags to cache template fragments. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment:
+Cacheops provides tags to cache template fragments for Django 1.4+. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment:
 
 .. code:: django
 
