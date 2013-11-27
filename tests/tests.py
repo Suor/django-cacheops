@@ -98,10 +98,10 @@ class BasicTests(BaseTestCase):
 
     def test_combine(self):
         qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
-        self.assertEquals(list(qs.cache()), list(qs))
+        self.assertEqual(list(qs.cache()), list(qs))
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
-        self.assertEquals(list(qs.cache()), list(qs))
+        self.assertEqual(list(qs.cache()), list(qs))
 
 
 class TemplateTests(BaseTestCase):
@@ -124,8 +124,8 @@ class TemplateTests(BaseTestCase):
         """)
 
         s = t.render(Context({'a': inc_a, 'b': inc_b}))
-        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a.b')
-        self.assertEquals(counts, {'a': 2, 'b': 1})
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
+        self.assertEqual(counts, {'a': 2, 'b': 1})
 
     @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached_as(self):
@@ -144,15 +144,15 @@ class TemplateTests(BaseTestCase):
         """)
 
         s = t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a')
-        self.assertEquals(counts['a'], 1)
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a')
+        self.assertEqual(counts['a'], 1)
 
         t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(counts['a'], 1)
+        self.assertEqual(counts['a'], 1)
 
         invalidate_model(Post)
         t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(counts['a'], 2)
+        self.assertEqual(counts['a'], 2)
 
 
 class IssueTests(BaseTestCase):

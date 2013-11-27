@@ -21,6 +21,7 @@ setup(
         'django>=1.2',
         'redis>=2.4.12',
         'simplejson>=2.2.0',
+        'six',
     ],
 
     classifiers=[
@@ -28,6 +29,10 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
 
         'Framework :: Django',
         'Environment :: Web Environment',

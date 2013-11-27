@@ -5,7 +5,9 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import hashlib
+
+import six
+from cacheops import cross
 
 import django
 from django.core.exceptions import ImproperlyConfigured
@@ -183,8 +185,12 @@ def _stringify_query():
                  'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
-    for k, v in attrs.items():
-        attrs[k] = map(intern, v)
+    try:
+        for k, v in attrs.items():
+            attrs[k] = map(intern, v)
+    except NameError:
+        # No intern() in Python 3
+        pass
 
     def encode_object(obj):
         if isinstance(obj, set):
@@ -257,8 +263,8 @@ class QuerySetMixin(object):
         """
         Compute a cache key for this queryset
         """
-        md5 = hashlib.md5()
-        md5.update(str(self.__class__))
+        md5 = cross.md5()
+        md5.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
         md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
         # If query results differ depending on database
@@ -490,7 +496,7 @@ class ManagerMixin(object):
             for k in unwanted_attrs:
                 del instance.__dict__[k]
 
-            key = cache_on_save if isinstance(cache_on_save, basestring) else 'pk'
+            key = 'pk' if cache_on_save is True else cache_on_save
             # Django doesn't allow filters like related_id = 1337.
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help

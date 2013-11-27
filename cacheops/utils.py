@@ -1,8 +1,19 @@
 # -*- coding: utf-8 -*-
 from operator import concat, itemgetter
-from itertools import product, imap
-from inspect import getmembers, ismethod
-import hashlib
+from itertools import product
+import inspect
+
+try:
+    from itertools import imap
+except ImportError:
+    # Use Python 2 map/filter here for now
+    imap = map
+    map = lambda f, seq: list(imap(f, seq))
+    ifilter = filter
+    filter = lambda f, seq: list(ifilter(f, seq))
+    from functools import reduce
+import six
+from cacheops import cross
 
 import django
 from django.db.models import Model
@@ -33,7 +44,7 @@ class MonkeyProxy(object):
     def __init__(self, cls):
         monkey_bases = tuple(b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey'))
         for monkey_base in monkey_bases:
-            for name, value in monkey_base.__dict__.iteritems():
+            for name, value in monkey_base.__dict__.items():
                 setattr(self, name, value)
 
 
@@ -53,14 +64,18 @@ def monkey_mix(cls, mixin, methods=None):
     cls._no_monkey = MonkeyProxy(cls)
 
     if methods is None:
-        methods = getmembers(mixin, ismethod)
+        # NOTE: there no such thing as unbound method in Python 3, it uses naked functions,
+        #       so we use some six based altering here
+        isboundmethod = inspect.isfunction if six.PY3 else inspect.ismethod
+        methods = inspect.getmembers(mixin, isboundmethod)
     else:
         methods = [(m, getattr(mixin, m)) for m in methods]
 
     for name, method in methods:
         if hasattr(cls, name):
             setattr(cls._no_monkey, name, getattr(cls, name))
-        setattr(cls, name, method.im_func)
+        # NOTE: remember, there is no bound methods in Python 3
+        setattr(cls, name, six.get_unbound_function(method))
 
 
 # Some special subconditions that don't provide dnf narrowing
@@ -164,7 +179,7 @@ def stamp_fields(model, cache={}):
     """
     if model not in cache:
         stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
-        cache[model] = hashlib.md5(stamp).hexdigest()
+        cache[model] = cross.md5(stamp).hexdigest()
     return cache[model]
 
 
