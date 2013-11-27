@@ -1,5 +1,10 @@
-import unittest, re
+import re
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
+import django
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.template import Context, Template
@@ -100,6 +105,7 @@ class BasicTests(BaseTestCase):
 
 
 class TemplateTests(BaseTestCase):
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached(self):
         counts = {'a': 0, 'b': 0}
         def inc_a():
@@ -121,6 +127,7 @@ class TemplateTests(BaseTestCase):
         self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a.b')
         self.assertEquals(counts, {'a': 2, 'b': 1})
 
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached_as(self):
         counts = {'a': 0}
         def inc_a():
@@ -290,12 +297,14 @@ class SimpleCacheTests(BaseTestCase):
 
 
 class DbAgnosticTests(BaseTestCase):
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
 
         with self.assertNumQueries(0, using='slave'):
             list(DbAgnostic.objects.cache().using('slave'))
 
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_disabled(self):
         list(DbBinded.objects.cache())
 
