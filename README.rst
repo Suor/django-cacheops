@@ -17,7 +17,7 @@ And there is more to it:
 Requirements
 ------------
 
-Python 2.6, Django 1.2 and Redis 2.2.7.
+Python 2.6 or 3.3, Django 1.2 and Redis 2.2.7.
 
 
 Installation
@@ -117,13 +117,13 @@ There are, however, a shortcut for it:
     qs2 = qs.filter(category=3)  # hits it once more
 
 
-It is usefull when you want to disable automatic caching on particular queryset.
+It is useful when you want to disable automatic caching on particular queryset.
 
 | **Function caching.**
 
 You can cache and invalidate result of a function the same way as a queryset.
 Cache of next function will be invalidated on any ``Article`` change, addition
-or deletetion:
+or deletion:
 
 .. code:: python
 
@@ -163,7 +163,7 @@ you should use a local function:
 
 Using local function gives additional advantage: we can filter queryset used
 in ``@cached_as()`` to make invalidation more granular. We also add an
-``extra`` to make diffrent keys for calls with same ``category`` but diffrent
+``extra`` to make different keys for calls with same ``category`` but different
 ``count``.
 
 
@@ -175,7 +175,7 @@ listens on model signals and invalidates appropriate caches on ``Model.save()``
 and ``.delete()``.
 
 Invalidation tries to be granular which means it won't invalidate a queryset
-that cannot be influenced by added/updated/deleted object judjing by query
+that cannot be influenced by added/updated/deleted object judging by query
 conditions. Most time this will do what you want, if it's not you can use one
 of the following:
 
@@ -294,23 +294,45 @@ File based cache can be used the same way as simple time-invalidated one:
     file_cache.delete(cache_key)
 
 
-It have several improvements upon django built-in file cache, both about highload. First, it is safe against concurrent writes. Second, it's invalidation is done as separate task, you'll need to call this from crontab for that to work::
+It have several improvements upon django built-in file cache, both about high load. First, it is safe against concurrent writes. Second, it's invalidation is done as separate task, you'll need to call this from crontab for that to work::
 
     /path/manage.py cleanfilecache
+
+
+Django templates integration
+----------------------------
+
+Cacheops provides tags to cache template fragments for Django 1.4+. They mimic ``@cached_as`` and ``@cached`` decorators, however they require explicit naming of each fragment:
+
+.. code:: django
+
+    {% load cacheops %}
+
+    {% cached_as <queryset> <timeout> <fragment_name> [<extra1> <extra2> ...] %}
+        ... some template code ...
+    {% endcached_as %}
+
+    {% cached <timeout> <fragment_name> [<extra1> <extra2> ...] %}
+        ... some template code ...
+    {% endcached %}
+
+You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
 
 
 Jinja2 extension
 ----------------
 
-Add ``cacheops.jinja2.cache`` to your extensions and use::
+Add ``cacheops.jinja2.cache`` to your extensions and use:
 
-    {% cached_as queryset [, timeout=<timeout>] [, extra=<key addition>] %}
+.. code:: jinja
+
+    {% cached_as <queryset> [, timeout=<timeout>] [, extra=<key addition>] %}
         ... some template code ...
     {% endcached_as %}
 
 or
 
-::
+.. code:: jinja
 
     {% cached [timeout=<timeout>] [, extra=<key addition>] %}
         ...
@@ -360,11 +382,11 @@ Here come some performance tips to make cacheops and Django ORM faster.
 3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
    which sometimes make queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances. Cacheops doesn't provide extension for django's built-in templates for now, but you can adapt ``django.templatetags.cache`` to work with cacheops fairly easily (send me a pull request if you do).
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances.
 
 5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/topics/persistence>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
 
-6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heurestics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
+6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
@@ -387,7 +409,8 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
+- faster .get() handling for simple cases such as get by pk/id, with simple key calculation
+- integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - make a version of invalidation with scripting
 - shard cache between multiple redises
-- integrate with prefetch_related()

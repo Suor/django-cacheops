@@ -5,7 +5,9 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import hashlib
+
+import six
+from cacheops import cross
 
 import django
 from django.core.exceptions import ImproperlyConfigured
@@ -142,14 +144,23 @@ def _stringify_query():
     from datetime import datetime, date
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
-    from django.db.models.fields.related import ManyToOneRel
-    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
+    from django.db.models.fields.related import ManyToOneRel, OneToOneRel
+    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
+                                           EverythingNode, NothingNode
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.datastructures import Date
     from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
+
+    # A new things in Django 1.6
+    try:
+        from django.db.models.sql.where import EmptyWhere, SubqueryConstraint
+        attrs[EmptyWhere] = ()
+        attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
+    except ImportError:
+        pass
 
     # RawValue removed in Django 1.7
     try:
@@ -165,7 +176,8 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
-    attrs[ManyToOneRel] = ('field',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
     q_keys = q.__dict__.keys()
@@ -173,8 +185,12 @@ def _stringify_query():
                  'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
-    for k, v in attrs.items():
-        attrs[k] = map(intern, v)
+    try:
+        for k, v in attrs.items():
+            attrs[k] = map(intern, v)
+    except NameError:
+        # No intern() in Python 3
+        pass
 
     def encode_object(obj):
         if isinstance(obj, set):
@@ -249,8 +265,8 @@ class QuerySetMixin(object):
         """
         Compute a cache key for this queryset
         """
-        md5 = hashlib.md5()
-        md5.update(str(self.__class__))
+        md5 = cross.md5()
+        md5.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
         md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
         # If query results differ depending on database
@@ -340,6 +356,7 @@ class QuerySetMixin(object):
         return clone
 
     def iterator(self):
+        # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheops
 
@@ -368,7 +385,8 @@ class QuerySetMixin(object):
     def count(self):
         # Optmization borrowed from overriden method:
         # if queryset cache is already filled just return its len
-        if self._result_cache is not None and not self._iter:
+        # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
+        if self._result_cache is not None and not getattr(self, '_iter', None):
             return len(self._result_cache)
         return cached_method(op='count')(self._no_monkey.count)(self)
 
@@ -480,7 +498,7 @@ class ManagerMixin(object):
             for k in unwanted_attrs:
                 del instance.__dict__[k]
 
-            key = cache_on_save if isinstance(cache_on_save, basestring) else 'pk'
+            key = 'pk' if cache_on_save is True else cache_on_save
             # Django doesn't allow filters like related_id = 1337.
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
@@ -505,7 +523,8 @@ class ManagerMixin(object):
 
     # Django 1.5- compatability
     if django.VERSION < (1, 6):
-        get_queryset = Manager.get_query_set
+        def get_queryset(self):
+            return self.get_query_set()
 
     def inplace(self):
         return self.get_queryset().inplace()
