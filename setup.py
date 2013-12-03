@@ -21,7 +21,7 @@ setup(
         'django>=1.2',
         'redis>=2.4.12',
         'simplejson>=2.2.0',
-        'six',
+        'six>=1.4.0',
     ],
 
     classifiers=[
