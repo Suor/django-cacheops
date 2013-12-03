@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from django.template import Context, Template
 
-from cacheops import invalidate_all, invalidate_model, cached
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached
 from .models import *
 
 
@@ -230,9 +230,17 @@ class ManyToManyTests(BaseTestCase):
         make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
         self.assertEqual(make_query(), [self.suor])
 
+        # query cache won't be invalidated on this create, since PhotoLike is through model
         PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
         self.assertEqual(make_query(), [self.suor, self.peterdds])
 
+    def test_44_workaround(self):
+        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
+        self.assertEqual(make_query(), [self.suor])
+
+        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
+        invalidate_obj(self.peterdds)
+        self.assertEqual(make_query(), [self.suor, self.peterdds])
 
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
