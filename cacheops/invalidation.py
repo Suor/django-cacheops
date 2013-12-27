@@ -43,10 +43,12 @@ class ConjSchemes(object):
     def load_schemes(self, model):
         model_name = get_model_name(model)
 
-        txn = redis_client.pipeline()
-        txn.get(self.get_version_key(model))
-        txn.smembers(self.get_lookup_key(model_name))
-        version, members = txn.execute()
+        lock_key = redis_lock_acquire("lock:schemes:" + model_name)
+        pipe = redis_client.pipeline(transaction=False)
+        pipe.get(self.get_version_key(model))
+        pipe.smembers(self.get_lookup_key(model_name))
+        version, members = pipe.execute()
+        redis_lock_release(lock_key)
 
         self.local[model_name] = set(map(deserialize_scheme, members))
         self.local[model_name].add(()) # Всегда добавляем пустую схему
@@ -84,13 +86,24 @@ class ConjSchemes(object):
                 schemes = self.load_schemes(model)
             if new_schemes - schemes:
                 # Write new schemes to redis
-                txn = redis_client.pipeline()
-                txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
+                # txn = redis_client.pipeline()
+                # txn.incr(self.get_version_key(model_name)) # Увеличиваем версию схем
+                #
+                # lookup_key = self.get_lookup_key(model_name)
+                # for scheme in new_schemes - schemes:
+                #     txn.sadd(lookup_key, serialize_scheme(scheme))
+                # txn.execute()
+                lock_key = redis_client.lock_acquire("lock:schemes:" +
+                                                     model_name)
+                pipe = redis_client.pipeline(transaction=False)
+                pipe.incr(self.get_version_key(model_name))
 
                 lookup_key = self.get_lookup_key(model_name)
                 for scheme in new_schemes - schemes:
-                    txn.sadd(lookup_key, serialize_scheme(scheme))
-                txn.execute()
+                    pipe.sadd(lookup_key, serialize_scheme(scheme))
+                pipe.execute()
+                redis_lock_release(lock_key)
+
 
                 # Updating local version
                 self.local[model_name].update(new_schemes)
@@ -114,6 +127,18 @@ class ConjSchemes(object):
 cache_schemes = ConjSchemes()
 
 
+def redis_lock_acquire(lock_key, timeout_ms=1000):
+    """ Spin-lock, be aware!
+    """
+    while not redis_client.set(lock_key, "1",  nx=True, px=timeout_ms):
+        pass
+    return lock_key
+
+
+def redis_lock_release(lock_key):
+    redis_client.delete(lock_key)
+    return
+
 @handle_connection_failure
 def invalidate_obj(obj):
     """
@@ -132,27 +157,38 @@ def invalidate_obj(obj):
 
         # Reading scheme version, cache_keys and deleting invalidators in
         # a single transaction.
-        def _invalidate_conjs(pipe):
-            # get schemes version to check later that it's not obsolete
-            pipe.get(cache_schemes.get_version_key(model))
-            # Get a union of all cache keys registered in invalidators
-            pipe.sunion(conjs_keys)
-            # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
-            # so we'll remove them too.
-            # NOTE: There could be some other invalidators not matched with current object,
-            #       which reference cache keys we delete, they will be hanging out for a while.
-            pipe.delete(*conjs_keys)
+        # def _invalidate_conjs(pipe):
+        #     # get schemes version to check later that it's not obsolete
+        #     pipe.get(cache_schemes.get_version_key(model))
+        #     # Get a union of all cache keys registered in invalidators
+        #     pipe.sunion(conjs_keys)
+        #     # `conjs_keys` are keys of sets containing `cache_keys` we are going to delete,
+        #     # so we'll remove them too.
+        #     # NOTE: There could be some other invalidators not matched with current object,
+        #     #       which reference cache keys we delete, they will be hanging out for a while.
+        #     pipe.delete(*conjs_keys)
+
+        for ck in conjs_keys:
+            lock_key = redis_lock_acquire("lock:" + ck)
+            pipe = redis_client.pipeline(transaction=False)
+            pipe.smembers(ck)
+            pipe.delete(ck)
+            cache_keys, _ = pipe.execute()
+            redis_lock_release(lock_key)
+            if cache_keys:
+                redis_client.delete(*cache_keys)
 
         # NOTE: we delete fetched cache_keys later which makes a tiny possibility that something
         #       will fail in the middle leaving those cache keys hanging without invalidators.
         #       The alternative WATCH-based optimistic locking proved to be pessimistic.
-        version, cache_keys, _ = redis_client.transaction(_invalidate_conjs)
-        if cache_keys:
-            redis_client.delete(*cache_keys)
+        # version, cache_keys, _ = redis_client.transaction(_invalidate_conjs)
+        # if cache_keys:
+        #     redis_client.delete(*cache_keys)
 
         # OK, we invalidated all conjunctions we had in memory, but model schema
         # may have been changed in redis long time ago. If this happened,
         # schema version will not match and we should load new schemes and redo our thing
+        version = redis_client.get(cache_schemes.get_version_key(model))
         if int(version or 0) != cache_schemes.version(model):
             schemes = cache_schemes.load_schemes(model)
         else:

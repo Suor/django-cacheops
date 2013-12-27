@@ -22,7 +22,7 @@ except ImportError:
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
 from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
-from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
+from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model, redis_lock_acquire
 
 
 __all__ = ('cached_method', 'cached_as', 'install_cacheops')
@@ -46,26 +46,26 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     schemes = map(conj_scheme, cond_dnf)
     cache_schemes.ensure_known(model, schemes)
 
-    txn = redis_client.pipeline()
-
     # Write data to cache
     pickled_data = pickle.dumps(data, -1)
     if timeout is not None:
-        txn.setex(cache_key, timeout, pickled_data)
+        redis_client.setex(cache_key, timeout, pickled_data)
     else:
-        txn.set(cache_key, pickled_data)
+        redis_client.set(cache_key, pickled_data)
+
+    # XXX If process dies here, cache key hangs without any dependencies
 
     # Add new cache_key to list of dependencies for every conjunction in dnf
     for conj in cond_dnf:
         conj_key = conj_cache_key(model, conj)
-        txn.sadd(conj_key, cache_key)
+        pip = redis_client.pipeline(transaction=True)
+        pip.sadd(conj_key, cache_key)
         if timeout is not None:
             # Invalidator timeout should be larger than timeout of any key it references
             # So we take timeout from profile which is our upper limit
             # Add few extra seconds to be extra safe
-            txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
-
-    txn.execute()
+            pip.expire(conj_key, model._cacheprofile['timeout'] + 10)
+        pip.execute()
 
 
 def cached_as(sample, extra=None, timeout=None):
