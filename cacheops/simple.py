@@ -4,10 +4,11 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import os, time, hashlib
+import os, time
 
 from django.conf import settings
 
+from cacheops import cross
 from cacheops.conf import redis_client
 
 
@@ -29,7 +30,7 @@ class BaseCache(object):
         def decorator(func):
             def get_cache_key(*args, **kwargs):
                 # Calculating cache key based on func and arguments
-                md5 = hashlib.md5()
+                md5 = cross.md5()
                 md5.update('%s.%s' % (func.__module__, func.__name__))
                 # TODO: make it more civilized
                 if extra is not None:
@@ -105,7 +106,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = hashlib.md5(key).hexdigest()
+        digest = cross.md5(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

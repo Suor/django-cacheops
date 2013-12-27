@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-import re
 
-from django.utils.safestring import mark_safe
 from jinja2 import nodes
 from jinja2.ext import Extension
 
 import cacheops
+from cacheops.utils import carefully_strip_whitespace
 
 
 class CacheopsExtension(Extension):
@@ -41,7 +40,7 @@ class CacheopsExtension(Extension):
         def _handle_tag():
             content = caller()
             # TODO: make this cache preparation configurable
-            return _carefully_strip_whitespace(content)
+            return carefully_strip_whitespace(content)
 
         return _handle_tag()
 
@@ -71,12 +70,3 @@ class CacheopsExtension(Extension):
         return args, kwargs
 
 cache = CacheopsExtension
-
-
-NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
-SPACE_BETWEEN_TAGS = mark_safe('> <')
-
-def _carefully_strip_whitespace(text):
-    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
-    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
-    return text

@@ -1,9 +1,21 @@
 # -*- coding: utf-8 -*-
 from operator import concat, itemgetter
-from itertools import product, imap
-from inspect import getmembers, ismethod
-import hashlib
+from itertools import product
+import inspect
 
+try:
+    from itertools import imap
+except ImportError:
+    # Use Python 2 map/filter here for now
+    imap = map
+    map = lambda f, seq: list(imap(f, seq))
+    ifilter = filter
+    filter = lambda f, seq: list(ifilter(f, seq))
+    from functools import reduce
+import six
+from cacheops import cross
+
+import django
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
@@ -19,15 +31,20 @@ def non_proxy(model):
         model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
     return model
 
-def get_model_name(model):
-    return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+
+if django.VERSION < (1, 6):
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+else:
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.model_name)
 
 
 class MonkeyProxy(object):
     def __init__(self, cls):
         monkey_bases = tuple(b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey'))
         for monkey_base in monkey_bases:
-            for name, value in monkey_base.__dict__.iteritems():
+            for name, value in monkey_base.__dict__.items():
                 setattr(self, name, value)
 
 
@@ -47,16 +64,30 @@ def monkey_mix(cls, mixin, methods=None):
     cls._no_monkey = MonkeyProxy(cls)
 
     if methods is None:
-        methods = getmembers(mixin, ismethod)
+        # NOTE: there no such thing as unbound method in Python 3, it uses naked functions,
+        #       so we use some six based altering here
+        isboundmethod = inspect.isfunction if six.PY3 else inspect.ismethod
+        methods = inspect.getmembers(mixin, isboundmethod)
     else:
         methods = [(m, getattr(mixin, m)) for m in methods]
 
     for name, method in methods:
         if hasattr(cls, name):
             setattr(cls._no_monkey, name, getattr(cls, name))
-        setattr(cls, name, method.im_func)
+        # NOTE: remember, there is no bound methods in Python 3
+        setattr(cls, name, six.get_unbound_function(method))
 
 
+# Some special subconditions that don't provide dnf narrowing
+from django.db.models.sql.where import EverythingNode, NothingNode
+dnfless_subconds = (ExtraWhere, EverythingNode, NothingNode)
+
+# A new thing in Django 1.6 that should be ignored for dnf purposes
+try:
+    from django.db.models.sql.where import SubqueryConstraint
+    dnfless_subconds += (SubqueryConstraint,)
+except ImportError:
+    pass
 
 def dnf(qs):
     """
@@ -86,7 +117,7 @@ def dnf(qs):
                 return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
                 return [[]]
-        elif isinstance(where, ExtraWhere):
+        elif isinstance(where, dnfless_subconds):
             return [[]]
         elif len(where) == 0:
             return None
@@ -148,5 +179,17 @@ def stamp_fields(model, cache={}):
     """
     if model not in cache:
         stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
-        cache[model] = hashlib.md5(stamp).hexdigest()
+        cache[model] = cross.md5(stamp).hexdigest()
     return cache[model]
+
+
+import re
+from django.utils.safestring import mark_safe
+
+NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
+SPACE_BETWEEN_TAGS = mark_safe('> <')
+
+def carefully_strip_whitespace(text):
+    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
+    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
+    return text

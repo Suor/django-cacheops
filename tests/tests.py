@@ -1,8 +1,15 @@
-import unittest, random
+import re
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
+import django
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.template import Context, Template
 
-from cacheops import invalidate_all, cached
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached
 from .models import *
 
 
@@ -89,8 +96,68 @@ class BasicTests(BaseTestCase):
                 for q in queries:
                     Extra.objects.cache().filter(**q).count()
 
+    def test_combine(self):
+        qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
+        self.assertEqual(list(qs.cache()), list(qs))
+
+        qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
+        self.assertEqual(list(qs.cache()), list(qs))
+
+
+class TemplateTests(BaseTestCase):
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
+    def test_cached(self):
+        counts = {'a': 0, 'b': 0}
+        def inc_a():
+            counts['a'] += 1
+            return ''
+        def inc_b():
+            counts['b'] += 1
+            return ''
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached 60 'a' %}.a{{ a }}{% endcached %}
+            {% cached 60 'a' %}.a{{ a }}{% endcached %}
+            {% cached 60 'a' 'variant' %}.a{{ a }}{% endcached %}
+            {% cached timeout=60 fragment_name='b' %}.b{{ b }}{% endcached %}
+        """)
+
+        s = t.render(Context({'a': inc_a, 'b': inc_b}))
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
+        self.assertEqual(counts, {'a': 2, 'b': 1})
+
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
+    def test_cached_as(self):
+        counts = {'a': 0}
+        def inc_a():
+            counts['a'] += 1
+            return ''
+
+        qs = Post.objects.all()
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached_as qs 0 'a' %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs timeout=60 fragment_name='a' %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs fragment_name='a' timeout=60 %}.a{{ a }}{% endcached_as %}
+        """)
+
+        s = t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a')
+        self.assertEqual(counts['a'], 1)
+
+        t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEqual(counts['a'], 1)
+
+        invalidate_model(Post)
+        t.render(Context({'a': inc_a, 'qs': qs}))
+        self.assertEqual(counts['a'], 2)
+
 
 class IssueTests(BaseTestCase):
+    fixtures = ['basic']
+
     def setUp(self):
         user = User.objects.create(username='Suor')
         Profile.objects.create(pk=2, user=user, tag=10)
@@ -104,7 +171,7 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(labels__in=[1,2,3]).cache().count()
+        MachineBrand.objects.exclude(labels__in=[1, 2, 3]).cache().count()
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
@@ -115,6 +182,30 @@ class IssueTests(BaseTestCase):
 
         with self.assertNumQueries(0):
             CacheOnSaveModel.objects.cache().get(pk=m.pk)
+
+    def test_54(self):
+        qs = Category.objects.all()
+        list(qs) # force load objects to quesryset cache
+        qs.count()
+
+    def test_56(self):
+        Post.objects.exclude(extra__in=[1, 2]).cache().count()
+
+    def test_57(self):
+        list(Post.objects.filter(category__in=Category.objects.nocache()).cache())
+
+    def test_58(self):
+        list(Post.objects.cache().none())
+
+    def test_62(self):
+        # setup
+        product = Product.objects.create(name='62')
+        ProductReview.objects.create(product=product, status=0)
+        ProductReview.objects.create(product=None, status=0)
+
+        # Test related manager filtering works, .get() will throw MultipleObjectsReturned if not
+        # The bug is related manager not respected when .get() is called
+        product.reviews.get(status=0)
 
 
 class LocalGetTests(BaseTestCase):
@@ -139,9 +230,17 @@ class ManyToManyTests(BaseTestCase):
         make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
         self.assertEqual(make_query(), [self.suor])
 
+        # query cache won't be invalidated on this create, since PhotoLike is through model
         PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
         self.assertEqual(make_query(), [self.suor, self.peterdds])
 
+    def test_44_workaround(self):
+        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
+        self.assertEqual(make_query(), [self.suor])
+
+        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
+        invalidate_obj(self.peterdds)
+        self.assertEqual(make_query(), [self.suor, self.peterdds])
 
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
@@ -205,33 +304,17 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 3)
 
 
-class DatabaseClusterSupportTests(BaseTestCase):
+class DbAgnosticTests(BaseTestCase):
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
+    def test_db_agnostic_by_default(self):
+        list(DbAgnostic.objects.cache())
 
-    @classmethod
-    def setUpClass(cls):
-        cls.qs = DatabaseClusterSupportModel.objects.cache()
-        cls.default_cache_profile = cls.qs._cacheprofile.copy()
+        with self.assertNumQueries(0, using='slave'):
+            list(DbAgnostic.objects.cache().using('slave'))
 
-    def setUp(self):
-        super(DatabaseClusterSupportTests, self).setUp()
-        self.qs._cacheprofile = self.default_cache_profile.copy()
+    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
+    def test_db_agnostic_disabled(self):
+        list(DbBinded.objects.cache())
 
-    def test_disable_by_default(self):
-        list(self.qs.all())
-
-        with self.assertNumQueries(0):
-            list(self.qs.all())
-        with self.assertNumQueries(0, using="slave"):
-            list(self.qs.using("slave").all())
-
-    def test_enable_by_cache_profile(self):
-        self.qs._cacheprofile.update(fidelity=True)
-        list(self.qs.all())
-
-        with self.assertNumQueries(0):
-            list(self.qs.all())
-        with self.assertNumQueries(1, using="slave"):
-            list(self.qs.using("slave").all())
-        # Ensure that cache worked
-        with self.assertNumQueries(0, using="slave"):
-            list(self.qs.using("slave").all())
+        with self.assertNumQueries(1, using='slave'):
+            list(DbBinded.objects.cache().using('slave'))

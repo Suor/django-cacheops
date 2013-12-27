@@ -1,3 +1,21 @@
+1.2.1
+- set six minimum version right (crazyzubr)
+
+1.2
+- Python 3 support
+
+1.1.1
+- fixed Django 1.5- compatibility (aykutozat)
+
+1.1
+- Django 1.6+ support
+- added Django template tags
+- fixed caching querysets combined with | and & operators
+
+1.0.3
+- added db_agnostic option to cache profile
+- partial support for Django 1.6+
+
 1.0.2
 - fixed cached_on_save
 - fixed .inplace() altering cache key
