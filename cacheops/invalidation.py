@@ -93,8 +93,7 @@ class ConjSchemes(object):
                 # for scheme in new_schemes - schemes:
                 #     txn.sadd(lookup_key, serialize_scheme(scheme))
                 # txn.execute()
-                lock_key = redis_client.lock_acquire("lock:schemes:" +
-                                                     model_name)
+                lock_key = redis_lock_acquire("lock:schemes:" + model_name)
                 pipe = redis_client.pipeline(transaction=False)
                 pipe.incr(self.get_version_key(model_name))
 
