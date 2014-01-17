@@ -126,7 +126,7 @@ class ConjSchemes(object):
 cache_schemes = ConjSchemes()
 
 
-def redis_lock_acquire(lock_key, timeout_ms=1000):
+def redis_lock_acquire(lock_key, timeout_ms=1000, redis_client=redis_client):
     """ Spin-lock, be aware!
     """
     while not redis_client.set(lock_key, "1",  nx=True, px=timeout_ms):
@@ -134,7 +134,7 @@ def redis_lock_acquire(lock_key, timeout_ms=1000):
     return lock_key
 
 
-def redis_lock_release(lock_key):
+def redis_lock_release(lock_key, redis_client=redis_client):
     redis_client.delete(lock_key)
     return
 
