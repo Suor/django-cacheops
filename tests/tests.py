@@ -6,6 +6,7 @@ except ImportError:
 
 import django
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.contrib.auth.models import User
 from django.template import Context, Template
 
@@ -102,6 +103,20 @@ class BasicTests(BaseTestCase):
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
+
+
+class BasicTestWithSoftLock(BasicTests):
+    """ Same as above but with different atomic strategy
+    """
+    @classmethod
+    def setUpClass(cls):
+        from cacheops import invalidation
+        invalidation.USE_SOFT_LOCK = True
+
+    @classmethod
+    def tearDownClass(cls):
+        from cacheops import invalidation
+        invalidation.USE_SOFT_LOCK = False
 
 
 class TemplateTests(BaseTestCase):
