@@ -26,6 +26,14 @@ for key in profiles:
 # Support degradation on redis fail
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
+# Provide atomic operations by setting lock key instead of using redis
+# transaction, by default disabled
+USE_SOFT_LOCK = getattr(settings, 'CACHEOPS_USE_SOFT_LOCK', False)
+
+# Expire time of lock keys in miliseconds, by default 1000
+SOFT_LOCK_TIMEOUT = getattr(settings, 'CACHEOPS_SOFT_LOCK_TIMEOUT', 1000)
+
+
 def handle_connection_failure(func):
     if not DEGRADE_ON_FAILURE:
         return func

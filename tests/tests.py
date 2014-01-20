@@ -104,6 +104,20 @@ class BasicTests(BaseTestCase):
         self.assertEqual(list(qs.cache()), list(qs))
 
 
+class BasicTestWithSoftLock(BasicTests):
+    """ Same as above but with different atomic strategy
+    """
+    @classmethod
+    def setUpClass(cls):
+        from cacheops import invalidation
+        invalidation.USE_SOFT_LOCK = True
+
+    @classmethod
+    def tearDownClass(cls):
+        from cacheops import invalidation
+        invalidation.USE_SOFT_LOCK = False
+
+
 class TemplateTests(BaseTestCase):
     @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached(self):
