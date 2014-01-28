@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
 
 
@@ -99,3 +101,15 @@ class ProductReview(models.Model):
         Product, related_name='reviews', null=True,
         on_delete=models.SET_NULL)
     status = models.IntegerField()
+
+
+# 70
+class GenericContainer(models.Model):
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
+    content_object = generic.GenericForeignKey('content_type', 'object_id')
+    name = models.CharField(max_length=30)
+
+class Contained(models.Model):
+    name = models.CharField(max_length=30)
+    containers = generic.GenericRelation(GenericContainer)

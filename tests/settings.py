@@ -31,6 +31,7 @@ CACHEOPS = {
     'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
     'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
     'tests.issue': ('all', 60*60),
+    'tests.genericcontainer': ('all', 60*60),
     '*.*': ('just_enable', 60*60),
 }
 
