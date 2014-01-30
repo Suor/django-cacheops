@@ -20,6 +20,7 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import Query, ExtraWhere
+from django.db.models.sql.expressions import SQLEvaluator
 
 
 LONG_DISJUNCTION = 8
@@ -106,7 +107,7 @@ def dnf(qs):
     def _dnf(where):
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
-            if constraint.alias != alias or isinstance(value, (QuerySet, Query)):
+            if constraint.alias != alias or isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[]]
             elif lookup == 'exact':
                 # attribute, value, negation
