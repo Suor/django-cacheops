@@ -207,6 +207,14 @@ class IssueTests(BaseTestCase):
         # The bug is related manager not respected when .get() is called
         product.reviews.get(status=0)
 
+    def test_70(self):
+        Contained(name="aaa").save()
+        contained_obj = Contained.objects.get(name="aaa")
+        GenericContainer(content_object=contained_obj, name="bbb").save()
+
+        qs = Contained.objects.cache().filter(containers__name="bbb")
+        list(qs)
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):

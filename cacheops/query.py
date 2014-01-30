@@ -11,6 +11,7 @@ from cacheops import cross
 
 import django
 from django.core.exceptions import ImproperlyConfigured
+from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -176,7 +177,7 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
-    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = attrs[GenericRel] = ('field',)
     attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
