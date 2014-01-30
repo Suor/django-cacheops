@@ -17,7 +17,7 @@ And there is more to it:
 Requirements
 ------------
 
-Python 2.6 or 3.3, Django 1.2 and Redis 2.2.7.
+Python 2.6, 2.7 or 3.3, Django 1.2 and Redis 2.6.
 
 
 Installation
@@ -412,5 +412,4 @@ TODO
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- make a version of invalidation with scripting
 - shard cache between multiple redises
