@@ -32,10 +32,5 @@ end
 for _, conj in ipairs(dnf) do
     local conj_key = conj_cache_key(model, conj)
     redis.call('sadd', conj_key, key)
-    if timeout then
-        -- Invalidator timeout should be larger than timeout of any key it references
-        -- So we take timeout from profile which is our upper limit
-        -- Add few extra seconds to be extra safe
-        redis.call('expire', conj_key, inv_timeout)
-    end
+    redis.call('expire', conj_key, inv_timeout)
 end

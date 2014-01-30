@@ -54,6 +54,9 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
             get_model_name(model),
             json.dumps(cond_dnf),
             timeout,
+            # Invalidator timeout should be larger than timeout of any key it references
+            # So we take timeout from profile which is our upper limit
+            # Add few extra seconds to be extra safe
             model._cacheprofile['timeout'] + 10
         ]
     )
