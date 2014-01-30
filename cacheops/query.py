@@ -23,7 +23,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
-from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
+from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fields, load_script
 from cacheops.invalidation import invalidate_obj, invalidate_model
 
 
@@ -33,64 +33,7 @@ _old_objs = {}
 _local_get_cache = {}
 
 
-
-
-
-
-CACHE_THING = """
-local key = KEYS[1]
-local data = ARGV[1]
-local model = ARGV[2]
-local dnf = cjson.decode(ARGV[3])
-local timeout = ARGV[4]
-local inv_timeout = ARGV[5]
-
--- Update schemes
-local schemes = {}
-for _, conj in ipairs(dnf) do
-    local s = {}
-    for _, eq in ipairs(conj) do
-        table.insert(s, eq[1])
-    end
-    table.insert(schemes, table.concat(s, ','))
-end
-redis.call('sadd', 'schemes:' .. model, unpack(schemes))
-redis.call('incr', 'schemes:' .. model .. ':version')
-
--- Write data to cache
-if timeout then
-    redis.call('setex', key, timeout, data)
-else
-    redis.call('set', key, data)
-end
-
-local conj_cache_key = function (model, conj)
-    local s = 'conj:' .. model .. ':'
-    local parts = {}
-
-    redis.call('set', 'conj', cjson.encode(conj))
-
-    for _, eq in ipairs(conj) do
-        table.insert(parts, eq[1] .. '=' .. tostring(eq[2]))
-    end
-
-    redis.call('set', 'parts', cjson.encode(parts))
-
-    return s .. table.concat(parts, '&')
-end
-
--- Add new cache_key to list of dependencies for every conjunction in dnf
-for _, conj in pairs(dnf) do
-    local conj_key = conj_cache_key(model, conj)
-    redis.call('sadd', conj_key, key)
-    if timeout then
-        -- Invalidator timeout should be larger than timeout of any key it references
-        -- So we take timeout from profile which is our upper limit
-        -- Add few extra seconds to be extra safe
-        redis.call('expire', conj_key, inv_timeout)
-    end
-end
-"""
+cache_thing_script = load_script('cache_thing')
 
 @handle_connection_failure
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
@@ -104,34 +47,16 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         timeout = profile['timeout']
 
     pickled_data = pickle.dumps(data, -1)
-    redis_client.execute_command('eval', CACHE_THING, 1,
-        cache_key, pickled_data,
-        get_model_name(model), json.dumps(cond_dnf),
-        timeout, model._cacheprofile['timeout'] + 10)
-
-    # # Ensure that all schemes of current query are "known"
-    # schemes = map(conj_scheme, cond_dnf)
-    # cache_schemes.ensure_known(model, schemes)
-
-    # txn = redis_client.pipeline()
-
-    # # Write data to cache
-    # if timeout is not None:
-        # txn.setex(cache_key, timeout, pickled_data)
-    # else:
-    #     txn.set(cache_key, pickled_data)
-
-    # # Add new cache_key to list of dependencies for every conjunction in dnf
-    # for conj in cond_dnf:
-    #     conj_key = conj_cache_key(model, conj)
-    #     txn.sadd(conj_key, cache_key)
-    #     if timeout is not None:
-    #         # Invalidator timeout should be larger than timeout of any key it references
-    #         # So we take timeout from profile which is our upper limit
-    #         # Add few extra seconds to be extra safe
-    #         txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
-
-    # txn.execute()
+    cache_thing_script(
+        keys=[cache_key],
+        args=[
+            pickled_data,
+            get_model_name(model),
+            json.dumps(cond_dnf),
+            timeout,
+            model._cacheprofile['timeout'] + 10
+        ]
+    )
 
 
 def cached_as(sample, extra=None, timeout=None):
