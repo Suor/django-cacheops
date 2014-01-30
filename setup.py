@@ -39,5 +39,7 @@ setup(
         'Intended Audience :: Developers',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Software Development :: Libraries :: Python Modules',
-    ]
+    ],
+
+    zip_safe=False,
 )
