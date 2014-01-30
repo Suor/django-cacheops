@@ -13,7 +13,7 @@ from operator import itemgetter
 def run_benchmarks(tests):
     for name, test in tests:
         time = bench_test(test)
-        print '%s\ttime: %.2fms' % (name, time * 1000)
+        print('%s\ttime: %.2fms' % (name, time * 1000))
 
 def bench_test(test):
     prepared = None
