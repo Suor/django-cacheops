@@ -14,6 +14,7 @@ except ImportError:
     from functools import reduce
 import six
 from cacheops import cross
+from cacheops.conf import redis_client
 
 import django
 from django.db.models import Model
@@ -183,6 +184,19 @@ def stamp_fields(model, cache={}):
         cache[model] = cross.md5(stamp).hexdigest()
     return cache[model]
 
+
+### Lua script loader
+
+import os.path
+
+def load_script(name):
+    filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
+    with open(filename) as f:
+        code = f.read()
+    return redis_client.register_script(code)
+
+
+### Whitespace handling for template tags
 
 import re
 from django.utils.safestring import mark_safe
