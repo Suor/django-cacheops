@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
 from functools import wraps
-import redis
 import warnings
+import redis
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -10,7 +10,8 @@ from django.core.exceptions import ImproperlyConfigured
 
 profile_defaults = {
     'ops': (),
-    'local_get': False
+    'local_get': False,
+    'db_agnostic': True,
 }
 profiles = {
     'just_enable': {},
@@ -33,7 +34,7 @@ def handle_connection_failure(func):
     def _inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except redis.ConnectionError, e:
+        except redis.ConnectionError as e:
             warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
 
     return _inner
@@ -85,7 +86,9 @@ def model_profile(model):
     if not model_profiles:
         prepare_profiles()
 
-    app, model_name = model._meta.app_label, model._meta.module_name
+    app = model._meta.app_label
+    # module_name is fallback for Django 1.5-
+    model_name = getattr(model._meta, 'model_name', None) or model._meta.module_name
     app_model = '%s.%s' % (app, model_name)
     for guess in (app_model, '%s.*' % app, '*.*'):
         if guess in model_profiles:

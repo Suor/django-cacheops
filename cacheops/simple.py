@@ -6,13 +6,13 @@ except ImportError:
 from functools import wraps
 import os, time
 
-from django.utils.hashcompat import md5_constructor
 from django.conf import settings
 
+from cacheops import cross
 from cacheops.conf import redis_client
 
 
-__all__ = ('cache', 'cached', 'file_cache')
+__all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
 
 
 class CacheMiss(Exception):
@@ -28,20 +28,26 @@ class BaseCache(object):
         A decorator for caching function calls
         """
         def decorator(func):
-            @wraps(func)
-            def wrapper(*args, **kwargs):
+            def get_cache_key(*args, **kwargs):
                 # Calculating cache key based on func and arguments
-                md5 = md5_constructor()
+                md5 = cross.md5()
                 md5.update('%s.%s' % (func.__module__, func.__name__))
+                # TODO: make it more civilized
                 if extra is not None:
-                    md5.update(str(extra))
+                    if isinstance(extra, (list, tuple)):
+                        md5.update(':'.join(map(str, extra)))
+                    else:
+                        md5.update(str(extra))
                 if args:
                     md5.update(repr(args))
                 if kwargs:
                     md5.update(repr(sorted(kwargs.items())))
 
-                cache_key = 'c:%s' % md5.hexdigest()
+                return 'c:%s' % md5.hexdigest()
 
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                cache_key = get_cache_key(*args, **kwargs)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -49,6 +55,12 @@ class BaseCache(object):
                     self.set(cache_key, result, timeout)
 
                 return result
+
+            def invalidate(*args, **kwargs):
+                cache_key = get_cache_key(*args, **kwargs)
+                self.delete(cache_key)
+            wrapper.invalidate = invalidate
+
             return wrapper
         return decorator
 
@@ -66,15 +78,18 @@ class RedisCache(BaseCache):
     def set(self, cache_key, data, timeout=None):
         pickled_data = pickle.dumps(data, -1)
         if timeout is not None:
-            self.conn.setex(cache_key, pickled_data, timeout)
+            self.conn.setex(cache_key, timeout, pickled_data)
         else:
             self.conn.set(cache_key, pickled_data)
+
+    def delete(self, cache_key):
+        self.conn.delete(cache_key)
 
 cache = RedisCache(redis_client)
 cached = cache.cached
 
 
-FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/file_cache')
+FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
 FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
 
 class FileCache(BaseCache):
@@ -91,7 +106,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = md5_constructor(key).hexdigest()
+        digest = cross.md5(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

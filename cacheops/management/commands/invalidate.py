@@ -31,7 +31,7 @@ class Command(LabelCommand):
     def handle_app(self, app_name):
         try:
             app = get_app(app_name)
-        except ImproperlyConfigured, e:
+        except ImproperlyConfigured as e:
             raise CommandError(e)
 
         for model in get_models(app, include_auto_created=True):
