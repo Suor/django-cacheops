@@ -1,3 +1,6 @@
+import six
+from datetime import date, datetime, time
+
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
@@ -31,8 +34,6 @@ class Extra(models.Model):
 
 ### Specific and custom fields
 
-from datetime import date, datetime, time
-
 class CustomValue(object):
     def __init__(self, value):
         self.value = value
@@ -40,9 +41,7 @@ class CustomValue(object):
     def __str__(self):
         return str(self.value)
 
-class CustomField(models.Field):
-    __metaclass__ = models.SubfieldBase
-
+class CustomField(six.with_metaclass(models.SubfieldBase, models.Field)):
     def db_type(self, connection):
         return 'text'
 
@@ -55,9 +54,7 @@ class CustomField(models.Field):
         return value.value
 
 
-class IntegerArrayField(models.Field):
-    __metaclass__ = models.SubfieldBase
-
+class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
     def db_type(self, connection):
         return 'text'
 
