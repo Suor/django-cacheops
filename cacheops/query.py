@@ -8,6 +8,7 @@ from functools import wraps
 
 import six
 from cacheops import cross
+from cacheops.cross import json
 
 import django
 from django.core.exceptions import ImproperlyConfigured
@@ -141,8 +142,8 @@ def _stringify_query():
           any significant optimization will most likely require a major
           refactor of sql.Query class, which is a substantial part of ORM.
     """
-    import simplejson as json
     from datetime import datetime, date, time
+    from decimal import Decimal
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
@@ -200,7 +201,7 @@ def _stringify_query():
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
             return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date, time)):
+        elif isinstance(obj, (datetime, date, time, Decimal)):
             return str(obj)
         elif isinstance(obj, Constraint):
             return (obj.alias, obj.col)
