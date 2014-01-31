@@ -104,6 +104,40 @@ class BasicTests(BaseTestCase):
         self.assertEqual(list(qs.cache()), list(qs))
 
 
+from datetime import date, datetime, time
+
+class WeirdTests(BaseTestCase):
+    def _template(self, field, value, invalidation=True):
+        qs = Weird.objects.cache().filter(**{field: value})
+        count = qs.count()
+
+        Weird.objects.create(**{field: value})
+
+        if invalidation:
+            with self.assertNumQueries(1):
+                self.assertEqual(qs.count(), count + 1)
+
+    def test_date(self):
+        self._template('date_field', date.today())
+
+    def test_datetime(self):
+        self._template('datetime_field', datetime.now())
+
+    def test_time(self):
+        self._template('time_field', time(10, 30))
+
+    def test_list(self):
+        self._template('list_field', [1, 2], invalidation=False)
+
+    @unittest.expectedFailure
+    def test_list_invalidation(self):
+        self._template('list_field', [1, 2], invalidation=True)
+
+    def test_custom(self):
+        # NOTE: invalidation works if stringification of value is the same as .get_prep_value()
+        self._template('custom_field', CustomValue('some'))
+
+
 class TemplateTests(BaseTestCase):
     @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached(self):
