@@ -13,7 +13,7 @@ from operator import itemgetter
 def run_benchmarks(tests):
     for name, test in tests:
         time = bench_test(test)
-        print('%s\ttime: %.2fms' % (name, time * 1000))
+        print('%-18s time: %.2fms' % (name, time * 1000))
 
 def bench_test(test):
     prepared = None
@@ -22,7 +22,7 @@ def bench_test(test):
 
     total = 0
     n = 1
-    while total < 2:
+    while total < 1:
         gc.disable()
         durations = [bench_once(test, prepared) for i in range(n)]
         gc.enable()
@@ -51,6 +51,9 @@ db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=no
 call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
 from tests.bench import TESTS
-run_benchmarks(TESTS)
+try:
+    run_benchmarks(TESTS)
+except KeyboardInterrupt:
+    pass
 
 connection.creation.destroy_test_db(db_name, verbosity=verbosity)
