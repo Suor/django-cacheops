@@ -1,4 +1,5 @@
 - support generic relations (erthalion)
+- support filtering by time equality
 
 1.2.1
 - set six minimum version right (crazyzubr)

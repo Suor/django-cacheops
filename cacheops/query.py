@@ -142,7 +142,7 @@ def _stringify_query():
           refactor of sql.Query class, which is a substantial part of ORM.
     """
     import simplejson as json
-    from datetime import datetime, date
+    from datetime import datetime, date, time
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
@@ -200,7 +200,7 @@ def _stringify_query():
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
             return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date)):
+        elif isinstance(obj, (datetime, date, time)):
             return str(obj)
         elif isinstance(obj, Constraint):
             return (obj.alias, obj.col)
