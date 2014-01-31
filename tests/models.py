@@ -145,9 +145,7 @@ class Product(models.Model):
     name = models.CharField(max_length=32)
 
 class ProductReview(models.Model):
-    product = models.ForeignKey(
-        Product, related_name='reviews', null=True,
-        on_delete=models.SET_NULL)
+    product = models.ForeignKey(Product, related_name='reviews', null=True)
     status = models.IntegerField()
 
 
