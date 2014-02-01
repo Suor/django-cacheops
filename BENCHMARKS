@@ -11,6 +11,8 @@ save_obj           time: 1.15ms
 complex_construct  time: 0.48ms
 complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.81ms
+model_invalidate   time: 0.89ms
 
 # scripting, Python 2.7.5, Django 1.6.1
 count_no_cache     time: 0.14ms
@@ -25,6 +27,8 @@ save_obj           time: 0.93ms
 complex_construct  time: 0.48ms
 complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.23ms
+model_invalidate   time: 0.77ms
 
 
 # master, Python 3.3.2, Django 1.6.1
