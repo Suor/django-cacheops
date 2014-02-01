@@ -87,8 +87,7 @@ def prepare_cache():
     return Extra.objects.cache().get(pk=1)
 
 def do_invalidate_model(obj):
-    pass
-    # invalidate_model(obj.__class__)
+    invalidate_model(obj.__class__)
 
 
 TESTS = [
