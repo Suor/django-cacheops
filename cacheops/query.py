@@ -6,7 +6,6 @@ except ImportError:
     import pickle
 from functools import wraps
 
-import six
 from cacheops import cross
 from cacheops.cross import json
 
