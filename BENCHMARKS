@@ -48,3 +48,18 @@ fetch_hit        time: 0.39ms
 fetch_miss       time: 0.74ms
 invalidate_obj   time: 0.15ms
 save_obj         time: 1.01ms
+
+
+# master, Python 2.6.9, Django 1.6.1
+count_no_cache     time: 0.15ms
+count_hit          time: 0.16ms
+count_miss         time: 0.50ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.23ms
+fetch_hit          time: 0.24ms
+fetch_miss         time: 0.67ms
+invalidate_obj     time: 0.24ms
+save_obj           time: 1.20ms
+complex_construct  time: 0.52ms
+complex_inplace    time: 0.39ms
+complex_cache_key  time: 0.14ms
