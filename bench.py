@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, time, gc
+import os, time, gc, sys
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 verbosity = 1
@@ -54,7 +54,11 @@ call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
 from tests.bench import TESTS
 try:
-    run_benchmarks(TESTS)
+    if len(sys.argv) > 1:
+        tests = [(name, test) for name, test in TESTS if sys.argv[1] in name]
+    else:
+        tests = TESTS
+    run_benchmarks(tests)
 except KeyboardInterrupt:
     pass
 
