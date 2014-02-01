@@ -20,7 +20,6 @@ for _, scheme in ipairs(schemes) do
 end
 
 -- get cache keys
-redis.call('set', '-- cache_keys', cjson.encode(conj_keys))
 if next(conj_keys) ~= nil then
     local cache_keys = redis.call('sunion', unpack(conj_keys))
     -- we delete cache keys since they are invalid
