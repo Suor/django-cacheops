@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, time, gc
+import os, time, gc, sys
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 verbosity = 1
@@ -22,17 +22,18 @@ def bench_test(test):
 
     total = 0
     n = 1
-    while total < 1:
+    while total < 2:
         gc.disable()
         durations = [bench_once(test, prepared) for i in range(n)]
         gc.enable()
 
-        total = sum(durations)
+        total = sum(d for _, d in durations)
         n *= 2
 
-    return min(durations)
+    return min(d for d, _ in durations)
 
 def bench_once(test, prepared=None):
+    zero_start = time.time()
     if 'prepare' in test:
         prepared = test['prepare']()
     start = time.time()
@@ -40,7 +41,8 @@ def bench_once(test, prepared=None):
         test['run']()
     else:
         test['run'](prepared)
-    return time.time() - start
+    now = time.time()
+    return now - start, now - zero_start
 
 from django.db import connection
 from django.core.management import call_command
@@ -52,7 +54,11 @@ call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
 from tests.bench import TESTS
 try:
-    run_benchmarks(TESTS)
+    if len(sys.argv) > 1:
+        tests = [(name, test) for name, test in TESTS if sys.argv[1] in name]
+    else:
+        tests = TESTS
+    run_benchmarks(tests)
 except KeyboardInterrupt:
     pass
 

@@ -1,6 +1,6 @@
-from cacheops import invalidate_obj
+from cacheops import invalidate_obj, invalidate_model
 from cacheops.conf import redis_client
-from .models import Category, Post
+from .models import Category, Post, Extra
 
 
 count_key = Category.objects.all()._cache_key(extra='count')
@@ -38,6 +38,8 @@ def do_save_obj(obj):
     obj.save()
 
 
+### Complex queryset
+
 from django.db.models import Q
 
 def do_complex_construct():
@@ -52,6 +54,41 @@ def do_complex_inplace():
 complex_qs = do_complex_construct()
 def do_complex_cache_key():
     return complex_qs._cache_key()
+
+
+### More invalidation
+
+def prepare_cache():
+    def _variants(*args, **kwargs):
+        qs = Extra.objects.cache().filter(*args, **kwargs)
+        qs.count()
+        list(qs)
+        list(qs[:2])
+        list(qs.values())
+
+    _variants(pk=1)
+    _variants(post=1)
+    _variants(tag=5)
+    _variants(to_tag=10)
+
+    _variants(pk=1, post=1)
+    _variants(pk=1, tag=5)
+    _variants(post=1, tag=5)
+
+    _variants(pk=1, post=1, tag=5)
+    _variants(pk=1, post=1, to_tag=10)
+
+    _variants(Q(pk=1) | Q(tag=5))
+    _variants(Q(pk=1) | Q(tag=1))
+    _variants(Q(pk=1) | Q(tag=2))
+    _variants(Q(pk=1) | Q(tag=3))
+    _variants(Q(pk=1) | Q(tag=4))
+
+    return Extra.objects.cache().get(pk=1)
+
+def do_invalidate_model(obj):
+    pass
+    # invalidate_model(obj.__class__)
 
 
 TESTS = [
@@ -69,4 +106,7 @@ TESTS = [
     ('complex_construct', {'run': do_complex_construct}),
     ('complex_inplace', {'run': do_complex_inplace}),
     ('complex_cache_key', {'run': do_complex_cache_key}),
+
+    ('big_invalidate', {'prepare': prepare_cache, 'run': do_invalidate_obj}),
+    ('model_invalidate', {'prepare': prepare_cache, 'run': do_invalidate_model}),
 ]

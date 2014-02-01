@@ -13,15 +13,15 @@ complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.18ms
 
 # scripting, Python 2.7.5, Django 1.6.1
-count_no_cache     time: 0.15ms
-count_hit          time: 0.16ms
+count_no_cache     time: 0.14ms
+count_hit          time: 0.15ms
 count_miss         time: 0.43ms
 fetch_construct    time: 0.02ms
 fetch_no_cache     time: 0.22ms
 fetch_hit          time: 0.23ms
 fetch_miss         time: 0.58ms
 invalidate_obj     time: 0.11ms
-save_obj           time: 0.97ms
+save_obj           time: 0.93ms
 complex_construct  time: 0.48ms
 complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.18ms
@@ -50,9 +50,9 @@ fetch_no_cache     time: 0.22ms
 fetch_hit          time: 0.22ms
 fetch_miss         time: 0.54ms
 invalidate_obj     time: 0.14ms
-save_obj           time: 1.02ms
-complex_construct  time: 0.48ms
-complex_inplace    time: 0.36ms
+save_obj           time: 0.99ms
+complex_construct  time: 0.49ms
+complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.10ms
 
 
