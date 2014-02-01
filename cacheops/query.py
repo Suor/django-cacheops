@@ -52,7 +52,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         args=[
             pickled_data,
             get_model_name(model),
-            json.dumps(cond_dnf),
+            json.dumps(cond_dnf, default=str),
             timeout,
             # Invalidator timeout should be larger than timeout of any key it references
             # So we take timeout from profile which is our upper limit

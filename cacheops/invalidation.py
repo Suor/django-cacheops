@@ -42,10 +42,8 @@ def invalidate_all():
 ### ORM instance serialization
 
 NON_SERIALIZABLE_FIELDS = (
-    models.DateTimeField,  # Too precise (microseconds), should not be used in equality tests
     models.FileField,
-    models.TextField,      # One should not filter by long text equality
-    models.TimeField,      # Too precise (microseconds), should not be used in equality tests
+    models.TextField, # One should not filter by long text equality
 )
 if hasattr(models, 'BinaryField'):
     NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
@@ -57,4 +55,4 @@ def serializable_attnames(model, cache={}):
     return cache[model]
 
 def serialize_object(model, obj):
-    return json.dumps(dict((f, getattr(obj, f)) for f in serializable_attnames(model)))
+    return json.dumps(dict((f, getattr(obj, f)) for f in serializable_attnames(model)), default=str)
