@@ -1,4 +1,6 @@
 - support generic relations (erthalion)
+- support filtering by time equality
+- optimizations for python 3
 
 1.2.1
 - set six minimum version right (crazyzubr)

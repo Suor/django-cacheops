@@ -38,6 +38,22 @@ def do_save_obj(obj):
     obj.save()
 
 
+from django.db.models import Q
+
+def do_complex_construct():
+    return Post.objects.filter(id__gt=1, title='Hi').exclude(category__in=[10, 20]) \
+                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))
+
+def do_complex_inplace():
+    return Post.objects.inplace()                                                   \
+                       .filter(id__gt=1, title='Hi').exclude(category__in=[10, 20]) \
+                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))
+
+complex_qs = do_complex_construct()
+def do_complex_cache_key():
+    return complex_qs._cache_key()
+
+
 TESTS = [
     ('count_no_cache', {'run': do_count_no_cache}),
     ('count_hit',  {'prepare_once': do_count, 'run': do_count}),
@@ -46,6 +62,11 @@ TESTS = [
     ('fetch_no_cache',  {'run': do_fetch_no_cache}),
     ('fetch_hit',  {'prepare_once': do_fetch, 'run': do_fetch}),
     ('fetch_miss', {'prepare': invalidate_fetch, 'run': do_fetch}),
+
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),
     ('save_obj', {'prepare': prepare_obj, 'run': do_save_obj}),
+
+    ('complex_construct', {'run': do_complex_construct}),
+    ('complex_inplace', {'run': do_complex_inplace}),
+    ('complex_cache_key', {'run': do_complex_cache_key}),
 ]

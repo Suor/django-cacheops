@@ -1,10 +1,14 @@
+import six
+from datetime import date, datetime, time
+
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
 
 
-# For basic tests and bench
+### For basic tests and bench
+
 class Category(models.Model):
     title = models.CharField(max_length=128)
 
@@ -26,6 +30,50 @@ class Extra(models.Model):
 
     def __unicode__(self):
         return 'Extra(post_id=%s, tag=%s)' % (self.post_id, self.tag)
+
+
+### Specific and custom fields
+
+class CustomValue(object):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
+
+class CustomField(six.with_metaclass(models.SubfieldBase, models.Field)):
+    def db_type(self, connection):
+        return 'text'
+
+    def to_python(self, value):
+        if isinstance(value, CustomValue):
+            return value
+        return CustomValue(value)
+
+    def get_prep_value(self, value):
+        return value.value
+
+
+class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
+    def db_type(self, connection):
+        return 'text'
+
+    def to_python(self, value):
+        if isinstance(value, list):
+            return value
+        return map(int, value.split(','))
+
+    def get_prep_value(self, value):
+        return ','.join(map(str, value))
+
+
+class Weird(models.Model):
+    date_field = models.DateField(default=date(2000, 1, 1))
+    datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
+    time_field = models.TimeField(default=time(10, 10))
+    list_field = IntegerArrayField(default=lambda: [])
+    custom_field = CustomField(default=CustomValue('default'))
+
 
 # 16
 class Profile(models.Model):
@@ -97,9 +145,7 @@ class Product(models.Model):
     name = models.CharField(max_length=32)
 
 class ProductReview(models.Model):
-    product = models.ForeignKey(
-        Product, related_name='reviews', null=True,
-        on_delete=models.SET_NULL)
+    product = models.ForeignKey(Product, related_name='reviews', null=True)
     status = models.IntegerField()
 
 
