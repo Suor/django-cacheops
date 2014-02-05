@@ -208,6 +208,8 @@ def _stringify_query():
             return (obj.model, obj.name)
         elif obj.__class__ in attrs:
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[obj.__class__]])
+        elif obj.__class__.__base__ in attrs:
+            return (obj.__class__.__base__, [getattr(obj, attr) for attr in attrs[obj.__class__.__base__]])
         elif isinstance(obj, QuerySet):
             return (obj.__class__, obj.query)
         elif isinstance(obj, Aggregate):
