@@ -14,7 +14,9 @@ def do_count_no_cache():
     Category.objects.nocache().count()
 
 
-fetch_key = Category.objects.all()._cache_key()
+fetch_qs = Category.objects.all()
+fetch_key = fetch_qs._cache_key()
+
 def invalidate_fetch():
     redis_client.delete(fetch_key)
 
@@ -26,6 +28,25 @@ def do_fetch_no_cache():
 
 def do_fetch_construct():
     Category.objects.all()
+
+def do_fetch_cache_key():
+    fetch_qs._cache_key()
+
+filter_qs = Category.objects.filter(pk=1)
+def do_filter_cache_key():
+    filter_qs._cache_key()
+
+
+def do_common_construct():
+    return Category.objects.filter(pk=1).exclude(title__contains='Hi').order_by('title')[:20]
+
+def do_common_inplace():
+    return Category.objects.inplace() \
+                   .filter(pk=1).exclude(title__contains='Hi').order_by('title')[:20]
+
+common_qs = do_common_construct()
+def do_common_cache_key():
+    common_qs._cache_key()
 
 
 def prepare_obj():
@@ -94,10 +115,17 @@ TESTS = [
     ('count_no_cache', {'run': do_count_no_cache}),
     ('count_hit',  {'prepare_once': do_count, 'run': do_count}),
     ('count_miss', {'prepare': invalidate_count, 'run': do_count}),
+
     ('fetch_construct',  {'run': do_fetch_construct}),
     ('fetch_no_cache',  {'run': do_fetch_no_cache}),
     ('fetch_hit',  {'prepare_once': do_fetch, 'run': do_fetch}),
     ('fetch_miss', {'prepare': invalidate_fetch, 'run': do_fetch}),
+    ('fetch_cache_key', {'run': do_fetch_cache_key}),
+
+    ('filter_cache_key', {'run': do_filter_cache_key}),
+    ('common_construct',  {'run': do_common_construct}),
+    ('common_inplace',  {'run': do_common_inplace}),
+    ('common_cache_key', {'run': do_common_cache_key}),
 
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),
     ('save_obj', {'prepare': prepare_obj, 'run': do_save_obj}),
