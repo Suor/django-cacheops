@@ -1,7 +1,13 @@
+Backwards incompatible changes:
+- reverted .cache(write_only=...) behaviour to enable caching for all ops
+- .cache(timeout=...) call will enable caching for all ops
+
 1.3.0
 - support generic relations (erthalion)
 - support filtering by time equality
 - optimizations for python 3
+Backwards incompatible changes:
+- .cache(write_only=...) doesn't enable caching of all ops anymore (not really intended)
 
 1.2.1
 - set six minimum version right (crazyzubr)
