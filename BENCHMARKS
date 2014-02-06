@@ -19,6 +19,27 @@ complex_cache_key  time: 0.18ms
 big_invalidate     time: 0.28ms
 model_invalidate   time: 0.79ms
 
+# master, fake cacheops, Python 2.7.5, Django 1.6.1
+count_no_cache     time: 0.12ms
+count_hit          time: 0.12ms
+count_miss         time: 0.14ms
+fetch_construct    time: 0.01ms
+fetch_no_cache     time: 0.17ms
+fetch_hit          time: 0.17ms
+fetch_miss         time: 0.19ms
+fetch_cache_key    time: 0.00ms
+filter_cache_key   time: 0.00ms
+common_construct   time: 0.23ms
+common_inplace     time: 0.23ms
+common_cache_key   time: 0.00ms
+invalidate_obj     time: 0.10ms
+save_obj           time: 0.31ms
+complex_construct  time: 0.44ms
+complex_inplace    time: 0.44ms
+complex_cache_key  time: 0.00ms
+big_invalidate     time: 0.00ms
+model_invalidate   time: 0.00ms
+
 # 1.3.0, Python 2.7.5, Django 1.6.1
 count_no_cache     time: 0.14ms
 count_hit          time: 0.15ms

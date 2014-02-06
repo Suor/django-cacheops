@@ -1,5 +1,7 @@
+import os
+
 INSTALLED_APPS = [
-    'cacheops',
+    'cacheops' if os.environ.get('CACHEOPS') != 'FAKE' else 'fakecacheops',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'tests',
