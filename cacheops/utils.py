@@ -167,12 +167,6 @@ def attname_of(model, col, cache={}):
         cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
     return cache[model].get(col, col)
 
-def conj_scheme(conj):
-    """
-    Return a scheme of conjunction.
-    Which is just a sorted tuple of field names.
-    """
-    return tuple(sorted(imap(itemgetter(0), conj)))
 
 @memoize
 def stamp_fields(model):
