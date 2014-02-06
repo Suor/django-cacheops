@@ -15,6 +15,7 @@ except ImportError:
 import six
 from cacheops import cross
 from cacheops.conf import redis_client
+from cacheops.funcy import memoize
 
 import django
 from django.db.models import Model
@@ -166,7 +167,6 @@ def attname_of(model, col, cache={}):
         cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
     return cache[model].get(col, col)
 
-
 def conj_scheme(conj):
     """
     Return a scheme of conjunction.
@@ -174,21 +174,20 @@ def conj_scheme(conj):
     """
     return tuple(sorted(imap(itemgetter(0), conj)))
 
-
-def stamp_fields(model, cache={}):
+@memoize
+def stamp_fields(model):
     """
     Returns serialized description of model fields.
     """
-    if model not in cache:
-        stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
-        cache[model] = cross.md5(stamp).hexdigest()
-    return cache[model]
+    stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
+    return cross.md5(stamp).hexdigest()
 
 
 ### Lua script loader
 
 import os.path
 
+@memoize
 def load_script(name):
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:

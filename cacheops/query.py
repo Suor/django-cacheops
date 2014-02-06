@@ -33,8 +33,6 @@ _old_objs = {}
 _local_get_cache = {}
 
 
-cache_thing_script = load_script('cache_thing')
-
 @handle_connection_failure
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
     """
@@ -47,7 +45,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         timeout = profile['timeout']
 
     pickled_data = pickle.dumps(data, -1)
-    cache_thing_script(
+    load_script('cache_thing')(
         keys=[cache_key],
         args=[
             pickled_data,
