@@ -457,10 +457,11 @@ class ManagerMixin(object):
         self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
-        try:
-            _old_objs[sender][instance.pk] = sender.objects.get(pk=instance.pk)
-        except sender.DoesNotExist:
-            pass
+        if instance.pk is not None:
+            try:
+                _old_objs[sender][instance.pk] = sender.objects.get(pk=instance.pk)
+            except sender.DoesNotExist:
+                pass
 
     def _post_save(self, sender, instance, **kwargs):
         """
