@@ -27,7 +27,7 @@ from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fie
 from cacheops.invalidation import invalidate_obj, invalidate_model
 
 
-__all__ = ('cached_method', 'cached_as', 'install_cacheops')
+__all__ = ('cached_as', 'install_cacheops')
 
 _old_objs = {}
 _local_get_cache = {}
@@ -102,18 +102,6 @@ def cached_as(sample, extra=None, timeout=None):
             queryset._cache_results(cache_key, result, timeout)
             return result
 
-        return wrapper
-    return decorator
-
-
-def cached_method(op='fetch', extra=None):
-    def decorator(method):
-        @wraps(method)
-        def wrapper(self, *args, **kwargs):
-            func = method
-            if self._cacheprofile is not None and op in self._cacheops:
-                func = cached_as(self, extra=extra or op)(func)
-            return func(self, *args, **kwargs)
         return wrapper
     return decorator
 
@@ -375,12 +363,15 @@ class QuerySetMixin(object):
         raise StopIteration
 
     def count(self):
-        # Optmization borrowed from overriden method:
-        # if queryset cache is already filled just return its len
-        # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
-        if self._result_cache is not None and not getattr(self, '_iter', None):
-            return len(self._result_cache)
-        return cached_method(op='count')(self._no_monkey.count)(self)
+        if self._cacheprofile and 'count' in self._cacheops:
+            # Optmization borrowed from overriden method:
+            # if queryset cache is already filled just return its len
+            # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
+            if self._result_cache is not None and not getattr(self, '_iter', None):
+                return len(self._result_cache)
+            return cached_as(self, extra='count')(self._no_monkey.count)(self)
+        else:
+            return self._no_monkey.count(self)
 
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
