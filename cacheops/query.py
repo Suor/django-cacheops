@@ -415,34 +415,13 @@ class QuerySetMixin(object):
 
         return qs._no_monkey.get(qs, *args, **kwargs)
 
-    def exists(self):
-        """
-        HACK: handling invalidation in post_save signal requires both
-              old and new object data, to get old data without extra db request
-              we use exists() call from django's Model.save_base().
-              Yes, if you use .exists() yourself this can cause memory leak.
-        """
-        # TODO: refactor this one to more understandable something
-        if self._cacheprofile:
-            query_dnf = dnf(self)
-            if len(query_dnf) == 1 and len(query_dnf[0]) == 1 \
-               and query_dnf[0][0][0] == self.model._meta.pk.name:
-                result = len(self.nocache()) > 0
-                if result:
-                    _old_objs[self.model][query_dnf[0][0][1]] = self._result_cache[0]
-                return result
-        return self._no_monkey.exists(self)
-
 
 class ManagerMixin(object):
     def _install_cacheops(self, cls):
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None and cls not in _old_objs:
             # Set up signals
-            if not getattr(cls._meta, 'select_on_save', True):
-                # Django 1.6+ doesn't make select on save by default,
-                # which we use to fetch old state, so we fetch it ourselves in pre_save handler
-                pre_save.connect(self._pre_save, sender=cls)
+            pre_save.connect(self._pre_save, sender=cls)
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
             _old_objs[cls] = {}
