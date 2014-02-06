@@ -214,16 +214,11 @@ class QuerySetMixin(object):
     def __init__(self, *args, **kwargs):
         self._no_monkey.__init__(self, *args, **kwargs)
         self._cloning = 1000
-        self._cacheprofile = None
-        if self.model:
-            self._cacheprofile = model_profile(self.model)
-            self._cache_write_only = False
-            if self._cacheprofile is not None:
-                self._cacheops = self._cacheprofile['ops']
-                self._cachetimeout = self._cacheprofile['timeout']
-            else:
-                self._cacheops = None
-                self._cachetimeout = None
+
+        self._cacheprofile = model_profile(self.model)
+        if self._cacheprofile:
+            self._cacheconf = self._cacheprofile.copy()
+            self._cacheconf['write_only'] = False
 
     def get_or_create(self, **kwargs):
         """
@@ -248,7 +243,7 @@ class QuerySetMixin(object):
         md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
         # If query results differ depending on database
-        if not self._cacheprofile['db_agnostic']:
+        if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md5.update(self.db)
         if extra:
             md5.update(str(extra))
@@ -260,7 +255,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results, timeout=None):
         cond_dnf = dnf(self)
-        cache_thing(self.model, cache_key, results, cond_dnf, timeout or self._cachetimeout)
+        cache_thing(self.model, cache_key, results, cond_dnf, timeout or self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -281,13 +276,14 @@ class QuerySetMixin(object):
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
-        if ops is not None:
-            self._cacheops = set(ops)
 
+        if ops is not None:
+            self._cacheconf['ops'] = set(ops)
         if timeout is not None:
-            self._cachetimeout = timeout
+            self._cacheconf['timeout'] = timeout
         if write_only is not None:
-            self._cache_write_only = write_only
+            self._cacheconf['write_only'] = write_only
+
         return self
 
     def nocache(self, clone=False):
@@ -325,9 +321,8 @@ class QuerySetMixin(object):
 
     def clone(self, klass=None, setup=False, **kwargs):
         kwargs.setdefault('_cacheprofile', self._cacheprofile)
-        kwargs.setdefault('_cacheops', self._cacheops)
-        kwargs.setdefault('_cachetimeout', self._cachetimeout)
-        kwargs.setdefault('_cache_write_only', self._cache_write_only)
+        if hasattr(self, '_cacheconf'):
+            kwargs.setdefault('_cacheconf', self._cacheconf)
 
         clone = self._no_monkey._clone(self, klass, setup, **kwargs)
         clone._cloning = self._cloning - 1 if self._cloning else 0
@@ -336,11 +331,11 @@ class QuerySetMixin(object):
     def iterator(self):
         # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
-        cache_this = self._cacheprofile and 'fetch' in self._cacheops
+        cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
 
         if cache_this:
             cache_key = self._cache_key()
-            if not self._cache_write_only:
+            if not self._cacheconf['write_only']:
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
@@ -361,7 +356,7 @@ class QuerySetMixin(object):
         raise StopIteration
 
     def count(self):
-        if self._cacheprofile and 'count' in self._cacheops:
+        if self._cacheprofile and 'count' in self._cacheconf['ops']:
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
@@ -374,7 +369,7 @@ class QuerySetMixin(object):
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile and 'get' in self._cacheops:
+        if self._cacheprofile and 'get' in self._cacheconf['ops']:
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
@@ -395,7 +390,7 @@ class QuerySetMixin(object):
                     pass # If some arg is unhashable we can't save it to dict key,
                          # we just skip local cache in that case
 
-            if 'fetch' in self._cacheops:
+            if 'fetch' in self._cacheconf['ops']:
                 qs = self
             else:
                 qs = self._clone().cache()
