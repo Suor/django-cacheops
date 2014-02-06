@@ -569,11 +569,7 @@ def install_cacheops():
     if 'django.contrib.admin' in settings.INSTALLED_APPS:
         from django.contrib.admin.options import ModelAdmin
         def ModelAdmin_queryset(self, request):
-            queryset = o_ModelAdmin_queryset(self, request)
-            if queryset._cacheprofile is None:
-                return queryset
-            else:
-                return queryset.nocache()
+            return o_ModelAdmin_queryset(self, request).nocache()
         o_ModelAdmin_queryset = ModelAdmin.queryset
         ModelAdmin.queryset = ModelAdmin_queryset
 
