@@ -1,5 +1,7 @@
 - Lua scripting is used to save and invalidate cache,
   this means Redis 2.6+ is required, it's also faster
+Backwards incompatible changes:
+- .cache(timeout=...) call now will set ops to full set
 
 1.3.0
 - support generic relations (erthalion)
