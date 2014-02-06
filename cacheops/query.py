@@ -5,6 +5,7 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
+import simplejson as json
 
 from cacheops import cross
 from cacheops.cross import json
@@ -22,8 +23,8 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
-from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
-from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
+from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fields, load_script
+from cacheops.invalidation import invalidate_obj, invalidate_model
 
 
 __all__ = ('cached_method', 'cached_as', 'install_cacheops')
@@ -31,6 +32,8 @@ __all__ = ('cached_method', 'cached_as', 'install_cacheops')
 _old_objs = {}
 _local_get_cache = {}
 
+
+cache_thing_script = load_script('cache_thing')
 
 @handle_connection_failure
 def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
@@ -43,30 +46,20 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         profile = model_profile(model)
         timeout = profile['timeout']
 
-    # Ensure that all schemes of current query are "known"
-    schemes = map(conj_scheme, cond_dnf)
-    cache_schemes.ensure_known(model, schemes)
-
-    txn = redis_client.pipeline()
-
-    # Write data to cache
     pickled_data = pickle.dumps(data, -1)
-    if timeout is not None:
-        txn.setex(cache_key, timeout, pickled_data)
-    else:
-        txn.set(cache_key, pickled_data)
-
-    # Add new cache_key to list of dependencies for every conjunction in dnf
-    for conj in cond_dnf:
-        conj_key = conj_cache_key(model, conj)
-        txn.sadd(conj_key, cache_key)
-        if timeout is not None:
+    cache_thing_script(
+        keys=[cache_key],
+        args=[
+            pickled_data,
+            get_model_name(model),
+            json.dumps(cond_dnf, default=str),
+            timeout,
             # Invalidator timeout should be larger than timeout of any key it references
             # So we take timeout from profile which is our upper limit
             # Add few extra seconds to be extra safe
-            txn.expire(conj_key, model._cacheprofile['timeout'] + 10)
-
-    txn.execute()
+            model._cacheprofile['timeout'] + 10
+        ]
+    )
 
 
 def cached_as(sample, extra=None, timeout=None):
