@@ -15,6 +15,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
+from django.db.models.sql.query import Query
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
 try:
@@ -165,6 +166,10 @@ def _stringify_query():
                  'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
+    # new
+    from django.db.models import Q
+    attrs[Q] = attrs[WhereNode]
+
     try:
         for k, v in attrs.items():
             attrs[k] = map(intern, v)
@@ -194,6 +199,8 @@ def _stringify_query():
         elif isinstance(obj, Query):
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+        elif isinstance(obj, LazyQuery):
+            return (obj._base, obj._calls) if obj._calls else obj._base
         else:
             raise TypeError("Can't stringify %s" % repr(obj))
 
@@ -208,6 +215,99 @@ def _stringify_query():
 
     return stringify_query
 stringify_query = _stringify_query()
+
+
+# Potential problems
+#
+# .can_filter()
+#
+# .set_limits() in __getitem__
+# .combine() in __and__, __or__
+# .distinct_fields in aggregate
+#
+# .group_by in annotate
+#
+# ordered() - big problems
+#
+# .get_compiler() in _as_sql()
+#
+# class InstanceCheckMeta(type):
+#     def __instancecheck__(self, instance):
+#         return instance.query.is_empty()
+#
+# ._setup_query
+
+from django.utils.functional import SimpleLazyObject
+
+class LazyQuery(object):
+    def __init__(self, base, calls=None):
+        self.__dict__['_base'] = base
+        self.__dict__['_calls'] = calls or []
+
+        self.__dict__['_can_filter'] = self._base.can_filter()
+
+    def _setup(self):
+        query = self._base._no_monkey.clone(self._base)
+        last = None
+        for method, args, kwargs in self._calls:
+            last = getattr(query, method)(*args, **kwargs)
+
+        object.__setattr__(self, '__class__', query.__class__)
+        object.__setattr__(self, '__dict__', query.__dict__)
+        return last
+
+    def __getattr__(self, name):
+        if callable(getattr(self._base, name)):
+            def lazy_call(*a, **kw):
+                self._calls.append((name, a, kw))
+                return SimpleLazyObject(lambda: self._setup())
+            return lazy_call
+        else:
+            self._setup()
+            return getattr(self, name)
+
+    def __setattr__(self, name, value):
+        call = ('__setattr__', (name, value), {})
+        self._calls.append(call)
+
+    __nonzero__ = __bool__ = lambda self: True
+    __repr__ = object.__repr__
+
+    def clone(self, *args, **kwargs):
+        if args or kwargs:
+            self._setup()
+            return self.clone(*args, **kwargs)
+        else:
+            return LazyQuery(self._base, self._calls[:])
+
+    def _cache_key(self):
+        pass
+
+    def set_limits(self, low=None, high=None):
+        self._can_filter = False
+        self._calls.append(('set_limits', (low, high), {}))
+
+    def clear_limits(self):
+        self._can_filter = True
+        self._calls.append(('clear_limits', (), {}))
+
+    def can_filter(self):
+        return self._can_filter
+
+
+class QueryMixin(object):
+    def clone(self, *args, **kwargs):
+        if args or kwargs:
+            return self._no_monkey.clone(self, *args, **kwargs)
+        else:
+            return LazyQuery(self)
+
+    def _setup(self):
+        pass
+
+    def _cache_key(self):
+        pass
+
 
 
 class QuerySetMixin(object):
@@ -356,15 +456,18 @@ class QuerySetMixin(object):
         raise StopIteration
 
     def count(self):
+        # Don't return SimpleLazyObjects to users
+        int_count = lambda s: int(self._no_monkey.count(s))
+
         if self._cacheprofile and 'count' in self._cacheconf['ops']:
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
             if self._result_cache is not None and not getattr(self, '_iter', None):
                 return len(self._result_cache)
-            return cached_as(self, extra='count')(self._no_monkey.count)(self)
+            return cached_as(self, extra='count')(int_count)(self)
         else:
-            return self._no_monkey.count(self)
+            return int_count(self)
 
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
@@ -522,6 +625,8 @@ def install_cacheops():
     monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
+
+    monkey_mix(Query, QueryMixin)
 
     # Install profile and signal handlers for any earlier created models
     from django.db.models import get_models
