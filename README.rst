@@ -417,3 +417,4 @@ TODO
 - integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
+- disable cache if select_for_update() called (or if _for_write set?)
