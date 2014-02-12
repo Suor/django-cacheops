@@ -8,10 +8,15 @@ fixtures = ['basic']
 
 
 from operator import itemgetter
+from profilehooks import profile
+
+HEADER_TEMPLATE = '==================== %-20s ===================='
 
 
 def run_benchmarks(tests):
     for name, test in tests:
+        if 'h' in flags:
+            print HEADER_TEMPLATE % name
         time = bench_test(test)
         print('%-18s time: %.2fms' % (name, time * 1000))
 
@@ -19,6 +24,11 @@ def bench_test(test):
     prepared = None
     if 'prepare_once' in test:
         prepared = test['prepare_once']()
+        if 'h' in flags:
+                print '-' * 62
+
+    if 'p' in flags:
+        test['run'] = profile(test['run'])
 
     total = 0
     n = 1
@@ -26,6 +36,9 @@ def bench_test(test):
         gc.disable()
         durations = [bench_once(test, prepared) for i in range(n)]
         gc.enable()
+
+        if '1' in flags:
+            break
 
         total = sum(d for _, d in durations)
         n *= 2
@@ -36,6 +49,8 @@ def bench_once(test, prepared=None):
     zero_start = time.time()
     if 'prepare' in test:
         prepared = test['prepare']()
+        if 'h' in flags:
+            print '-' * 62
     start = time.time()
     if prepared is None:
         test['run']()
@@ -52,10 +67,15 @@ db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=no
 # Import the fixture data into the test database.
 call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
+
+flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
+args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
+selector = args[0] if args else None
+
 from tests.bench import TESTS
 try:
-    if len(sys.argv) > 1:
-        tests = [(name, test) for name, test in TESTS if sys.argv[1] in name]
+    if selector:
+        tests = [(name, test) for name, test in TESTS if selector in name]
     else:
         tests = TESTS
     run_benchmarks(tests)
