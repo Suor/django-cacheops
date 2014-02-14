@@ -420,6 +420,11 @@ def QuerySet__getitem(self, k):
         self._no_monkey.__getitem__(self, k)
 QuerySetMixin.__getitem__ = QuerySet__getitem
 
+# NOTE: .get() or non lazy __getitem__() on lazy queryset will result in some inefficiency.
+#           get:         query will be set up on self.query.can_filter() check
+#           __getitem__: _clone() call
+
+
 # Postponed: values, values_list, dates, datetimes, select_for_update, using
 # Intentionally skipping none, since doesn't cause
 for method in ('filter', 'exclude', 'annotate', 'order_by', 'reverse', 'distinct', 'all',
@@ -443,7 +448,6 @@ class LazyQuery(object):
 
         object.__setattr__(self, '__class__', qs.query.__class__)
         object.__setattr__(self, '__dict__', qs.query.__dict__)
-
 
     __nonzero__ = __bool__ = lambda self: True
 
