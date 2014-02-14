@@ -413,6 +413,13 @@ def queued_call(method):
         return qs
     return _queued_call
 
+def QuerySet__getitem(self, k):
+    if isinstance(k, slice) and not k.step:
+        return queued_call('__getitem__')(self, k)
+    else:
+        self._no_monkey.__getitem__(self, k)
+QuerySetMixin.__getitem__ = QuerySet__getitem
+
 # Postponed: values, values_list, dates, datetimes, select_for_update, using
 # Intentionally skipping none, since doesn't cause
 for method in ('filter', 'exclude', 'annotate', 'order_by', 'reverse', 'distinct', 'all',
