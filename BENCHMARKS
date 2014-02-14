@@ -1,3 +1,27 @@
+# lazy-queryset, Python 2.7.5, Django 1.6.1
+get_no_cache       time: 0.30ms
+get_hit            time: 0.35ms
+get_miss           time: 0.71ms
+count_no_cache     time: 0.13ms
+count_hit          time: 0.14ms
+count_miss         time: 0.42ms
+fetch_construct    time: 0.01ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.23ms
+fetch_miss         time: 0.59ms
+fetch_cache_key    time: 0.05ms
+filter_cache_key   time: 0.10ms
+common_construct   time: 0.03ms
+common_inplace     time: 0.03ms
+common_cache_key   time: 0.11ms
+invalidate_obj     time: 0.12ms
+save_obj           time: 1.00ms
+complex_construct  time: 0.04ms
+complex_inplace    time: 0.04ms
+complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.65ms
+model_invalidate   time: 1.07ms
+
 # master, Python 2.7.5, Django 1.6.1
 get_no_cache       time: 0.32ms
 get_hit            time: 0.36ms
