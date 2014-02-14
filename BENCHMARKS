@@ -1,4 +1,7 @@
 # master, Python 2.7.5, Django 1.6.1
+get_no_cache       time: 0.32ms
+get_hit            time: 0.36ms
+get_miss           time: 0.73ms
 count_no_cache     time: 0.15ms
 count_hit          time: 0.15ms
 count_miss         time: 0.43ms

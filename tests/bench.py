@@ -3,6 +3,17 @@ from cacheops.conf import redis_client
 from .models import Category, Post, Extra
 
 
+get_key = Category.objects.filter(pk=1).order_by()._cache_key()
+def invalidate_get():
+    redis_client.delete(get_key)
+
+def do_get():
+    Category.objects.cache().get(pk=1)
+
+def do_get_no_cache():
+    Category.objects.nocache().get(pk=1)
+
+
 count_key = Category.objects.all()._cache_key(extra='count')
 def invalidate_count():
     redis_client.delete(count_key)
@@ -112,6 +123,10 @@ def do_invalidate_model(obj):
 
 
 TESTS = [
+    ('get_no_cache', {'run': do_get_no_cache}),
+    ('get_hit',  {'prepare_once': do_get, 'run': do_get}),
+    ('get_miss', {'prepare': invalidate_get, 'run': do_get}),
+
     ('count_no_cache', {'run': do_count_no_cache}),
     ('count_hit',  {'prepare_once': do_count, 'run': do_count}),
     ('count_miss', {'prepare': invalidate_count, 'run': do_count}),
