@@ -418,3 +418,4 @@ TODO
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
 - disable cache if select_for_update() called (or if _for_write set?)
+- autodiscover ways to stringify things, make a better error message/docs
