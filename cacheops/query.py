@@ -328,6 +328,8 @@ class QuerySetMixin(object):
         clone._cloning = self._cloning - 1 if self._cloning else 0
         return clone
 
+    ### Data methods
+
     def iterator(self):
         # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
@@ -398,6 +400,53 @@ class QuerySetMixin(object):
             qs = self
 
         return qs._no_monkey.get(qs, *args, **kwargs)
+
+
+### Laziness
+
+def queued_call(method):
+    def _queued_call(self, *args, **kwargs):
+        # NOTE: we create a copy here instead of _clone or __init__ cause we will call _clone later
+        qs = self.__class__.__new__(self.__class__)
+        qs.__dict__ = self.__dict__.copy()
+        qs.query = LazyQuery(self, call=(method, args, kwargs))
+        return qs
+    return _queued_call
+
+# Postponed: values, values_list, dates, datetimes, select_for_update, using
+# Intentionally skipping none, since doesn't cause
+for method in ('filter', 'exclude', 'annotate', 'order_by', 'reverse', 'distinct', 'all',
+               'select_related', 'extra', 'defer', 'only'):
+    setattr(QuerySetMixin, method, queued_call(method))
+
+class LazyQuery(object):
+    def __init__(self, qs, call):
+        self.__dict__['_qs'] = qs
+        self.__dict__['_base'] = getattr(qs.query, '_base', qs.query)
+        self.__dict__['_calls'] = getattr(qs.query, '_calls', ()) + (call,)
+
+    def _setup(self):
+        qs = self._qs
+        qs.query = self._base.clone()
+
+        qs.inplace()
+        for method, args, kwargs in self._calls:
+            getattr(qs._no_monkey, method)(qs, *args, **kwargs)
+        qs.cloning()
+
+        object.__setattr__(self, '__class__', qs.query.__class__)
+        object.__setattr__(self, '__dict__', qs.query.__dict__)
+
+
+    __nonzero__ = __bool__ = lambda self: True
+
+    def __getattr__(self, name):
+        self._setup()
+        return getattr(self, name)
+
+    def __setattr__(self, name, value):
+        self._setup()
+        return setattr(self, name, value)
 
 
 class ManagerMixin(object):
