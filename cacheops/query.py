@@ -6,11 +6,12 @@ except ImportError:
     import pickle
 from functools import wraps
 
-import six
 from cacheops import cross
+from cacheops.cross import json
 
 import django
 from django.core.exceptions import ImproperlyConfigured
+from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -140,8 +141,8 @@ def _stringify_query():
           any significant optimization will most likely require a major
           refactor of sql.Query class, which is a substantial part of ORM.
     """
-    import simplejson as json
-    from datetime import datetime, date
+    from datetime import datetime, date, time
+    from decimal import Decimal
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
@@ -176,7 +177,7 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
-    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = attrs[GenericRel] = ('field',)
     attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
@@ -199,7 +200,7 @@ def _stringify_query():
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
             return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date)):
+        elif isinstance(obj, (datetime, date, time, Decimal)):
             return str(obj)
         elif isinstance(obj, Constraint):
             return (obj.alias, obj.col)
@@ -299,7 +300,7 @@ class QuerySetMixin(object):
         if timeout and timeout > self._cacheprofile['timeout']:
             raise NotImplementedError('timeout override should be smaller than default')
 
-        if ops is None and timeout is None:
+        if ops is None and timeout is None and write_only is None:
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]

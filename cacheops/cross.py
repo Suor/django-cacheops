@@ -1,5 +1,11 @@
 import six, hashlib
 
+# simplejson is slow in python 3 and json supports sort_keys
+if six.PY2:
+    import simplejson as json
+else:
+    import json
+
 if six.PY2:
     md5 = hashlib.md5
 else:
