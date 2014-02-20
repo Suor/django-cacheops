@@ -23,7 +23,7 @@ setup(
         'simplejson>=2.2.0',
         'six>=1.4.0',
     ],
-
+    include_package_data=True,
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
