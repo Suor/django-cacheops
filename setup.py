@@ -19,11 +19,11 @@ setup(
     ],
     install_requires=[
         'django>=1.2',
-        'redis>=2.6',
+        'redis>=2.9.1',
         'simplejson>=2.2.0',
         'six>=1.4.0',
     ],
-    include_package_data=True,
+
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
@@ -43,4 +43,5 @@ setup(
     ],
 
     zip_safe=False,
+    include_package_data=True,
 )
