@@ -159,7 +159,7 @@ def dnf(qs):
     #       just keep your querysets sane.
     if not all(result):
         return [[]]
-    return result
+    return map(sorted, result)
 
 
 def attname_of(model, col, cache={}):
