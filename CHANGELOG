@@ -1,3 +1,4 @@
+- fixed bug with schemes unsync when invalidating model
 Backwards incompatible changes:
 - reverted .cache(write_only=...) behaviour to enable caching for all ops
 - .cache(timeout=...) call will enable caching for all ops
