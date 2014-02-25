@@ -1,4 +1,4 @@
-import re
+import os, re
 try:
     import unittest2 as unittest
 except ImportError:
@@ -261,6 +261,18 @@ class IssueTests(BaseTestCase):
 
         qs = Contained.objects.cache().filter(containers__name="bbb")
         list(qs)
+
+
+@unittest.skipIf(not os.environ.get('LONG'), "Too long")
+class LongTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def test_big_invalidation(self):
+        for x in range(8000):
+            list(Category.objects.cache().exclude(pk=x))
+
+        c = Category.objects.get(pk=1)
+        invalidate_obj(c) # lua unpack() fails with 8000 keys, workaround works
 
 
 class LocalGetTests(BaseTestCase):
