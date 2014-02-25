@@ -87,15 +87,6 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, six.get_unbound_function(method))
 
 
-
-class Named(object):
-    def __init__(self, name):
-        self.name = name
-
-    def __repr__(self):
-        return self.name
-
-
 def dnf(qs):
     """
     Converts sql condition tree to DNF.
@@ -104,18 +95,15 @@ def dnf(qs):
     conditions on joined models and subrequests are ignored.
     __in is converted into = or = or = ...
     """
-    NONE, SOME, ALL = Named('NONE'), Named('SOME'), Named('ALL')
+    SOME = object()
 
     def negate(el):
-        return ALL  if el is NONE else \
-               SOME if el is SOME else \
-               NONE if el is ALL  else \
+        return SOME if el is SOME else \
                (el[0], el[1], not el[2])
 
     def strip_negates(conj):
-        return [term[:2] for term in conj if term not in (SOME, ALL) and term[2]]
+        return [term[:2] for term in conj if term is not SOME and term[2]]
 
-    # @print_calls
     def _dnf(where):
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
@@ -133,7 +121,7 @@ def dnf(qs):
         elif isinstance(where, EverythingNode):
             return [[]]
         elif isinstance(where, NothingNode):
-            return [[NONE]]
+            return []
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
             return [[SOME]]
         elif len(where) == 0:
@@ -165,7 +153,7 @@ def dnf(qs):
 
     result = _dnf(where)
     # Cutting out negative terms and negation itself
-    result = [strip_negates(conj) for conj in result if NONE not in conj]
+    result = [strip_negates(conj) for conj in result]
     # Any empty conjunction eats up the rest
     # NOTE: a more elaborate DNF reduction is not really needed,
     #       just keep your querysets sane.
