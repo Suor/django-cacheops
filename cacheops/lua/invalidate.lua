@@ -33,6 +33,8 @@ if next(conj_keys) ~= nil then
     -- and conj keys as they will refer only deleted keys
     redis.call('del', unpack(conj_keys))
     if next(cache_keys) ~= nil then
+        -- NOTE: can't just do redis.call('del', unpack(...)) cause there is limit on number
+        --       of return values in lua.
         call_in_chunks('del', cache_keys)
     end
 end
