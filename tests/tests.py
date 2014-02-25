@@ -28,6 +28,10 @@ class BasicTests(BaseTestCase):
             cnt2 = Category.objects.cache().count()
             self.assertEqual(cnt1, cnt2)
 
+    def test_empty(self):
+        with self.assertNumQueries(0):
+            list(Category.objects.cache().filter(id__in=[]))
+
     def test_some(self):
         # Ignoring SOME condition lead to wrong DNF for this queryset,
         # which leads to no invalidation
