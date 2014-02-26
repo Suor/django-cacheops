@@ -117,10 +117,8 @@ class FileCache(BaseCache):
                 self.delete(filename)
                 raise CacheMiss
 
-            f = open(filename, 'rb')
-            data = pickle.load(f)
-            f.close()
-            return data
+            with open(filename, 'rb') as f:
+                return pickle.load(f)
         except (IOError, OSError, EOFError, pickle.PickleError):
             raise CacheMiss
 
