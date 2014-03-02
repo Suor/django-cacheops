@@ -276,9 +276,8 @@ class QuerySetMixin(object):
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
+        self._cacheconf['ops'] = set(ops)
 
-        if ops is not None:
-            self._cacheconf['ops'] = set(ops)
         if timeout is not None:
             self._cacheconf['timeout'] = timeout
         if write_only is not None:

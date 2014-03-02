@@ -9,8 +9,9 @@ filesystem for simple time-invalidated one.
 
 And there is more to it:
 
-- decorator to cache any user function as queryset
-- extension for jinja2 to cache template fragments as querysets
+- decorators to cache any user function as queryset or by time
+- extensions for django and jinja2 templates to cache template fragments as querysets or by time
+- concurrent file cache with a decorator
 - a couple of hacks to make django faster
 
 
@@ -411,6 +412,8 @@ TODO
 
 - lazy methods on querysets
 - calculate cache key from methods called
+- add local cache (cleared at the and of request?)
+- support transactions
 - better invalidate_model()
 - a way to turn off or postpone invalidation
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation

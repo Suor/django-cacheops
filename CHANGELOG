@@ -1,8 +1,8 @@
 - Lua scripting is used to save and invalidate cache,
   this means Redis 2.6+ is required, it's also faster
-- Fixed bug with negating "some"-conditions
 
 1.3.1
+- fixed bug with negating "some"-conditions
 - fixed bug with schemes unsync when invalidating model
 Backwards incompatible changes:
 - reverted .cache(write_only=...) behaviour to enable caching for all ops
