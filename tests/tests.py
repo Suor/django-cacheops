@@ -1,4 +1,4 @@
-import re
+import os, re
 try:
     import unittest2 as unittest
 except ImportError:
@@ -27,6 +27,19 @@ class BasicTests(BaseTestCase):
             cnt1 = Category.objects.cache().count()
             cnt2 = Category.objects.cache().count()
             self.assertEqual(cnt1, cnt2)
+
+    def test_empty(self):
+        with self.assertNumQueries(0):
+            list(Category.objects.cache().filter(id__in=[]))
+
+    def test_some(self):
+        # Ignoring SOME condition lead to wrong DNF for this queryset,
+        # which leads to no invalidation
+        list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
+        c = Category.objects.get(pk=1)
+        c.save()
+        with self.assertNumQueries(1):
+            list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
@@ -248,6 +261,18 @@ class IssueTests(BaseTestCase):
 
         qs = Contained.objects.cache().filter(containers__name="bbb")
         list(qs)
+
+
+@unittest.skipIf(not os.environ.get('LONG'), "Too long")
+class LongTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def test_big_invalidation(self):
+        for x in range(8000):
+            list(Category.objects.cache().exclude(pk=x))
+
+        c = Category.objects.get(pk=1)
+        invalidate_obj(c) # lua unpack() fails with 8000 keys, workaround works
 
 
 class LocalGetTests(BaseTestCase):

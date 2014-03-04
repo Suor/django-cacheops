@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import
 from operator import concat, itemgetter
 from itertools import product
 import inspect
@@ -22,7 +23,14 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import Query, ExtraWhere
+from django.db.models.sql.where import EverythingNode, NothingNode
 from django.db.models.sql.expressions import SQLEvaluator
+# A new thing in Django 1.6
+try:
+    from django.db.models.sql.where import SubqueryConstraint
+except ImportError:
+    class SubqueryConstraint(object):
+        pass
 
 
 LONG_DISJUNCTION = 8
@@ -81,17 +89,6 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, six.get_unbound_function(method))
 
 
-# Some special subconditions that don't provide dnf narrowing
-from django.db.models.sql.where import EverythingNode, NothingNode
-dnfless_subconds = (ExtraWhere, EverythingNode, NothingNode)
-
-# A new thing in Django 1.6 that should be ignored for dnf purposes
-try:
-    from django.db.models.sql.where import SubqueryConstraint
-    dnfless_subconds += (SubqueryConstraint,)
-except ImportError:
-    pass
-
 def dnf(qs):
     """
     Converts sql condition tree to DNF.
@@ -100,17 +97,20 @@ def dnf(qs):
     conditions on joined models and subrequests are ignored.
     __in is converted into = or = or = ...
     """
+    SOME = object()
+
     def negate(el):
-        return (el[0], el[1], not el[2])
+        return SOME if el is SOME else \
+               (el[0], el[1], not el[2])
 
     def strip_negates(conj):
-        return [term[:2] for term in conj if term[2]]
+        return [term[:2] for term in conj if term is not SOME and term[2]]
 
     def _dnf(where):
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             if constraint.alias != alias or isinstance(value, (QuerySet, Query, SQLEvaluator)):
-                return [[]]
+                return [[SOME]]
             elif lookup == 'exact':
                 # attribute, value, negation
                 return [[(attname_of(model, constraint.col), value, True)]]
@@ -119,16 +119,20 @@ def dnf(qs):
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
                 return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
-                return [[]]
-        elif isinstance(where, dnfless_subconds):
+                return [[SOME]]
+        elif isinstance(where, EverythingNode):
             return [[]]
+        elif isinstance(where, NothingNode):
+            return []
+        elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
+            return [[SOME]]
         elif len(where) == 0:
-            return None
+            return [[]]
         else:
-            chilren_dnfs = filter(None, imap(_dnf, where.children))
+            chilren_dnfs = map(_dnf, where.children)
 
             if len(chilren_dnfs) == 0:
-                return None
+                return [[]]
             elif len(chilren_dnfs) == 1:
                 result = chilren_dnfs[0]
             else:
@@ -150,16 +154,14 @@ def dnf(qs):
     alias = model._meta.db_table
 
     result = _dnf(where)
-    if result is None:
-        return [[]]
     # Cutting out negative terms and negation itself
-    result = map(strip_negates, result)
+    result = [strip_negates(conj) for conj in result]
     # Any empty conjunction eats up the rest
     # NOTE: a more elaborate DNF reduction is not really needed,
     #       just keep your querysets sane.
     if not all(result):
         return [[]]
-    return result
+    return map(sorted, result)
 
 
 def attname_of(model, col, cache={}):

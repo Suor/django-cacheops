@@ -3,7 +3,7 @@ local obj = cjson.decode(ARGV[2])
 
 local schemes = redis.call('smembers', 'schemes:' .. model)
 
--- conj cache key
+-- utility functions
 local conj_cache_key = function (model, scheme, obj)
     local parts = {}
     for field in string.gmatch(scheme, "[^,]+") do
@@ -11,6 +11,13 @@ local conj_cache_key = function (model, scheme, obj)
     end
 
     return 'conj:' .. model .. ':' .. table.concat(parts, '&')
+end
+
+local call_in_chunks = function (command, args)
+    local step = 1000
+    for i = 1, #args, step do
+        redis.call(command, unpack(args, i, math.min(i + step - 1, #args)))
+    end
 end
 
 -- calculate conj keys
@@ -26,6 +33,8 @@ if next(conj_keys) ~= nil then
     -- and conj keys as they will refer only deleted keys
     redis.call('del', unpack(conj_keys))
     if next(cache_keys) ~= nil then
-        redis.call('del', unpack(cache_keys))
+        -- NOTE: can't just do redis.call('del', unpack(...)) cause there is limit on number
+        --       of return values in lua.
+        call_in_chunks('del', cache_keys)
     end
 end

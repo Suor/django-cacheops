@@ -6,15 +6,18 @@ local timeout = ARGV[4]
 local inv_timeout = ARGV[5]
 
 -- Update schemes
-local schemes = {}
-for _, conj in ipairs(dnf) do
-    local s = {}
-    for _, eq in ipairs(conj) do
-        table.insert(s, eq[1])
+-- NOTE: dnf could be empty for reliably empty query
+if next(dnf) ~= nil then
+    local schemes = {}
+    for _, conj in ipairs(dnf) do
+        local s = {}
+        for _, eq in ipairs(conj) do
+            table.insert(s, eq[1])
+        end
+        table.insert(schemes, table.concat(s, ','))
     end
-    table.insert(schemes, table.concat(s, ','))
+    redis.call('sadd', 'schemes:' .. model, unpack(schemes))
 end
-redis.call('sadd', 'schemes:' .. model, unpack(schemes))
 
 -- Write data to cache
 redis.call('setex', key, timeout, data)
