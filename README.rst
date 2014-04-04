@@ -410,15 +410,14 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
-- lazy methods on querysets
-- calculate cache key from methods called
+- autodiscover ways to stringify things, make a better error message/docs
+- better invalidate_model()
 - add local cache (cleared at the and of request?)
 - support transactions
-- better invalidate_model()
 - a way to turn off or postpone invalidation
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
 - disable cache if select_for_update() called (or if _for_write set?)
-- autodiscover ways to stringify things, make a better error message/docs
+- lazy methods on querysets (calculate cache key from methods called)
