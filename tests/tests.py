@@ -32,6 +32,9 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(Category.objects.cache().filter(id__in=[]))
 
+    def test_slice(self):
+        list(Category.objects.cache()[:2])
+
     def test_some(self):
         # Ignoring SOME condition lead to wrong DNF for this queryset,
         # which leads to no invalidation

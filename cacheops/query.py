@@ -175,6 +175,8 @@ def _stringify_query():
     def encode_object(obj):
         if isinstance(obj, set):
             return sorted(obj)
+        elif isinstance(obj, slice):
+            return (obj.start, obj.stop, obj.step)
         elif isinstance(obj, type):
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
@@ -198,11 +200,16 @@ def _stringify_query():
             raise TypeError("Can't stringify %s" % repr(obj))
 
     def stringify_query(query):
+        if isinstance(query, LazyQuery) and getattr(query._base, '_virgin', False):
+            query_data = query._calls
+        else:
+            query_data = query
+
         # HACK: Catch TypeError and reraise it as ValueError
         #       since django hides it and behave weird when gets a TypeError in Queryset.iterator()
         try:
-            return json.dumps(query, default=encode_object, skipkeys=True,
-                                     sort_keys=True, separators=(',',':'))
+            return json.dumps(query_data, default=encode_object, skipkeys=True,
+                                          sort_keys=True, separators=(',',':'))
         except TypeError as e:
             raise ValueError(*e.args)
 
@@ -211,8 +218,10 @@ stringify_query = _stringify_query()
 
 
 class QuerySetMixin(object):
-    def __init__(self, *args, **kwargs):
-        self._no_monkey.__init__(self, *args, **kwargs)
+    def __init__(self, model=None, query=None, using=None):
+        self._no_monkey.__init__(self, model, query, using)
+        if query is None:
+            self.query._virgin = True
         self._cloning = 1000
 
         self._cacheprofile = model_profile(self.model)
@@ -425,7 +434,7 @@ QuerySetMixin.__getitem__ = QuerySet__getitem
 
 
 # Postponed: values, values_list, dates, datetimes, select_for_update, using
-# Intentionally skipping none, since doesn't cause
+# Intentionally skipping none, since doesn't cause database access
 for method in ('filter', 'exclude', 'annotate', 'order_by', 'reverse', 'distinct', 'all',
                'select_related', 'extra', 'defer', 'only'):
     setattr(QuerySetMixin, method, queued_call(method))
