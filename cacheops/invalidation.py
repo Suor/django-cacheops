@@ -51,5 +51,7 @@ def serializable_attnames(model):
     return tuple(f.attname for f in model._meta.fields
                            if not isinstance(f, NON_SERIALIZABLE_FIELDS))
 
+# FIXME: default to str is probably not a best thing to do.
+#        That won't always match a value we get from dnf().
 def serialize_object(model, obj):
     return json.dumps(dict((f, getattr(obj, f)) for f in serializable_attnames(model)), default=str)

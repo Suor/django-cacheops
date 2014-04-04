@@ -147,8 +147,13 @@ class WeirdTests(BaseTestCase):
         self._template('list_field', [1, 2], invalidation=True)
 
     def test_custom(self):
-        # NOTE: invalidation works if stringification of value is the same as .get_prep_value()
         self._template('custom_field', CustomValue('some'))
+
+    def test_weird_custom(self):
+        class WeirdCustom(CustomValue):
+            def __str__(self):
+                return 'other'
+        self._template('custom_field', WeirdCustom('some'))
 
 
 class TemplateTests(BaseTestCase):
