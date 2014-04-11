@@ -140,11 +140,7 @@ class WeirdTests(BaseTestCase):
         self._template('time_field', time(10, 30))
 
     def test_list(self):
-        self._template('list_field', [1, 2], invalidation=False)
-
-    @unittest.expectedFailure
-    def test_list_invalidation(self):
-        self._template('list_field', [1, 2], invalidation=True)
+        self._template('list_field', [1, 2])
 
     def test_custom(self):
         self._template('custom_field', CustomValue('some'))

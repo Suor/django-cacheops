@@ -47,11 +47,13 @@ if hasattr(models, 'BinaryField'):
     NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
 
 @memoize
-def serializable_attnames(model):
-    return tuple(f.attname for f in model._meta.fields
-                           if not isinstance(f, NON_SERIALIZABLE_FIELDS))
+def serializable_fields(model):
+    return tuple(f for f in model._meta.fields
+                   if not isinstance(f, NON_SERIALIZABLE_FIELDS))
 
-# FIXME: default to str is probably not a best thing to do.
-#        That won't always match a value we get from dnf().
 def serialize_object(model, obj):
-    return json.dumps(dict((f, getattr(obj, f)) for f in serializable_attnames(model)), default=str)
+    obj_dict = dict(
+        (field.attname, field.get_prep_value(getattr(obj, field.attname)))
+        for field in serializable_fields(model)
+    )
+    return json.dumps(obj_dict, default=str)
