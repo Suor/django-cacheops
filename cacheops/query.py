@@ -127,6 +127,7 @@ def _stringify_query():
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
     from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
                                            EverythingNode, NothingNode
+    from django.contrib.gis.db.models.sql.where import GeoWhereNode
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.datastructures import Date
@@ -149,7 +150,7 @@ def _stringify_query():
     except ImportError:
         pass
 
-    attrs[WhereNode] = attrs[ExpressionNode] \
+    attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
         = ('connector', 'negated', 'children')
     attrs[SQLEvaluator] = ('expression',)
     attrs[ExtraWhere] = ('sqls', 'params')
