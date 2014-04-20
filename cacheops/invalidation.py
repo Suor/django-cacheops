@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import simplejson as json
-from django.db import models
 
 from cacheops.conf import redis_client, handle_connection_failure
 from cacheops.funcy import memoize
-from cacheops.utils import get_model_name, non_proxy, load_script
+from cacheops.utils import get_model_name, non_proxy, load_script, NON_SERIALIZABLE_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
@@ -38,13 +37,6 @@ def invalidate_all():
 
 
 ### ORM instance serialization
-
-NON_SERIALIZABLE_FIELDS = (
-    models.FileField,
-    models.TextField, # One should not filter by long text equality
-)
-if hasattr(models, 'BinaryField'):
-    NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
 
 @memoize
 def serializable_fields(model):

@@ -356,8 +356,9 @@ CAVEATS
 8. Doesn't work right with multi-table inheritance.
 9. Aggregates is not implemented yet.
 10. Timeout in queryset and ``@cached_as()`` cannot be larger than default.
+11. Filters on TextFields don't affect invalidation. One should not test on their equality anyway.
 
-Here 1, 3, 5, 10 are part of design compromise, trying to solve them will make
+Here 1, 3, 5, 10, 11 are part of design compromise, trying to solve them will make
 things complicated and slow. 2 and 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simple ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush

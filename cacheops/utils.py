@@ -19,7 +19,7 @@ from cacheops.conf import redis_client
 from cacheops.funcy import memoize
 
 import django
-from django.db.models import Model
+from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -39,7 +39,8 @@ LONG_DISJUNCTION = 8
 def non_proxy(model):
     while model._meta.proxy:
         # Every proxy model has exactly one non abstract parent model
-        model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
+        model = next(b for b in model.__bases__
+                       if issubclass(b, models.Model) and not b._meta.abstract)
     return model
 
 
@@ -89,6 +90,14 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, six.get_unbound_function(method))
 
 
+NON_SERIALIZABLE_FIELDS = (
+    models.FileField,
+    models.TextField, # One should not filter by long text equality
+)
+if hasattr(models, 'BinaryField'):
+    NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
+
+
 def dnf(qs):
     """
     Converts sql condition tree to DNF.
@@ -112,8 +121,11 @@ def dnf(qs):
             if constraint.alias != alias or isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME]]
             elif lookup == 'exact':
-                # attribute, value, negation
-                return [[(attname_of(model, constraint.col), value, True)]]
+                if isinstance(constraint.field, NON_SERIALIZABLE_FIELDS):
+                    return [[SOME]]
+                else:
+                    # attribute, value, negation
+                    return [[(attname_of(model, constraint.col), value, True)]]
             elif lookup == 'isnull':
                 return [[(attname_of(model, constraint.col), None, value)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
