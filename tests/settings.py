@@ -37,4 +37,7 @@ CACHEOPS = {
     '*.*': ('just_enable', 60*60),
 }
 
+# We need to catch any changes in django
+CACHEOPS_STRICT_STRINGIFY = True
+
 SECRET_KEY = 'abc'

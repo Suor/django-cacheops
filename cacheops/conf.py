@@ -25,7 +25,7 @@ for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
 
-# Support degradation on redis fail
+STRICT_STRINGIFY = getattr(settings, 'CACHEOPS_STRICT_STRINGIFY', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 def handle_connection_failure(func):

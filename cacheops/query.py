@@ -22,7 +22,7 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from cacheops.conf import model_profile, redis_client, handle_connection_failure
+from cacheops.conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
 from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fields, load_script
 from cacheops.invalidation import invalidate_obj, invalidate_model
 
@@ -200,6 +200,9 @@ def _stringify_query():
         elif isinstance(obj, Query):
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+        # Fall back for unknown objects
+        elif not STRICT_STRINGIFY and hasattr(obj, '__dict__'):
+            return (obj.__class__, obj.__dict__)
         else:
             raise TypeError("Can't stringify %s" % repr(obj))
 
