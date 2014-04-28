@@ -411,7 +411,6 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
-- autodiscover ways to stringify things, make a better error message/docs
 - better invalidate_model()
 - add local cache (cleared at the and of request?)
 - support transactions
