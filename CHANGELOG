@@ -4,6 +4,7 @@
 - Support caching django.contrib.gis queries (koodjo)
 - Better invalidation for complex and custom fields.
   It won't always work previously if get_prep_value() is different from stringification.
+- Fixed invalidate_model() for proxy models
 Backwards incompatible changes:
 - filters on TextFields no longer affect invalidation.
 

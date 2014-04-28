@@ -27,6 +27,7 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
+    model = non_proxy(model)
     conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
