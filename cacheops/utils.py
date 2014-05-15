@@ -22,6 +22,10 @@ from django.db.models.sql import AND, OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.expressions import SQLEvaluator
 
+try:
+    from bitfield.types import Bit
+except ImportError:
+    Bit = None
 
 LONG_DISJUNCTION = 8
 
@@ -107,7 +111,10 @@ def dnf(qs):
     def _dnf(where):
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
-            if constraint.alias != alias or isinstance(value, (QuerySet, Query, SQLEvaluator)):
+            value_types_to_skip = (QuerySet, Query, SQLEvaluator)
+            if Bit:
+                value_types_to_skip += (Bit,)
+            if constraint.alias != alias or isinstance(value, value_types_to_skip):
                 return [[]]
             elif lookup == 'exact':
                 # attribute, value, negation
