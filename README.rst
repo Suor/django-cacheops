@@ -9,8 +9,9 @@ filesystem for simple time-invalidated one.
 
 And there is more to it:
 
-- decorator to cache any user function as queryset
-- extension for jinja2 to cache template fragments as querysets
+- decorators to cache any user function as queryset or by time
+- extensions for django and jinja2 templates to cache template fragments as querysets or by time
+- concurrent file cache with a decorator
 - a couple of hacks to make django faster
 
 
@@ -409,6 +410,8 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
+- add local cache (cleared at the and of request?)
+- support transactions
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid

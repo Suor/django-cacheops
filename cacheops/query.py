@@ -300,13 +300,13 @@ class QuerySetMixin(object):
         if timeout and timeout > self._cacheprofile['timeout']:
             raise NotImplementedError('timeout override should be smaller than default')
 
-        if ops is None and timeout is None and write_only is None:
+        if ops is None:
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
-
         if ops is not None:
             self._cacheops = set(ops)
+
         if timeout is not None:
             self._cachetimeout = timeout
         if write_only is not None:

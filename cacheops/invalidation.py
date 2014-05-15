@@ -98,13 +98,6 @@ class ConjSchemes(object):
                 # because even our updated collection could be already obsolete
                 self.versions[model_name] += 1
 
-    def clear(self, model):
-        """
-        Clears schemes for models
-        """
-        redis_client.delete(self.get_lookup_key(model))
-        redis_client.incr(self.get_version_key(model))
-
     def clear_all(self):
         self.local = {}
         for model_name in self.versions:
@@ -172,9 +165,6 @@ def invalidate_model(model):
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
-
-    # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
-    cache_schemes.clear(model)
 
 def invalidate_all():
     redis_client.flushdb()
