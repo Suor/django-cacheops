@@ -1,10 +1,11 @@
-- Lua scripting is used to save and invalidate cache,
+- lua scripting is used to save and invalidate cache,
   this means Redis 2.6+ is required, it's also faster
-- Silent stringify of unknown objects by default
-- Support caching django.contrib.gis queries (koodjo)
-- Better invalidation for complex and custom fields.
+- silent stringify of unknown objects by default
+- support caching django.contrib.gis queries (koodjo)
+- better invalidation for complex and custom fields.
   It won't always work previously if get_prep_value() is different from stringification.
-- Fixed invalidate_model() for proxy models
+- fixed invalidate_model() for proxy models
+- fixed deepcopy(queryset) bug
 Backwards incompatible changes:
 - filters on TextFields no longer affect invalidation.
 

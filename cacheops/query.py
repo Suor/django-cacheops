@@ -224,7 +224,7 @@ class QuerySetMixin(object):
         self._no_monkey.__init__(self, *args, **kwargs)
         self._cloning = 1000
 
-        self._cacheprofile = model_profile(self.model)
+        self._cacheprofile = model_profile(self.model) if self.model else None
         if self._cacheprofile:
             self._cacheconf = self._cacheprofile.copy()
             self._cacheconf['write_only'] = False

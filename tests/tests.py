@@ -1,4 +1,4 @@
-import os, re
+import os, re, copy
 try:
     import unittest2 as unittest
 except ImportError:
@@ -275,6 +275,9 @@ class IssueTests(BaseTestCase):
 
         qs = Contained.objects.cache().filter(containers__name="bbb")
         list(qs)
+
+    def test_82(self):
+        list(copy.deepcopy(Post.objects.all()).cache())
 
 
 @unittest.skipIf(not os.environ.get('LONG'), "Too long")
