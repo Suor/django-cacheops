@@ -232,7 +232,7 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(labels__in=[1, 2, 3]).cache().count()
+        Brand.objects.exclude(labels__in=[1, 2, 3]).cache().count()
 
     def test_39(self):
         list(Point.objects.filter(x=7).cache())
@@ -301,13 +301,74 @@ class LocalGetTests(BaseTestCase):
         Local.objects.cache().get(pk__in=[1, 2])
 
 
-class ManyToManyTests(BaseTestCase):
+class RelatedTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def test_related_invalidation(self):
+        list(Post.objects.filter(category__title='Django').cache())
+
+        c = Category.objects.get(title='Django')
+        c.title = 'Forget it'
+        c.save()
+
+        with self.assertNumQueries(1):
+            posts = Post.objects.filter(category__title='Django').cache()
+            self.assertEqual(len(posts), 0)
+
+
+class M2MTests(BaseTestCase):
+    def setUp(self):
+        self.bf = Brand.objects.create()
+        self.bs = Brand.objects.create()
+
+        self.fast = Label.objects.create(text='fast')
+        self.slow = Label.objects.create(text='slow')
+        self.furious = Label.objects.create(text='furios')
+
+        self.bf.labels.add(self.fast, self.furious)
+        self.bs.labels.add(self.slow, self.furious)
+
+        super(M2MTests, self).setUp()
+
+    def test_target_invalidates(self):
+        list(self.bf.labels.cache())
+        self.bf.labels.clear()
+
+        with self.assertNumQueries(1):
+            list(self.bf.labels.cache())
+
+    def test_base_invalidates(self):
+        list(self.furious.brands.cache())
+        self.bf.labels.clear()
+
+        with self.assertNumQueries(1):
+            list(self.furious.brands.cache())
+
+    def test_granular_through(self):
+        through_qs = Brand.labels.through.objects.cache().filter(brand=self.bs, label=self.slow)
+        through_qs.get()
+
+        self.bf.labels.clear()
+
+        with self.assertNumQueries(0):
+            through_qs.get()
+
+    def test_granular_target(self):
+        Label.objects.cache().get(pk=self.slow.pk)
+
+        self.bf.labels.clear()
+
+        with self.assertNumQueries(0):
+            Label.objects.cache().get(pk=self.slow.pk)
+
+
+class M2MThroughTests(BaseTestCase):
     def setUp(self):
         self.suor = User.objects.create(username='Suor')
         self.peterdds = User.objects.create(username='peterdds')
         self.photo = Photo.objects.create()
         PhotoLike.objects.create(user=self.suor, photo=self.photo)
-        super(ManyToManyTests, self).setUp()
+        super(M2MThroughTests, self).setUp()
 
     @unittest.expectedFailure
     def test_44(self):
@@ -325,6 +386,7 @@ class ManyToManyTests(BaseTestCase):
         PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
         invalidate_obj(self.peterdds)
         self.assertEqual(make_query(), [self.suor, self.peterdds])
+
 
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):

@@ -124,8 +124,8 @@ class Point(models.Model):
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
 
-class MachineBrand(models.Model):
-    labels = models.ManyToManyField(Label)
+class Brand(models.Model):
+    labels = models.ManyToManyField(Label, related_name='brands')
 
 
 # local_get
