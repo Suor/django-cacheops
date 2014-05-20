@@ -22,6 +22,7 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
+from .funcy import cached_property
 from cacheops.conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
 from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fields, load_script
 from cacheops.invalidation import invalidate_obj, invalidate_model
@@ -220,14 +221,17 @@ stringify_query = _stringify_query()
 
 
 class QuerySetMixin(object):
-    def __init__(self, *args, **kwargs):
-        self._no_monkey.__init__(self, *args, **kwargs)
-        self._cloning = 1000
-
-        self._cacheprofile = model_profile(self.model) if self.model else None
-        if self._cacheprofile:
-            self._cacheconf = self._cacheprofile.copy()
+    @cached_property
+    def _cacheprofile(self):
+        profile = model_profile(self.model)
+        if profile:
+            self._cacheconf = profile.copy()
             self._cacheconf['write_only'] = False
+        return profile
+
+    @cached_property
+    def _cloning(self):
+        return 1000
 
     def get_or_create(self, **kwargs):
         """
@@ -527,6 +531,8 @@ def install_cacheops():
 
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
+    QuerySet._cacheprofile = QuerySetMixin._cacheprofile
+    QuerySet._cloning = QuerySetMixin._cloning
     monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
