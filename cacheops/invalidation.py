@@ -33,6 +33,7 @@ def invalidate_model(model):
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
+@handle_connection_failure
 def invalidate_all():
     redis_client.flushdb()
 
