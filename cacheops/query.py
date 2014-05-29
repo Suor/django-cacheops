@@ -121,7 +121,7 @@ def _stringify_query():
           any significant optimization will most likely require a major
           refactor of sql.Query class, which is a substantial part of ORM.
     """
-    from datetime import datetime, date, time
+    from datetime import datetime, date, time, timedelta
     from decimal import Decimal
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
@@ -186,7 +186,7 @@ def _stringify_query():
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
             return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date, time, Decimal)):
+        elif isinstance(obj, (datetime, date, time, timedelta, Decimal)):
             return str(obj)
         elif isinstance(obj, Constraint):
             return (obj.alias, obj.col)
