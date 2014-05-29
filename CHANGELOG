@@ -4,6 +4,7 @@
 - support caching django.contrib.gis queries (koodjo)
 - better invalidation for complex and custom fields.
   It won't always work previously if get_prep_value() is different from stringification.
+- added a way to no-op cacheops
 - fixed working with querysets created by non-patched constructor (#3 and dups)
 - fixed invalidate_model() for proxy models
 - fixed deepcopy(queryset) bug

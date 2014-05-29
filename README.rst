@@ -78,7 +78,13 @@ Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 
 .. code:: python
 
-    CACHEOPS_DEGRADE_ON_FAILURE=True
+    CACHEOPS_DEGRADE_ON_FAILURE = True
+
+There is also a possibility to make all cacheops methods and decorators no-op, e.g. for testing:
+
+.. code:: python
+
+    CACHEOPS_FAKE = True
 
 
 Usage

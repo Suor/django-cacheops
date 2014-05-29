@@ -1,7 +1,7 @@
 import os
 
 INSTALLED_APPS = [
-    'cacheops' if os.environ.get('CACHEOPS') != 'FAKE' else 'fakecacheops',
+    'cacheops',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'tests',
@@ -21,6 +21,8 @@ DATABASES = {
         'NAME': 'sqlite.db'
     }
 }
+
+CACHEOPS_FAKE = os.environ.get('CACHEOPS') == 'FAKE'
 
 CACHEOPS_REDIS = {
     'host': 'localhost',
