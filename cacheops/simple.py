@@ -9,7 +9,7 @@ import os, time
 from django.conf import settings
 
 from cacheops import cross
-from cacheops.conf import redis_client
+from cacheops.conf import redis_client, handle_connection_failure
 
 
 __all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
@@ -75,6 +75,7 @@ class RedisCache(BaseCache):
             raise CacheMiss
         return pickle.loads(data)
 
+    @handle_connection_failure
     def set(self, cache_key, data, timeout=None):
         pickled_data = pickle.dumps(data, -1)
         if timeout is not None:
@@ -82,6 +83,7 @@ class RedisCache(BaseCache):
         else:
             self.conn.set(cache_key, pickled_data)
 
+    @handle_connection_failure
     def delete(self, cache_key):
         self.conn.delete(cache_key)
 
