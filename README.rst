@@ -1,4 +1,4 @@
-Cacheops
+Cacheops |Build Status|
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
@@ -427,3 +427,7 @@ TODO
 - shard cache between multiple redises
 - disable cache if select_for_update() called (or if _for_write set?)
 - lazy methods on querysets (calculate cache key from methods called)
+
+
+.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
+   :target: https://travis-ci.org/Suor/django-cacheops
