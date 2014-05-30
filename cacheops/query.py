@@ -5,7 +5,6 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import simplejson as json
 
 from cacheops import cross
 from cacheops.cross import json
@@ -212,7 +211,7 @@ def _stringify_query():
         #       since django hides it and behave weird when gets a TypeError in Queryset.iterator()
         try:
             return json.dumps(query, default=encode_object, skipkeys=True,
-                                     sort_keys=True, separators=(',',':'))
+                                     sort_keys=True, separators=(',', ':'))
         except TypeError as e:
             raise ValueError(*e.args)
 

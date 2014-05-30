@@ -1,10 +1,8 @@
 import os
 
-from django.core.management.base import BaseCommand, CommandError
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from django.core.management.base import BaseCommand
 
-from cacheops.simple import file_cache, FILE_CACHE_DIR
+from cacheops.simple import FILE_CACHE_DIR
 
 
 class Command(BaseCommand):
