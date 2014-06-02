@@ -304,16 +304,46 @@ class LocalGetTests(BaseTestCase):
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
 
+    def _template(self, qs, change, should_invalidate=True):
+        list(qs._clone().cache())
+        change()
+        with self.assertNumQueries(1 if should_invalidate else 0):
+            list(qs.cache())
+
     def test_related_invalidation(self):
-        list(Post.objects.filter(category__title='Django').cache())
+        self._template(
+            Post.objects.filter(category__title='Django'),
+            lambda: Category.objects.get(title='Django').save()
+        )
 
-        c = Category.objects.get(title='Django')
-        c.title = 'Forget it'
-        c.save()
+    def test_reverse_fk(self):
+        self._template(
+            Category.objects.filter(posts__title='Cacheops'),
+            lambda: Post.objects.get(title='Cacheops').save()
+        )
 
-        with self.assertNumQueries(1):
-            posts = Post.objects.filter(category__title='Django').cache()
-            self.assertEqual(len(posts), 0)
+    def test_reverse_fk_same(self):
+        title = "Implicit variable as pronoun"
+        self._template(
+            Category.objects.filter(posts__title=title, posts__visible=True),
+            lambda: Post.objects.get(title=title, visible=True).save()
+        )
+        self._template(
+            Category.objects.filter(posts__title=title, posts__visible=False),
+            lambda: Post.objects.get(title=title, visible=True).save(),
+            should_invalidate=False,
+        )
+
+    def test_reverse_fk_separate(self):
+        title = "Implicit variable as pronoun"
+        self._template(
+            Category.objects.filter(posts__title=title).filter(posts__visible=True),
+            lambda: Post.objects.get(title=title, visible=True).save()
+        )
+        self._template(
+            Category.objects.filter(posts__title=title).filter(posts__visible=False),
+            lambda: Post.objects.get(title=title, visible=True).save(),
+        )
 
 
 class M2MTests(BaseTestCase):
@@ -330,36 +360,67 @@ class M2MTests(BaseTestCase):
 
         super(M2MTests, self).setUp()
 
-    def test_target_invalidates(self):
-        list(self.bf.labels.cache())
-        self.bf.labels.clear()
+    def _template(self, qs_or_action, change, should_invalidate=True):
+        if hasattr(qs_or_action, 'all'):
+            action = lambda: list(qs_or_action.all().cache())
+        else:
+            action = qs_or_action
 
-        with self.assertNumQueries(1):
-            list(self.bf.labels.cache())
+        action()
+        change()
+        with self.assertNumQueries(1 if should_invalidate else 0):
+            action()
 
-    def test_base_invalidates(self):
-        list(self.furious.brands.cache())
-        self.bf.labels.clear()
+    def test_target_invalidates_on_clear(self):
+        self._template(
+            self.bf.labels,
+            lambda: self.bf.labels.clear()
+        )
 
-        with self.assertNumQueries(1):
-            list(self.furious.brands.cache())
+    def test_base_invalidates_on_clear(self):
+        self._template(
+            self.furious.brands,
+            lambda: self.bf.labels.clear()
+        )
 
-    def test_granular_through(self):
+    def test_granular_through_on_clear(self):
         through_qs = Brand.labels.through.objects.cache().filter(brand=self.bs, label=self.slow)
-        through_qs.get()
+        self._template(
+            lambda: through_qs.get(),
+            lambda: self.bf.labels.clear(),
+            should_invalidate=False
+        )
 
-        self.bf.labels.clear()
+    def test_granular_target_on_clear(self):
+        self._template(
+            lambda: Label.objects.cache().get(pk=self.slow.pk),
+            lambda: self.bf.labels.clear(),
+            should_invalidate=False
+        )
 
-        with self.assertNumQueries(0):
-            through_qs.get()
+    def test_target_invalidates_on_add(self):
+        self._template(
+            self.bf.labels,
+            lambda: self.bf.labels.add(self.slow)
+        )
 
-    def test_granular_target(self):
-        Label.objects.cache().get(pk=self.slow.pk)
+    def test_base_invalidates_on_add(self):
+        self._template(
+            self.slow.brands,
+            lambda: self.bf.labels.add(self.slow)
+        )
 
-        self.bf.labels.clear()
+    def test_target_invalidates_on_remove(self):
+        self._template(
+            self.bf.labels,
+            lambda: self.bf.labels.remove(self.furious)
+        )
 
-        with self.assertNumQueries(0):
-            Label.objects.cache().get(pk=self.slow.pk)
+    def test_base_invalidates_on_remove(self):
+        self._template(
+            self.furious.brands,
+            lambda: self.bf.labels.remove(self.furious)
+        )
 
 
 class M2MThroughTests(BaseTestCase):
@@ -370,21 +431,11 @@ class M2MThroughTests(BaseTestCase):
         PhotoLike.objects.create(user=self.suor, photo=self.photo)
         super(M2MThroughTests, self).setUp()
 
-    @unittest.expectedFailure
     def test_44(self):
         make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
         self.assertEqual(make_query(), [self.suor])
 
-        # query cache won't be invalidated on this create, since PhotoLike is through model
         PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
-        self.assertEqual(make_query(), [self.suor, self.peterdds])
-
-    def test_44_workaround(self):
-        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
-        self.assertEqual(make_query(), [self.suor])
-
-        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
-        invalidate_obj(self.peterdds)
         self.assertEqual(make_query(), [self.suor, self.peterdds])
 
 

@@ -46,10 +46,10 @@ def non_proxy(model):
 
 if django.VERSION < (1, 6):
     def get_model_name(model):
-        return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+        return model._meta.module_name
 else:
     def get_model_name(model):
-        return '%s.%s' % (model._meta.app_label, model._meta.model_name)
+        return model._meta.model_name
 
 
 class MonkeyProxy(object):
@@ -98,46 +98,52 @@ if hasattr(models, 'BinaryField'):
     NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
 
 
-def dnf(qs):
+def dnfs(qs):
     """
-    Converts sql condition tree to DNF.
+    Converts query condition tree into a DNF of eq conds.
+    Separately for each alias.
 
     Any negations, conditions with lookups other than __exact or __in,
     conditions on joined models and subrequests are ignored.
     __in is converted into = or = or = ...
     """
     SOME = object()
+    SOME_COND = (None, None, SOME, True)
 
-    def negate(el):
-        return SOME if el is SOME else \
-               (el[0], el[1], not el[2])
-
-    def strip_negates(conj):
-        return [term[:2] for term in conj if term is not SOME and term[2]]
+    def negate(term):
+        return (term[0], term[1], term[2], not term[3])
 
     def _dnf(where):
+        """
+        Constructs DNF of where tree consisting of terms in form:
+            (alias, attribute, value, negation)
+        meaning `alias.attribute = value`
+         or `not alias.attribute = value` if negation is False
+
+        Any conditions other then eq are dropped.
+        """
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
-            if constraint.alias != alias or isinstance(value, (QuerySet, Query, SQLEvaluator)):
-                return [[SOME]]
+            attname = attname_of(model, constraint.col)
+            if isinstance(value, (QuerySet, Query, SQLEvaluator)):
+                return [[SOME_COND]]
             elif lookup == 'exact':
                 if isinstance(constraint.field, NON_SERIALIZABLE_FIELDS):
-                    return [[SOME]]
+                    return [[SOME_COND]]
                 else:
-                    # attribute, value, negation
-                    return [[(attname_of(model, constraint.col), value, True)]]
+                    return [[(constraint.alias, attname, value, True)]]
             elif lookup == 'isnull':
-                return [[(attname_of(model, constraint.col), None, value)]]
+                return [[(constraint.alias, attname, None, value)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(attname_of(model, constraint.col), v, True)] for v in value]
+                return [[(constraint.alias, attname, v, True)] for v in value]
             else:
-                return [[SOME]]
+                return [[SOME_COND]]
         elif isinstance(where, EverythingNode):
             return [[]]
         elif isinstance(where, NothingNode):
             return []
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
-            return [[SOME]]
+            return [[SOME_COND]]
         elif len(where) == 0:
             return [[]]
         else:
@@ -161,19 +167,37 @@ def dnf(qs):
 
             return result
 
+    def clean_conj(conj, for_alias):
+        # "SOME" conds, negated conds and conds for other aliases should be stripped
+        return [(attname, value) for alias, attname, value, negation in conj
+                                 if value is not SOME and negation and alias == for_alias]
+
+    def clean_dnf(tree, for_alias):
+        cleaned = [clean_conj(conj, for_alias) for conj in tree]
+        # Any empty conjunction eats up the rest
+        # NOTE: a more elaborate DNF reduction is not really needed,
+        #       just keep your querysets sane.
+        if not all(cleaned):
+            return [[]]
+        # To keep all schemes the same we sort conjunctions
+        return map(sorted, cleaned)
+
+    def table_for(alias):
+        if alias == main_alias:
+            return model._meta.db_table
+        else:
+            return qs.query.alias_map[alias][0]
+
     where = qs.query.where
     model = qs.model
-    alias = model._meta.db_table
+    main_alias = model._meta.db_table
 
-    result = _dnf(where)
-    # Cutting out negative terms and negation itself
-    result = [strip_negates(conj) for conj in result]
-    # Any empty conjunction eats up the rest
-    # NOTE: a more elaborate DNF reduction is not really needed,
-    #       just keep your querysets sane.
-    if not all(result):
-        return [[]]
-    return map(sorted, result)
+    dnf = _dnf(where)
+    aliases = set(alias for conj in dnf
+                        for alias, _, _, _ in conj
+                        if alias)
+    aliases.add(main_alias)
+    return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
 
 
 def attname_of(model, col, cache={}):
@@ -197,6 +221,7 @@ import os.path
 
 @memoize
 def load_script(name):
+    # TODO: strip comments
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()

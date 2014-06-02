@@ -59,7 +59,7 @@
     "fields": {
       "title": "Perl 6 hyperoperator",
       "category": 3,
-      "visible": true
+      "visible": false
     }
   },
 

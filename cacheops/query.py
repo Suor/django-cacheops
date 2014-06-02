@@ -23,7 +23,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
-from cacheops.utils import monkey_mix, dnf, get_model_name, non_proxy, stamp_fields, load_script
+from cacheops.utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script
 from cacheops.invalidation import invalidate_obj, invalidate_model
 
 
@@ -34,7 +34,7 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
+def cache_thing(model, cache_key, data, cond_dnfs=[[]], timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
     """
@@ -49,8 +49,7 @@ def cache_thing(model, cache_key, data, cond_dnf=[[]], timeout=None):
         keys=[cache_key],
         args=[
             pickled_data,
-            get_model_name(model),
-            json.dumps(cond_dnf, default=str),
+            json.dumps(cond_dnfs, default=str),
             timeout,
             # Invalidator timeout should be larger than timeout of any key it references
             # So we take timeout from profile which is our upper limit
@@ -239,9 +238,9 @@ class QuerySetMixin(object):
     def _require_cacheprofile(self):
         if self._cacheprofile is None:
             raise ImproperlyConfigured(
-                'Cacheops is not enabled for %s model.\n'
+                'Cacheops is not enabled for %s.%s model.\n'
                 'If you don\'t want to cache anything by default you can "just_enable" it.'
-                    % get_model_name(self.model))
+                    % (self.model._meta.app_label, get_model_name(self.model)))
 
     def _cache_key(self, extra=''):
         """
@@ -263,8 +262,8 @@ class QuerySetMixin(object):
         return 'q:%s' % md5.hexdigest()
 
     def _cache_results(self, cache_key, results, timeout=None):
-        cond_dnf = dnf(self)
-        cache_thing(self.model, cache_key, results, cond_dnf, timeout or self._cacheconf['timeout'])
+        cond_dnfs = dnfs(self)
+        cache_thing(self.model, cache_key, results, cond_dnfs, timeout or self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -507,11 +506,23 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     """
     Invoke invalidation on m2m changes.
     """
-    if action in ('post_add', 'post_remove', 'post_clear'):
-        invalidate_model(sender) # NOTE: this is harsh, but what's the alternative?
-        invalidate_obj(instance)
-        # TODO: more granular invalidation for referenced models
-        invalidate_model(model)
+    # TODO: skip this machinery for explicit through tables
+    # TODO: optimize add and remove by not querying through objects.
+    #       We know all their meaningfull attributes anyway.
+    # TODO: optimize several invalidate objs at once
+    objects = []
+    if action == 'pre_clear':
+        attname = get_model_name(instance)
+        objects = sender.objects.filter(**{attname: instance.pk})
+    elif action in ('post_add', 'pre_remove'):
+        base_ref = get_model_name(instance)
+        item_ref = get_model_name(model) + '__in'
+        objects = sender.objects.filter(**{
+            base_ref: instance.pk,
+            item_ref: pk_set
+        })
+    for obj in objects:
+        invalidate_obj(obj)
 
 
 installed = False

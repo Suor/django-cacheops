@@ -19,7 +19,7 @@ class Category(models.Model):
 
 class Post(models.Model):
     title = models.CharField(max_length=128)
-    category = models.ForeignKey(Category)
+    category = models.ForeignKey(Category, related_name='posts')
     visible = models.BooleanField(default=True)
 
     def __unicode__(self):
