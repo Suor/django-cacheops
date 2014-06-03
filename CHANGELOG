@@ -1,3 +1,5 @@
+- conditions on related models will now invalidate queryset.
+- m2m invalidation is much more granular.
 - lua scripting is used to save and invalidate cache,
   this means Redis 2.6+ is required, it's also faster
 - silent stringify of unknown objects by default
