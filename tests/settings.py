@@ -14,13 +14,11 @@ DATABASE_ENGINE = 'django.db.backends.sqlite3',
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite.db',
-        'TEST_DEPENDENCIES': [], # hope these will make travis.ci with django 1.3 happy
+        'NAME': 'sqlite.db'
     },
     'slave': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite_slave.db',
-        'TEST_DEPENDENCIES': [],
+        'NAME': 'sqlite_slave.db'
     }
 }
 
