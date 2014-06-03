@@ -24,7 +24,7 @@ except ImportError:
 from .funcy import cached_property
 from cacheops.conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
 from cacheops.utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script
-from cacheops.invalidation import invalidate_obj, invalidate_model
+from cacheops.invalidation import invalidate_obj, invalidate_model, invalidate_dict
 
 
 __all__ = ('cached_as', 'install_cacheops')
@@ -509,26 +509,24 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     """
     Invoke invalidation on m2m changes.
     """
-    # TODO: optimize add and remove by not querying through objects.
-    #       We know all their meaningfull attributes anyway.
-    # TODO: optimize several invalidate objs at once
-    objects = []
     # Skip this machinery for explicit through tables,
     # since post_save and post_delete events are triggered for them
     if not sender._meta.auto_created:
         return
+
+    # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
         attname = get_model_name(instance)
         objects = sender.objects.filter(**{attname: instance.pk})
+        for obj in objects:
+            invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
-        base_ref = get_model_name(instance)
-        item_ref = get_model_name(model) + '__in'
-        objects = sender.objects.filter(**{
-            base_ref: instance.pk,
-            item_ref: pk_set
-        })
-    for obj in objects:
-        invalidate_obj(obj)
+        # NOTE: we don't need to query thorugh objects here,
+        #       cause we already know all their meaningfull attributes.
+        base_att = get_model_name(instance) + '_id'
+        item_att = get_model_name(model) + '_id'
+        for pk in pk_set:
+            invalidate_dict(sender, {base_att: instance.pk, item_att: pk})
 
 
 installed = False

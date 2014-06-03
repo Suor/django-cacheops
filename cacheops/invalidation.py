@@ -10,16 +10,19 @@ __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
 
 
 @handle_connection_failure
+def invalidate_dict(model, obj_dict):
+    model = non_proxy(model)
+    load_script('invalidate')(args=[
+        model._meta.db_table,
+        json.dumps(obj_dict, default=str)
+    ])
+
 def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
     """
     model = non_proxy(obj.__class__)
-    data = serialize_object(model, obj)
-    load_script('invalidate')(args=[
-        model._meta.db_table,
-        serialize_object(model, obj)
-    ])
+    invalidate_dict(model, get_obj_dict(model, obj))
 
 @handle_connection_failure
 def invalidate_model(model):
@@ -46,9 +49,8 @@ def serializable_fields(model):
     return tuple(f for f in model._meta.fields
                    if not isinstance(f, NON_SERIALIZABLE_FIELDS))
 
-def serialize_object(model, obj):
-    obj_dict = dict(
+def get_obj_dict(model, obj):
+    return dict(
         (field.attname, field.get_prep_value(getattr(obj, field.attname)))
         for field in serializable_fields(model)
     )
-    return json.dumps(obj_dict, default=str)
