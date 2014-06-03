@@ -509,11 +509,14 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     """
     Invoke invalidation on m2m changes.
     """
-    # TODO: skip this machinery for explicit through tables
     # TODO: optimize add and remove by not querying through objects.
     #       We know all their meaningfull attributes anyway.
     # TODO: optimize several invalidate objs at once
     objects = []
+    # Skip this machinery for explicit through tables,
+    # since post_save and post_delete events are triggered for them
+    if not sender._meta.auto_created:
+        return
     if action == 'pre_clear':
         attname = get_model_name(instance)
         objects = sender.objects.filter(**{attname: instance.pk})
