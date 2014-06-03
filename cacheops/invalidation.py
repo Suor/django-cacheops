@@ -3,7 +3,7 @@ import simplejson as json
 
 from cacheops.conf import redis_client, handle_connection_failure
 from cacheops.funcy import memoize
-from cacheops.utils import get_model_name, non_proxy, load_script, NON_SERIALIZABLE_FIELDS
+from cacheops.utils import non_proxy, load_script, NON_SERIALIZABLE_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
@@ -15,8 +15,9 @@ def invalidate_obj(obj):
     Invalidates caches that can possibly be influenced by object
     """
     model = non_proxy(obj.__class__)
+    data = serialize_object(model, obj)
     load_script('invalidate')(args=[
-        get_model_name(model),
+        model._meta.db_table,
         serialize_object(model, obj)
     ])
 
@@ -28,7 +29,7 @@ def invalidate_model(model):
           which could be relatively slow on large datasets.
     """
     model = non_proxy(model)
-    conjs_keys = redis_client.keys('conj:%s:*' % get_model_name(model))
+    conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))

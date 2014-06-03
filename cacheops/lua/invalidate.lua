@@ -1,16 +1,15 @@
-local model = ARGV[1]
+local db_table = ARGV[1]
 local obj = cjson.decode(ARGV[2])
 
-local schemes = redis.call('smembers', 'schemes:' .. model)
 
--- utility functions
-local conj_cache_key = function (model, scheme, obj)
+-- Utility functions
+local conj_cache_key = function (db_table, scheme, obj)
     local parts = {}
     for field in string.gmatch(scheme, "[^,]+") do
         table.insert(parts, field .. '=' .. tostring(obj[field]))
     end
 
-    return 'conj:' .. model .. ':' .. table.concat(parts, '&')
+    return 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
 end
 
 local call_in_chunks = function (command, args)
@@ -20,13 +19,16 @@ local call_in_chunks = function (command, args)
     end
 end
 
--- calculate conj keys
+
+-- Calculate conj keys
 local conj_keys = {}
+local schemes = redis.call('smembers', 'schemes:' .. db_table)
 for _, scheme in ipairs(schemes) do
-    table.insert(conj_keys, conj_cache_key(model, scheme, obj))
+    table.insert(conj_keys, conj_cache_key(db_table, scheme, obj))
 end
 
--- get cache keys
+
+-- Delete cache keys and refering conj keys
 if next(conj_keys) ~= nil then
     local cache_keys = redis.call('sunion', unpack(conj_keys))
     -- we delete cache keys since they are invalid

@@ -353,7 +353,6 @@ CAVEATS
 
 1. Conditions other than ``__exact`` or ``__in`` don't provide more granularity for
    invalidation.
-2. Conditions on related models don't provide it either.
 3. Update of "selected_related" object does not invalidate cache for queryset.
 4. Mass updates don't trigger invalidation.
 5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
@@ -365,8 +364,8 @@ CAVEATS
 11. Filters on TextFields don't affect invalidation. One should not test on their equality anyway.
 
 Here 1, 3, 5, 10, 11 are part of design compromise, trying to solve them will make
-things complicated and slow. 2 and 7 can be implemented if needed, but it's
-probably counter-productive since one can just break queries into simple ones,
+things complicated and slow. 7 can be implemented if needed, but it's
+probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
 6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that

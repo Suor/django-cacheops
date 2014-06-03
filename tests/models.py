@@ -19,7 +19,7 @@ class Category(models.Model):
 
 class Post(models.Model):
     title = models.CharField(max_length=128)
-    category = models.ForeignKey(Category)
+    category = models.ForeignKey(Category, related_name='posts')
     visible = models.BooleanField(default=True)
 
     def __unicode__(self):
@@ -124,8 +124,8 @@ class Point(models.Model):
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
 
-class MachineBrand(models.Model):
-    labels = models.ManyToManyField(Label)
+class Brand(models.Model):
+    labels = models.ManyToManyField(Label, related_name='brands')
 
 
 # local_get
