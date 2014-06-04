@@ -29,7 +29,6 @@ from cacheops.invalidation import invalidate_obj, invalidate_model, invalidate_d
 
 __all__ = ('cached_as', 'install_cacheops')
 
-_old_objs = {}
 _local_get_cache = {}
 
 
@@ -410,20 +409,33 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
 
+# This will help with thread-safe cacheprofiles installation and _old_objs access
+import threading
+_install_lock = threading.Lock()
+_installed_classes = set()
+_old_objs = {}
+
+def get_thread_id():
+    return threading.current_thread().ident
+
+
 class ManagerMixin(object):
     def _install_cacheops(self, cls):
-        cls._cacheprofile = model_profile(cls)
-        if cls._cacheprofile is not None and cls not in _old_objs:
-            # Set up signals
-            pre_save.connect(self._pre_save, sender=cls)
-            post_save.connect(self._post_save, sender=cls)
-            post_delete.connect(self._post_delete, sender=cls)
-            _old_objs[cls] = {}
+        with _install_lock:
+            if cls not in _installed_classes:
+                _installed_classes.add(cls)
 
-            # Install auto-created models as their module attributes to make them picklable
-            module = sys.modules[cls.__module__]
-            if not hasattr(module, cls.__name__):
-                setattr(module, cls.__name__, cls)
+                cls._cacheprofile = model_profile(cls)
+                if cls._cacheprofile is not None:
+                    # Set up signals
+                    pre_save.connect(self._pre_save, sender=cls)
+                    post_save.connect(self._post_save, sender=cls)
+                    post_delete.connect(self._post_delete, sender=cls)
+
+                    # Install auto-created models as their module attributes to make them picklable
+                    module = sys.modules[cls.__module__]
+                    if not hasattr(module, cls.__name__):
+                        setattr(module, cls.__name__, cls)
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
@@ -432,15 +444,13 @@ class ManagerMixin(object):
     def _pre_save(self, sender, instance, **kwargs):
         if instance.pk is not None:
             try:
-                _old_objs[sender][instance.pk] = sender.objects.get(pk=instance.pk)
+                _old_objs[get_thread_id(), sender, instance.pk] = sender.objects.get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
     def _post_save(self, sender, instance, **kwargs):
-        """
-        Invokes invalidations for both old and new versions of saved object
-        """
-        old = _old_objs[sender].pop(instance.pk, None)
+        # Invoke invalidations for both old and new versions of saved object
+        old = _old_objs.pop((get_thread_id(), sender, instance.pk), None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
