@@ -18,7 +18,7 @@ setup(
         'cacheops.templatetags'
     ],
     install_requires=[
-        'django>=1.2',
+        'django>=1.3',
         'redis>=2.9.1',
         'simplejson>=2.2.0',
         'six>=1.4.0',
