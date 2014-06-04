@@ -1,12 +1,10 @@
-- conditions on related models will now invalidate queryset.
-- m2m invalidation is much more granular.
-- lua scripting is used to save and invalidate cache,
-  this means Redis 2.6+ is required, it's also faster
+- conditions on related models will now invalidate queryset
+- m2m invalidation is much more granular
+- lua scripting is used to save and invalidate cache, making things faster
+- better invalidation for complex and custom fields
 - silent stringify of unknown objects by default
 - support caching django.contrib.gis queries (koodjo)
-- better invalidation for complex and custom fields.
-  It won't always work previously if get_prep_value() is different from stringification.
-- cacheops is now thread-safe.
+- cacheops is now thread-safe
 - added a way to no-op cacheops
 - fixed working with querysets created by non-patched constructor (#3 and dups)
 - fixed invalidate_model() for proxy models
@@ -15,6 +13,7 @@
 Backwards incompatible changes:
 - filters on TextFields no longer affect invalidation.
 - Django 1.2 no longer supported
+- Redis 2.6+ is required
 
 1.3.1
 - fixed bug with negating "some"-conditions
