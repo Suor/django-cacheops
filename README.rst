@@ -416,7 +416,6 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
-- better invalidate_model()
 - add local cache (cleared at the and of request?)
 - support transactions
 - a way to turn off or postpone invalidation
