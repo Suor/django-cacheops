@@ -22,9 +22,10 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .funcy import cached_property
-from cacheops.conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
-from cacheops.utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script
-from cacheops.invalidation import invalidate_obj, invalidate_model, invalidate_dict
+from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
+from .utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script, \
+                   func_cache_key
+from .invalidation import invalidate_obj, invalidate_model, invalidate_dict
 
 
 __all__ = ('cached_as', 'install_cacheops')
@@ -80,16 +81,12 @@ def cached_as(sample, extra=None, timeout=None):
         raise NotImplementedError('timeout override should be smaller than default')
 
     def decorator(func):
-        if extra:
-            key_extra = extra
-        else:
-            key_extra = '%s.%s' % (func.__module__, func.__name__)
-        cache_key = queryset._cache_key(extra=key_extra)
+        key_extra = queryset._cache_key(extra=extra)
 
         @wraps(func)
-        def wrapper(*args):
-            # NOTE: These args must not effect function result.
-            #       I'm keeping them to cache view functions.
+        def wrapper(*args, **kwargs):
+            cache_key = 's:' + func_cache_key(func, args, kwargs, key_extra)
+
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
                 return pickle.loads(cache_data)
@@ -371,7 +368,7 @@ class QuerySetMixin(object):
             # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
             if self._result_cache is not None and not getattr(self, '_iter', None):
                 return len(self._result_cache)
-            return cached_as(self, extra='count')(self._no_monkey.count)(self)
+            return cached_as(self, extra='count')(lambda: self._no_monkey.count(self))()
         else:
             return self._no_monkey.count(self)
 

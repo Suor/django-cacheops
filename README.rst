@@ -147,9 +147,8 @@ or deletion:
 Note that we are using list on both querysets here, it's because we don't want
 to cache queryset objects but their results.
 
-Also note that cache key does not depend on arguments of a function, so it's result
-should not, either. This is done to enable caching of view functions. Instead
-you should use a local function:
+Also note that if you want to filter queryset based on arguments,
+e.g. to make invalidation more granular, you can use a local function:
 
 .. code:: python
 
@@ -168,10 +167,8 @@ you should use a local function:
         return _articles_block()
 
 
-Using local function gives additional advantage: we can filter queryset used
-in ``@cached_as()`` to make invalidation more granular. We also add an
-``extra`` to make different keys for calls with same ``category`` but different
-``count``.
+We can also add an ``extra`` to make different keys for calls with same ``category`` but different
+``count``. Cache key will also depend on function arguments.
 
 
 Invalidation

@@ -14,6 +14,7 @@ except ImportError:
     filter = lambda f, seq: list(ifilter(f, seq))
     from functools import reduce
 import six
+from .cross import json
 from cacheops import cross
 from cacheops.conf import redis_client
 from cacheops.funcy import memoize
@@ -213,6 +214,15 @@ def stamp_fields(model):
     """
     stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
     return cross.md5(stamp).hexdigest()
+
+
+def func_cache_key(func, args, kwargs, extra=None):
+    """
+    Calculate cache key based on func and arguments
+    """
+    factors = [func.__module__, func.__name__, args, sorted(kwargs.items()), extra]
+    js = json.dumps(factors, sort_keys=True, default=str)
+    return cross.md5(js).hexdigest()
 
 
 ### Lua script loader

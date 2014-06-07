@@ -10,6 +10,7 @@ from django.conf import settings
 
 from cacheops import cross
 from cacheops.conf import redis_client, handle_connection_failure
+from .utils import func_cache_key
 
 
 __all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
@@ -28,26 +29,9 @@ class BaseCache(object):
         A decorator for caching function calls
         """
         def decorator(func):
-            def get_cache_key(*args, **kwargs):
-                # Calculating cache key based on func and arguments
-                md5 = cross.md5()
-                md5.update('%s.%s' % (func.__module__, func.__name__))
-                # TODO: make it more civilized
-                if extra is not None:
-                    if isinstance(extra, (list, tuple)):
-                        md5.update(':'.join(map(str, extra)))
-                    else:
-                        md5.update(str(extra))
-                if args:
-                    md5.update(repr(args))
-                if kwargs:
-                    md5.update(repr(sorted(kwargs.items())))
-
-                return 'c:%s' % md5.hexdigest()
-
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cache_key = get_cache_key(*args, **kwargs)
+                cache_key = 'c:' + func_cache_key(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -57,7 +41,7 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = get_cache_key(*args, **kwargs)
+                cache_key = 'c:' + func_cache_key(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
