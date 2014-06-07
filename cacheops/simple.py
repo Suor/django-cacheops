@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-from functools import wraps
 import os, time
+from functools import wraps
+from .cross import pickle, md5hex
 
 from django.conf import settings
 
-from cacheops import cross
-from cacheops.conf import redis_client, handle_connection_failure
+from .conf import redis_client, handle_connection_failure
 from .utils import func_cache_key
 
 
@@ -92,7 +88,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = cross.md5(key).hexdigest()
+        digest = md5hex(key)
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

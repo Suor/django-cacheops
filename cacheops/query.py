@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
 from functools import wraps
-
-from cacheops import cross
-from cacheops.cross import json
+from .cross import pickle, json, md5
 
 import django
 from django.core.exceptions import ImproperlyConfigured
@@ -15,7 +9,6 @@ from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
-
 try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
@@ -243,20 +236,20 @@ class QuerySetMixin(object):
         """
         Compute a cache key for this queryset
         """
-        md5 = cross.md5()
-        md5.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
-        md5.update(stamp_fields(self.model)) # Protect from field list changes in model
-        md5.update(stringify_query(self.query))
+        md = md5()
+        md.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
+        md.update(stamp_fields(self.model)) # Protect from field list changes in model
+        md.update(stringify_query(self.query))
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
-            md5.update(self.db)
+            md.update(self.db)
         if extra:
-            md5.update(str(extra))
+            md.update(str(extra))
         # 'flat' attribute changes results formatting for ValuesQuerySet
         if hasattr(self, 'flat'):
-            md5.update(str(self.flat))
+            md.update(str(self.flat))
 
-        return 'q:%s' % md5.hexdigest()
+        return 'q:%s' % md.hexdigest()
 
     def _cache_results(self, cache_key, results, timeout=None):
         cond_dnfs = dnfs(self)

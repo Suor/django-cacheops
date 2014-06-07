@@ -3,6 +3,8 @@ from __future__ import absolute_import
 from operator import concat
 from itertools import product
 import inspect
+import six
+from .cross import json, md5hex
 
 try:
     import __builtin__ as builtins
@@ -19,12 +21,6 @@ except ImportError:
     filter = lambda f, seq: list(ifilter(f, seq))
     from functools import reduce
 
-import six
-from .cross import json
-from cacheops import cross
-from cacheops.conf import redis_client
-from cacheops.funcy import memoize
-
 import django
 from django.db import models
 from django.db.models.query import QuerySet
@@ -38,6 +34,9 @@ try:
 except ImportError:
     class SubqueryConstraint(object):
         pass
+
+from .conf import redis_client
+from .funcy import memoize
 
 
 LONG_DISJUNCTION = 8
@@ -219,7 +218,7 @@ def stamp_fields(model):
     Returns serialized description of model fields.
     """
     stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
-    return cross.md5(stamp).hexdigest()
+    return md5hex(stamp)
 
 
 def func_cache_key(func, args, kwargs, extra=None):
@@ -227,8 +226,7 @@ def func_cache_key(func, args, kwargs, extra=None):
     Calculate cache key based on func and arguments
     """
     factors = [func.__module__, func.__name__, args, sorted(kwargs.items()), extra]
-    js = json.dumps(factors, sort_keys=True, default=str)
-    return cross.md5(js).hexdigest()
+    return md5hex(json.dumps(factors, sort_keys=True, default=str))
 
 
 ### Lua script loader

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-import simplejson as json
+from .cross import json
 
-from cacheops.conf import redis_client, handle_connection_failure
-from cacheops.funcy import memoize
-from cacheops.utils import non_proxy, load_script, NON_SERIALIZABLE_FIELDS
+from .funcy import memoize
+from .conf import redis_client, handle_connection_failure
+from .utils import non_proxy, load_script, NON_SERIALIZABLE_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
