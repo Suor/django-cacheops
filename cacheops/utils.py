@@ -5,14 +5,20 @@ from itertools import product
 import inspect
 
 try:
+    import __builtin__ as builtins
+except ImportError:
+    import builtins
+
+try:
     from itertools import imap
 except ImportError:
     # Use Python 2 map/filter here for now
-    imap = map
+    imap = builtins.map
     map = lambda f, seq: list(imap(f, seq))
-    ifilter = filter
+    ifilter = builtins.filter
     filter = lambda f, seq: list(ifilter(f, seq))
     from functools import reduce
+
 import six
 from .cross import json
 from cacheops import cross
