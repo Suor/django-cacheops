@@ -1,25 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
 from operator import concat
 from itertools import product
+from functools import reduce
 import inspect
 import six
+# Use Python 2 map here for now
+from funcy.py2 import memoize, map, cat
 from .cross import json, md5hex
-
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
-
-try:
-    from itertools import imap
-except ImportError:
-    # Use Python 2 map/filter here for now
-    imap = builtins.map
-    map = lambda f, seq: list(imap(f, seq))
-    ifilter = builtins.filter
-    filter = lambda f, seq: list(ifilter(f, seq))
-    from functools import reduce
 
 import django
 from django.db import models
@@ -36,7 +23,6 @@ except ImportError:
         pass
 
 from .conf import redis_client
-from .funcy import memoize
 
 
 LONG_DISJUNCTION = 8
@@ -60,10 +46,9 @@ else:
 
 class MonkeyProxy(object):
     def __init__(self, cls):
-        monkey_bases = tuple(b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey'))
+        monkey_bases = [b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey')]
         for monkey_base in monkey_bases:
-            for name, value in monkey_base.__dict__.items():
-                setattr(self, name, value)
+            self.__dict__.update(monkey_base.__dict__)
 
 
 def monkey_mix(cls, mixin, methods=None):
@@ -162,10 +147,10 @@ def dnfs(qs):
             else:
                 # Just unite children joined with OR
                 if where.connector == OR:
-                    result = reduce(concat, chilren_dnfs)
+                    result = cat(chilren_dnfs)
                 # Use Cartesian product to AND children
                 else:
-                    result = [reduce(concat, p) for p in product(*chilren_dnfs)]
+                    result = map(cat, product(*chilren_dnfs))
 
             # Negating and expanding brackets
             if where.negated:

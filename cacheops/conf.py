@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
-from functools import wraps
 import warnings
 import redis
+from funcy import memoize, decorator, identity
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .funcy import memoize
 
 
 profile_defaults = {
@@ -28,18 +27,17 @@ for key in profiles:
 STRICT_STRINGIFY = getattr(settings, 'CACHEOPS_STRICT_STRINGIFY', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
-def handle_connection_failure(func):
-    if not DEGRADE_ON_FAILURE:
-        return func
 
-    @wraps(func)
-    def _inner(*args, **kwargs):
+# Support DEGRADE_ON_FAILURE
+if DEGRADE_ON_FAILURE:
+    @decorator
+    def handle_connection_failure(call):
         try:
-            return func(*args, **kwargs)
+            return call()
         except redis.ConnectionError as e:
             warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
-
-    return _inner
+else:
+    handle_connection_failure = identity
 
 class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)

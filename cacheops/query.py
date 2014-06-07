@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
+from funcy import cached_property, project
 from .cross import pickle, json, md5
 
 import django
@@ -14,7 +15,6 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .funcy import cached_property
 from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
 from .utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script, \
                    func_cache_key
@@ -456,9 +456,9 @@ class ManagerMixin(object):
             #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
             # Stripping up undesirable attributes
-            unwanted_attrs = [k for k in instance.__dict__.keys()
+            unwanted_attrs = [k for k in instance.__dict__
                                 if k.startswith('_') and k.endswith('_cache')]
-            unwanted_dict = dict((k, instance.__dict__[k]) for k in unwanted_attrs)
+            unwanted_dict = project(instance.__dict__, unwanted_attrs)
             for k in unwanted_attrs:
                 del instance.__dict__[k]
 

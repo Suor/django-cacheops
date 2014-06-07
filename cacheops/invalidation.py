@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+from funcy import memoize
 from .cross import json
 
-from .funcy import memoize
 from .conf import redis_client, handle_connection_failure
 from .utils import non_proxy, load_script, NON_SERIALIZABLE_FIELDS
 
