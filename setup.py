@@ -7,7 +7,7 @@ setup(
     author_email='suor.web@gmail.com',
 
     description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
-    long_description=open('README.rst').read(),
+    long_description=open('README.rst').read().replace('|Build Status|', '', 1),
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 
