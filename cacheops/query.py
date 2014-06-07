@@ -50,7 +50,7 @@ def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
     )
 
 
-def cached_as(sample, extra=None, timeout=None):
+def cached_as(sample, timeout=None, extra=None):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.

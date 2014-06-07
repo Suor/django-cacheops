@@ -11,8 +11,10 @@
 - fixed deepcopy(queryset) bug
 - fixed StringifyError on timedelta (mpyatishev)
 Backwards incompatible changes:
-- @cached_as() cache key will now depend on function arguments
 - filters on TextFields no longer affect invalidation
+- @cached_as() cache key will now depend on function arguments
+- @cached_as() and @cached() will now take timeout as first argument and extra as second.
+  Anyway using them as keyword arguments is recommended
 - Django 1.2 no longer supported
 - Redis 2.6+ is required
 

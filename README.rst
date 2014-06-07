@@ -168,7 +168,8 @@ e.g. to make invalidation more granular, you can use a local function:
 
 
 We can also add an ``extra`` to make different keys for calls with same ``category`` but different
-``count``. Cache key will also depend on function arguments.
+``count``. Cache key will also depend on function arguments. You can also override cache timeout
+with ``timeout`` argument.
 
 
 Invalidation

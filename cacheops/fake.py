@@ -4,7 +4,7 @@ from django.db.models.query import QuerySet
 
 
 # query
-def cached_as(sample, extra=None, timeout=None):
+def cached_as(sample, timeout=None, extra=None):
     return lambda func: func
 
 def install_cacheops():

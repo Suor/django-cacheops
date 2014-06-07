@@ -20,7 +20,7 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, extra=None, timeout=None):
+    def cached(self, timeout=None, extra=None):
         """
         A decorator for caching function calls
         """
