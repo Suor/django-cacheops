@@ -34,17 +34,15 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(model, cache_key, data, cond_dnfs=[[]], timeout=None):
+def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
     """
     Writes data to cache and creates appropriate invalidators.
     """
     model = non_proxy(model)
-
-    if timeout is None:
-        profile = model_profile(model)
-        timeout = profile['timeout']
-
     pickled_data = pickle.dumps(data, -1)
+    if timeout is None:
+        timeout = model._cacheprofile['timeout']
+
     load_script('cache_thing')(
         keys=[cache_key],
         args=[
