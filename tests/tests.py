@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from django.template import Context, Template
 
-from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached, cached_as
 from .models import *
 
 
@@ -120,6 +120,52 @@ class BasicTests(BaseTestCase):
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
+
+
+class DecoratorTests(BaseTestCase):
+    def _make_func(self, deco):
+        calls = [0]
+
+        @deco
+        def get_calls(n=None):
+            calls[0] += 1
+            return calls[0]
+
+        return get_calls
+
+    def test_cached_as_model(self):
+        get_calls = self._make_func(cached_as(Category))
+
+        self.assertEqual(get_calls(), 1)      # miss
+        self.assertEqual(get_calls(), 1)      # hit
+        Category.objects.create(title='test') # invalidate
+        self.assertEqual(get_calls(), 2)      # miss
+
+    def test_cached_as_cond(self):
+        get_calls = self._make_func(cached_as(Category.objects.filter(title='test')))
+
+        self.assertEqual(get_calls(), 1)      # cache
+        Category.objects.create(title='miss') # don't invalidate
+        self.assertEqual(get_calls(), 1)      # hit
+        Category.objects.create(title='test') # invalidate
+        self.assertEqual(get_calls(), 2)      # miss
+
+    def test_cached_as_obj(self):
+        c = Category.objects.create(title='test')
+        get_calls = self._make_func(cached_as(c))
+
+        self.assertEqual(get_calls(), 1)      # cache
+        Category.objects.create(title='miss') # don't invalidate
+        self.assertEqual(get_calls(), 1)      # hit
+        c.title = 'new'; c.save()             # invalidate
+        self.assertEqual(get_calls(), 2)      # miss
+
+    def test_cached_as_depends_on_args(self):
+        get_calls = self._make_func(cached_as(Category))
+
+        self.assertEqual(get_calls(1), 1)      # cache
+        self.assertEqual(get_calls(1), 1)      # hit
+        self.assertEqual(get_calls(2), 2)      # miss
 
 
 from datetime import date, datetime, time
