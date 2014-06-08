@@ -6,10 +6,10 @@ from .cross import pickle, md5hex
 from django.conf import settings
 
 from .conf import redis_client, handle_connection_failure
-from .utils import func_cache_key
+from .utils import func_cache_key, cached_view_fab
 
 
-__all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
+__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss')
 
 
 class CacheMiss(Exception):
@@ -20,14 +20,14 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, timeout=None, extra=None):
+    def _cached(self, timeout=None, extra=None, _get_key=None):
         """
         A decorator for caching function calls
         """
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cache_key = 'c:' + func_cache_key(func, args, kwargs, extra)
+                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -37,12 +37,18 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + func_cache_key(func, args, kwargs, extra)
+                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
             return wrapper
         return decorator
+
+    def cached(self, timeout=None, extra=None):
+        return self._cached(timeout, extra, _get_key=func_cache_key)
+
+    def cached_view(self, timeout=None, extra=None):
+        return cached_view_fab(self._cached)(timeout, extra)
 
 
 class RedisCache(BaseCache):
@@ -69,6 +75,7 @@ class RedisCache(BaseCache):
 
 cache = RedisCache(redis_client)
 cached = cache.cached
+cached_view = cache.cached_view
 
 
 FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')

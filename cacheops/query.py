@@ -17,11 +17,11 @@ except ImportError:
 
 from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
 from .utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script, \
-                   func_cache_key
+                   func_cache_key, cached_view_fab
 from .invalidation import invalidate_obj, invalidate_model, invalidate_dict
 
 
-__all__ = ('cached_as', 'install_cacheops')
+__all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
 
@@ -50,7 +50,7 @@ def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
     )
 
 
-def cached_as(sample, timeout=None, extra=None):
+def _cached_as(sample, timeout=None, extra=None, _get_key=None):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
@@ -76,7 +76,7 @@ def cached_as(sample, timeout=None, extra=None):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = 's:' + func_cache_key(func, args, kwargs, key_extra)
+            cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -88,6 +88,13 @@ def cached_as(sample, timeout=None, extra=None):
 
         return wrapper
     return decorator
+
+def cached_as(sample, timeout=None, extra=None):
+    return _cached_as(sample, timeout, extra, _get_key=func_cache_key)
+
+def cached_view_as(sample, timeout=None, extra=None):
+    return cached_view_fab(_cached_as)(sample, timeout, extra)
+
 
 
 def _stringify_query():

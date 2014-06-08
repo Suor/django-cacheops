@@ -6,10 +6,12 @@ except ImportError:
 
 import django
 from django.test import TestCase
+from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
 
-from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached, cached_as
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
+                     cached, cached_as, cached_view_as
 from .models import *
 
 
@@ -127,7 +129,7 @@ class DecoratorTests(BaseTestCase):
         calls = [0]
 
         @deco
-        def get_calls(n=None):
+        def get_calls(r=None):
             calls[0] += 1
             return calls[0]
 
@@ -166,6 +168,20 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(1), 1)      # cache
         self.assertEqual(get_calls(1), 1)      # hit
         self.assertEqual(get_calls(2), 2)      # miss
+
+    def test_cached_view_as(self):
+        get_calls = self._make_func(cached_view_as(Category))
+
+        factory = RequestFactory()
+        r1 = factory.get('/hi')
+        r2 = factory.get('/hi')
+        r2.META['REMOTE_ADDR'] = '10.10.10.10'
+        r3 = factory.get('/bye')
+
+        self.assertEqual(get_calls(r1), 1) # cache
+        self.assertEqual(get_calls(r1), 1) # hit
+        self.assertEqual(get_calls(r2), 1) # hit, since only url is considered
+        self.assertEqual(get_calls(r3), 2) # miss
 
 
 from datetime import date, datetime, time

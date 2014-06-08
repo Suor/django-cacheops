@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from operator import concat
 from itertools import product
-from functools import reduce
+from functools import wraps, reduce
 import inspect
 import six
 # Use Python 2 map here for now
@@ -21,6 +21,7 @@ try:
 except ImportError:
     class SubqueryConstraint(object):
         pass
+from django.http import HttpRequest
 
 from .conf import redis_client
 
@@ -206,12 +207,40 @@ def stamp_fields(model):
     return md5hex(stamp)
 
 
+### Cache keys calculation
+
 def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
     """
     factors = [func.__module__, func.__name__, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=str))
+
+def view_cache_key(func, args, kwargs, extra=None):
+    """
+    Calculate cache key for view func.
+    Use url instead of not properly serializable request argument.
+    """
+    uri = args[0].build_absolute_uri()
+    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+
+def cached_view_fab(_cached):
+    def cached_view(*dargs, **dkwargs):
+        def decorator(func):
+            dkwargs['_get_key'] = view_cache_key
+            cached_func = _cached(*dargs, **dkwargs)(func)
+
+            @wraps(func)
+            def wrapper(request, *args, **kwargs):
+                assert isinstance(request, HttpRequest),                            \
+                       "A view should be passed with HttpRequest as first argument"
+                if request.method not in ('GET', 'HEAD'):
+                    return func(request, *args, **kwargs)
+
+                return cached_func(request, *args, **kwargs)
+            return wrapper
+        return decorator
+    return cached_view
 
 
 ### Lua script loader
