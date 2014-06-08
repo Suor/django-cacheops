@@ -210,7 +210,7 @@ def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
     """
-    factors = [func.__module__, func.__name__, args, sorted(kwargs.items()), extra]
+    factors = [func.__module__, func.__name__, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=str))
 
 
