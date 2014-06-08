@@ -9,6 +9,7 @@
 - fixed working with querysets created by non-patched constructor (#3 and dups)
 - fixed invalidate_model() for proxy models
 - fixed deepcopy(queryset) bug
+- fixed possible collisions when cached functions passed complex structured arguments
 - fixed StringifyError on timedelta (mpyatishev)
 Backwards incompatible changes:
 - filters on TextFields no longer affect invalidation
