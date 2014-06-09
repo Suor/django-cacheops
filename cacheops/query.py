@@ -50,7 +50,7 @@ def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
     )
 
 
-def _cached_as(sample, timeout=None, extra=None, _get_key=None):
+def _cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
@@ -58,6 +58,11 @@ def _cached_as(sample, timeout=None, extra=None, _get_key=None):
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
     # TODO: think of better way doing this.
+    sample = samples[0]
+    timeout = kwargs.get('timeout')
+    extra = kwargs.get('extra')
+    _get_key =  kwargs.get('_get_key')
+
     if isinstance(sample, (list, tuple)):
         return lambda func: func
     elif isinstance(sample, Model):
@@ -89,12 +94,14 @@ def _cached_as(sample, timeout=None, extra=None, _get_key=None):
         return wrapper
     return decorator
 
-def cached_as(sample, timeout=None, extra=None):
-    return _cached_as(sample, timeout, extra, _get_key=func_cache_key)
 
-def cached_view_as(sample, timeout=None, extra=None):
-    return cached_view_fab(_cached_as)(sample, timeout, extra)
+def cached_as(*samples, **kwargs):
+    kwargs["_get_key"] = func_cache_key
+    return _cached_as(*samples, **kwargs)
 
+
+def cached_view_as(*samples, **kwargs):
+    return cached_view_fab(_cached_as)(*samples, **kwargs)
 
 
 def _stringify_query():
