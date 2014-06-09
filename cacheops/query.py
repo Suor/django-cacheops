@@ -80,6 +80,7 @@ def _cached_as(*samples, **kwargs):
         return queryset
 
     querysets = list(map(_get_queryset, samples))
+    cond_dnfs = list(cat(map(dnfs, querysets)))
 
     def decorator(func):
         @wraps(func)
@@ -95,7 +96,6 @@ def _cached_as(*samples, **kwargs):
 
             result = func(*args)
 
-            cond_dnfs = list(cat(map(dnfs, querysets)))
             cache_thing(querysets[0].model, cache_key, result, cond_dnfs)
 
             return result
