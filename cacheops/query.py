@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
-from funcy import cached_property, project
+from funcy import cached_property, project, cat
 from .cross import pickle, json, md5
 
 import django
@@ -55,32 +55,38 @@ def _cached_as(*samples, **kwargs):
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
-    # If we unexpectedly get list instead of queryset return identity decorator.
-    # Paginator could do this when page.object_list is empty.
-    # TODO: think of better way doing this.
-    sample = samples[0]
+
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
     _get_key =  kwargs.get('_get_key')
 
-    if isinstance(sample, (list, tuple)):
-        return lambda func: func
-    elif isinstance(sample, Model):
-        queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
-    elif isinstance(sample, type) and issubclass(sample, Model):
-        queryset = sample.objects.all()
-    else:
-        queryset = sample
+    def _get_queryset(sample):
+        # If we unexpectedly get list instead of queryset return identity decorator.
+        # Paginator could do this when page.object_list is empty.
+        # TODO: think of better way doing this.
+        if isinstance(sample, (list, tuple)):
+            return lambda func: func
+        elif isinstance(sample, Model):
+            queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+        elif isinstance(sample, type) and issubclass(sample, Model):
+            queryset = sample.objects.all()
+        else:
+            queryset = sample
 
-    queryset._require_cacheprofile()
-    if timeout and timeout > queryset._cacheprofile['timeout']:
-        raise NotImplementedError('timeout override should be smaller than default')
+        queryset._require_cacheprofile()
+        if timeout and timeout > queryset._cacheprofile['timeout']:
+            raise NotImplementedError('timeout override should be smaller than default')
+
+        return queryset
+
+    querysets = list(map(_get_queryset, samples))
 
     def decorator(func):
-        key_extra = queryset._cache_key(extra=extra)
-
         @wraps(func)
         def wrapper(*args, **kwargs):
+            key_extra = [qs._cache_key(extra=extra) for qs in querysets]
+            key_extra.append(extra)
+
             cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
@@ -88,7 +94,10 @@ def _cached_as(*samples, **kwargs):
                 return pickle.loads(cache_data)
 
             result = func(*args)
-            queryset._cache_results(cache_key, result, timeout)
+
+            cond_dnfs = list(cat(map(dnfs, querysets)))
+            cache_thing(querysets[0].model, cache_key, result, cond_dnfs)
+
             return result
 
         return wrapper
