@@ -50,50 +50,71 @@ def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
     )
 
 
-def _cached_as(sample, timeout=None, extra=None, _get_key=None):
+def _cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
+    timeout = kwargs.get('timeout')
+    extra = kwargs.get('extra')
+    _get_key =  kwargs.get('_get_key')
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
     # TODO: think of better way doing this.
-    if isinstance(sample, (list, tuple)):
+    if any(map(lambda sample: isinstance(sample, (list, tuple)),
+               samples)):
         return lambda func: func
-    elif isinstance(sample, Model):
-        queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
-    elif isinstance(sample, type) and issubclass(sample, Model):
-        queryset = sample.objects.all()
-    else:
-        queryset = sample
 
-    queryset._require_cacheprofile()
-    if timeout and timeout > queryset._cacheprofile['timeout']:
-        raise NotImplementedError('timeout override should be smaller than default')
+    def _to_queryset(sample):
+        if isinstance(sample, Model):
+            queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+        elif isinstance(sample, type) and issubclass(sample, Model):
+            queryset = sample.objects.all()
+        else:
+            queryset = sample
+
+        queryset._require_cacheprofile()
+
+        if timeout and timeout > queryset._cacheprofile['timeout']:
+            raise NotImplementedError('timeout override should be smaller than default')
+
+        return queryset
+
+    querysets = map(_to_queryset, samples)
 
     def decorator(func):
-        key_extra = queryset._cache_key(extra=extra)
+        keys_extra = map(lambda queryset: queryset._cache_key(extra=extra),
+                         querysets)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
+            cache_keys = map(lambda key_extra: 'as:' + _get_key(func, args, kwargs, key_extra),
+                             keys_extra)
 
-            cache_data = redis_client.get(cache_key)
-            if cache_data is not None:
-                return pickle.loads(cache_data)
+            cache_datas = map(lambda cache_key: redis_client.get(cache_key),
+                              cache_keys)
+
+            if all(map(lambda cache_data: cache_data is not None,
+                       cache_datas)):
+                return pickle.loads(cache_datas[0])
 
             result = func(*args)
-            queryset._cache_results(cache_key, result, timeout)
+            map(lambda (queryset, cache_key): queryset._cache_results(cache_key, result, timeout),
+                zip(querysets, cache_keys))
             return result
 
         return wrapper
     return decorator
 
-def cached_as(sample, timeout=None, extra=None):
-    return _cached_as(sample, timeout, extra, _get_key=func_cache_key)
+def cached_as(*samples, **kwargs):
+    timeout = kwargs.get('timeout')
+    extra = kwargs.get('extra')
+    return _cached_as(*samples, timeout=timeout, extra=extra, _get_key=func_cache_key)
 
-def cached_view_as(sample, timeout=None, extra=None):
-    return cached_view_fab(_cached_as)(sample, timeout, extra)
+def cached_view_as(*samples, **kwargs):
+    timeout = kwargs.get('timeout')
+    extra = kwargs.get('extra')
+    return cached_view_fab(_cached_as)(*samples, timeout=timeout, extra=extra)
 
 
 
