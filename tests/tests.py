@@ -181,7 +181,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(1), 2)      # hit
         p.title = 'new title'; p.save()        # invalidate by Post
         self.assertEqual(get_calls(1), 3)      # miss and cache
-        self.assertEqual(get_calls(1), 3)      # miss and cache
+        self.assertEqual(get_calls(1), 3)      # hit
 
     def test_cached_view_as(self):
         get_calls = self._make_func(cached_view_as(Category))
