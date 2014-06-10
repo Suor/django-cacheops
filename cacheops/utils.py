@@ -24,6 +24,10 @@ except ImportError:
 from django.http import HttpRequest
 
 from .conf import redis_client
+try:
+    from bitfield.types import Bit
+except ImportError:
+    Bit = None
 
 
 LONG_DISJUNCTION = 8
@@ -117,7 +121,12 @@ def dnfs(qs):
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             attname = attname_of(model, constraint.col)
-            if isinstance(value, (QuerySet, Query, SQLEvaluator)):
+
+            value_types_to_skip = (QuerySet, Query, SQLEvaluator)
+            if Bit:
+                value_types_to_skip += (Bit,)
+
+            if isinstance(value, value_types_to_skip):
                 return [[SOME_COND]]
             elif lookup == 'exact':
                 if isinstance(constraint.field, NON_SERIALIZABLE_FIELDS):
