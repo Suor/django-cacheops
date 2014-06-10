@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
-from funcy import cached_property, project, cat
+from funcy import cached_property, project
+from funcy.py2 import cat, map
 from .cross import pickle, json, md5
 
 import django
@@ -60,13 +61,15 @@ def _cached_as(*samples, **kwargs):
     extra = kwargs.get('extra')
     _get_key =  kwargs.get('_get_key')
 
+    # If we unexpectedly get list instead of queryset return identity decorator.
+    # Paginator could do this when page.object_list is empty.
+    # TODO: think of better way doing this.
+    if len(samples) == 1 and isinstance(samples[0], list):
+        return lambda func: func
+
+
     def _get_queryset(sample):
-        # If we unexpectedly get list instead of queryset return identity decorator.
-        # Paginator could do this when page.object_list is empty.
-        # TODO: think of better way doing this.
-        if isinstance(sample, (list, tuple)):
-            return lambda func: func
-        elif isinstance(sample, Model):
+        if isinstance(sample, Model):
             queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
         elif isinstance(sample, type) and issubclass(sample, Model):
             queryset = sample.objects.all()
@@ -79,15 +82,15 @@ def _cached_as(*samples, **kwargs):
 
         return queryset
 
-    querysets = list(map(_get_queryset, samples))
-    cond_dnfs = list(cat(map(dnfs, querysets)))
+    querysets = map(_get_queryset, samples)
+    cond_dnfs = cat(map(dnfs, querysets))
+    key_extra = [qs._cache_key() for qs in querysets]
+    key_extra.append(extra)
 
     def decorator(func):
+
         @wraps(func)
         def wrapper(*args, **kwargs):
-            key_extra = [qs._cache_key(extra=extra) for qs in querysets]
-            key_extra.append(extra)
-
             cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
