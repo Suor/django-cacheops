@@ -8,6 +8,7 @@
 - cacheops is now thread-safe
 - added a way to no-op cacheops
 - added @cached_view() and @cached_view_as()
+- pass several samples for @cached_as() and @cached_view_as()
 - fixed working with querysets created by non-patched constructor (#3 and dups)
 - fixed invalidate_model() for proxy models
 - fixed deepcopy(queryset) bug
