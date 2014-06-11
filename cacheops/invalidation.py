@@ -3,7 +3,7 @@ from funcy import memoize
 from .cross import json
 
 from .conf import redis_client, handle_connection_failure
-from .utils import non_proxy, load_script, NON_SERIALIZABLE_FIELDS
+from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
@@ -47,7 +47,7 @@ def invalidate_all():
 @memoize
 def serializable_fields(model):
     return tuple(f for f in model._meta.fields
-                   if not isinstance(f, NON_SERIALIZABLE_FIELDS))
+                   if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
 def get_obj_dict(model, obj):
     return dict(

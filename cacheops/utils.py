@@ -82,12 +82,14 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, six.get_unbound_function(method))
 
 
-NON_SERIALIZABLE_FIELDS = (
+# NOTE: we don't serialize this fields since their values could be very long
+#       and one should not filter by their equality anyway.
+NOT_SERIALIZED_FIELDS = (
     models.FileField,
     models.TextField, # One should not filter by long text equality
 )
 if hasattr(models, 'BinaryField'):
-    NON_SERIALIZABLE_FIELDS += (models.BinaryField,) # Not possible to filter by it
+    NOT_SERIALIZED_FIELDS += (models.BinaryField,) # Not possible to filter by it
 
 
 def dnfs(qs):
@@ -120,7 +122,7 @@ def dnfs(qs):
             if isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
             elif lookup == 'exact':
-                if isinstance(constraint.field, NON_SERIALIZABLE_FIELDS):
+                if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
                     return [[SOME_COND]]
                 else:
                     return [[(constraint.alias, attname, value, True)]]
