@@ -186,8 +186,8 @@ Invalidation
 ------------
 
 Cacheops uses both time and event-driven invalidation. The event-driven one
-listens on model signals and invalidates appropriate caches on ``Model.save()``
-and ``.delete()``.
+listens on model signals and invalidates appropriate caches on ``Model.save()``, ``.delete()``
+and m2m changes.
 
 Invalidation tries to be granular which means it won't invalidate a queryset
 that cannot be influenced by added/updated/deleted object judging by query
