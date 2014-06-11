@@ -359,8 +359,10 @@ Tags work the same way as corresponding decorators.
 CAVEATS
 -------
 
-1. Conditions other than ``__exact`` or ``__in`` don't provide more granularity for
-   invalidation.
+1. Conditions other than ``__exact``, ``__in`` and ``__isnull=True`` don't make invalidation
+   more granular.
+2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
+   One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
 4. Mass updates don't trigger invalidation.
 5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
@@ -368,9 +370,8 @@ CAVEATS
 7. Conditions on subqueries don't affect invalidation.
 8. Doesn't work right with multi-table inheritance.
 9. Aggregates is not implemented yet.
-11. Filters on TextFields don't affect invalidation. One should not test on their equality anyway.
 
-Here 1, 3, 5, 11 are part of design compromise, trying to solve them will make
+Here 1, 2, 3, 5 are part of design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
