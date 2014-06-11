@@ -2,7 +2,7 @@
 import sys
 from functools import wraps
 from funcy import cached_property, project
-from funcy.py2 import cat, mapcat
+from funcy.py2 import cat, mapcat, map
 from .cross import pickle, json, md5
 
 import django
