@@ -2,7 +2,7 @@
 import sys
 from functools import wraps
 from funcy import cached_property, project
-from funcy.py2 import cat, map
+from funcy.py2 import cat, mapcat
 from .cross import pickle, json, md5
 
 import django
@@ -56,7 +56,6 @@ def _cached_as(*samples, **kwargs):
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
-
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
     _get_key =  kwargs.get('_get_key')
@@ -83,12 +82,11 @@ def _cached_as(*samples, **kwargs):
         return queryset
 
     querysets = map(_get_queryset, samples)
-    cond_dnfs = cat(map(dnfs, querysets))
+    cond_dnfs = mapcat(dnfs, querysets)
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
 
     def decorator(func):
-
         @wraps(func)
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
@@ -98,9 +96,7 @@ def _cached_as(*samples, **kwargs):
                 return pickle.loads(cache_data)
 
             result = func(*args)
-
             cache_thing(querysets[0].model, cache_key, result, cond_dnfs)
-
             return result
 
         return wrapper
