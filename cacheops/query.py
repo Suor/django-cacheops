@@ -28,25 +28,17 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(model, cache_key, data, cond_dnfs, timeout=None):
+def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    model = non_proxy(model)
-    pickled_data = pickle.dumps(data, -1)
-    if timeout is None:
-        timeout = model._cacheprofile['timeout']
-
     load_script('cache_thing')(
         keys=[cache_key],
         args=[
-            pickled_data,
+            pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
             timeout,
-            # Invalidator timeout should be larger than timeout of any key it references
-            # So we take timeout from profile which is our upper limit
-            # Add few extra seconds to be extra safe
-            model._cacheprofile['timeout'] + 10
+            # model._cacheprofile['timeout'] + 10
         ]
     )
 
@@ -66,7 +58,6 @@ def _cached_as(*samples, **kwargs):
     if len(samples) == 1 and isinstance(samples[0], list):
         return lambda func: func
 
-
     def _get_queryset(sample):
         if isinstance(sample, Model):
             queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
@@ -76,8 +67,6 @@ def _cached_as(*samples, **kwargs):
             queryset = sample
 
         queryset._require_cacheprofile()
-        if timeout and timeout > queryset._cacheprofile['timeout']:
-            raise NotImplementedError('timeout override should be smaller than default')
 
         return queryset
 
@@ -85,6 +74,8 @@ def _cached_as(*samples, **kwargs):
     cond_dnfs = mapcat(dnfs, querysets)
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
+    if not timeout:
+        timeout = min(qs._cacheconf['timeout'] for qs in querysets)
 
     def decorator(func):
         @wraps(func)
@@ -96,7 +87,7 @@ def _cached_as(*samples, **kwargs):
                 return pickle.loads(cache_data)
 
             result = func(*args)
-            cache_thing(querysets[0].model, cache_key, result, cond_dnfs)
+            cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
         return wrapper
@@ -275,7 +266,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results, timeout=None):
         cond_dnfs = dnfs(self)
-        cache_thing(self.model, cache_key, results, cond_dnfs, timeout or self._cacheconf['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, timeout or self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -289,8 +280,6 @@ class QuerySetMixin(object):
               .cache(ops=[]) disables caching for this queryset.
         """
         self._require_cacheprofile()
-        if timeout and timeout > self._cacheprofile['timeout']:
-            raise NotImplementedError('timeout override should be smaller than default')
 
         if ops is None:
             ops = ['get', 'fetch', 'count']

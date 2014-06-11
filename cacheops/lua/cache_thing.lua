@@ -1,8 +1,7 @@
 local key = KEYS[1]
 local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
-local timeout = ARGV[3]
-local inv_timeout = ARGV[4]
+local timeout = tonumber(ARGV[3])
 
 
 -- Write data to cache
@@ -40,6 +39,13 @@ for _, disj_pair in ipairs(dnfs) do
         -- Add new cache_key to list of dependencies
         local conj_key = conj_cache_key(db_table, conj)
         redis.call('sadd', conj_key, key)
-        redis.call('expire', conj_key, inv_timeout)
+        -- An invalidator should live longer than any key it references
+        -- So we update its ttl on every key if needed
+        local conj_ttl = redis.call('ttl', conj_key)
+        if conj_ttl < timeout then
+            -- We set conj_key life with a margin over key life to call expire rarer
+            -- And add few extra seconds to be extra safe
+            redis.call('expire', conj_key, timeout * 2 + 10)
+        end
     end
 end

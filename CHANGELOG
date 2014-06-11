@@ -1,5 +1,6 @@
 - conditions on related models will now invalidate queryset
 - m2m invalidation is much more granular
+- removed requirement that timeout should not be greater than default
 - lua scripting is used to save and invalidate cache, making things faster
 - better invalidation for complex and custom fields
 - silent stringify of unknown objects by default
