@@ -530,8 +530,8 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         for obj in objects:
             invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
-        # NOTE: we don't need to query thorugh objects here,
-        #       cause we already know all their meaningfull attributes.
+        # NOTE: we don't need to query through objects here,
+        #       cause we already know all their meaningful attributes.
         base_att = get_model_name(instance) + '_id'
         item_att = get_model_name(model) + '_id'
         for pk in pk_set:
