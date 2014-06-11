@@ -150,6 +150,8 @@ class Labeling(models.Model):
     brand = models.ForeignKey(BrandT)
     tag = models.IntegerField()
 
+class PremiumBrand(Brand):
+    extra = models.CharField(max_length=127, blank=True, default='')
 
 # local_get
 class Local(models.Model):
