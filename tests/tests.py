@@ -169,6 +169,17 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(1), 1)      # hit
         self.assertEqual(get_calls(2), 2)      # miss
 
+    def test_cached_as_depends_on_two_models(self):
+        get_calls = self._make_func(cached_as(Category, Post))
+        c = Category.objects.create(title='miss')
+        p = Post.objects.create(title='New Post', category=c)
+
+        self.assertEqual(get_calls(1), 1)      # cache
+        c.title = 'new title'; c.save()        # invalidate by Category
+        self.assertEqual(get_calls(1), 2)      # miss and cache
+        p.title = 'new title'; p.save()        # invalidate by Post
+        self.assertEqual(get_calls(1), 3)      # miss and cache
+
     def test_cached_view_as(self):
         get_calls = self._make_func(cached_view_as(Category))
 
