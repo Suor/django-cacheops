@@ -171,6 +171,16 @@ We can also add an ``extra`` to make different keys for calls with same ``catego
 ``count``. Cache key will also depend on function arguments. You can also override cache timeout
 with ``timeout`` argument.
 
+Another possibility is to make function cache invalidate on changes to any of a several modules:
+
+.. code:: python
+
+    @cached_as(Article.objects.filter(public=True), Tag)
+    def article_stats():
+        return {...}
+
+As you can see, we can mix querysets and models here.
+
 
 Invalidation
 ------------
