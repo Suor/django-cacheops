@@ -9,7 +9,7 @@ filesystem for simple time-invalidated one.
 
 And there is more to it:
 
-- decorators to cache any user function as queryset or by time
+- decorators to cache any user function or view as a queryset or by time
 - extensions for django and jinja2 templates to cache template fragments as querysets or by time
 - concurrent file cache with a decorator
 - a couple of hacks to make django faster
@@ -112,7 +112,7 @@ Here you can specify which ops should be cached for queryset, for example, this 
     articles = list(pager.page(page_num)) # hits database
 
 
-will cache ``.count()`` call in Paginator but not later in articles fetch.
+will cache ``.count()`` call in ``Paginator`` but not later in articles fetch.
 There are three possible actions - ``get``, ``fetch`` and ``count``. You can
 pass any subset of this ops to ``.cache()`` method even empty to turn off caching.
 There are, however, a shortcut for it:
@@ -185,6 +185,22 @@ Another possibility is to make function cache invalidate on changes to any of a 
 
 As you can see, we can mix querysets and models here.
 
+| **View caching.**
+
+You can also cache and invalidate a view as a queryset. This works mostly the same way as function
+caching, but only path of the request parameter is used to construct cache key:
+
+.. code:: python
+
+    from cacheops import cached_view_as
+
+    @cached_view_as(News)
+    def news_index(request):
+        # ...
+        return HttpResponse(...)
+
+You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``.
+
 
 Invalidation
 ------------
@@ -235,19 +251,25 @@ By default cacheops considers query result is same for same query, not depending
 Simple time-invalidated cache
 -----------------------------
 
-To cache result of a function call for some time use:
+To cache result of a function call or a view for some time use:
 
 .. code:: python
 
-    from cacheops import cached
+    from cacheops import cached, cached_view
 
     @cached(timeout=number_of_seconds)
     def top_articles(category):
         return ... # Some costly queries
 
+    @cached_view(timeout=number_of_seconds)
+    def top_articles(request, category=None):
+        # Some costly queries
+        return HttpResponse(...)
+
 
 ``@cached()`` will generate separate entry for each combination of decorated function and its
-arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested functions:
+arguments. Also you can use ``extra`` same way as in ``@cached_as()``, most useful for nested
+functions:
 
 .. code:: python
 
@@ -303,6 +325,11 @@ File based cache can be used the same way as simple time-invalidated one:
     @file_cache.cached(timeout=number_of_seconds)
     def top_articles(category):
         return ... # Some costly queries
+
+    @file_cache.cached_view(timeout=number_of_seconds)
+    def top_articles(request, category):
+        # Some costly queries
+        return HttpResponse(...)
 
     # later, on appropriate event
     top_articles.invalidate(some_category)
