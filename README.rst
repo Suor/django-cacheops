@@ -456,14 +456,14 @@ Writing a test for an issue you are having can speed up it's resolution a lot. H
 TODO
 ----
 
+- disable cache if select_for_update() called (or if _for_write set?)
 - add local cache (cleared at the and of request?)
-- support transactions
+- better support transactions
 - a way to turn off or postpone invalidation
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
-- disable cache if select_for_update() called (or if _for_write set?)
 - lazy methods on querysets (calculate cache key from methods called)
 
 
