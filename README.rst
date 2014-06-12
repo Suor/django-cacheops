@@ -140,7 +140,7 @@ or deletion:
 
     from cacheops import cached_as
 
-    @cached_as(Article)
+    @cached_as(Article, timeout=120)
     def article_stats():
         return {
             'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
@@ -171,9 +171,10 @@ e.g. to make invalidation more granular, you can use a local function:
         return _articles_block()
 
 
-We can also add an ``extra`` to make different keys for calls with same ``category`` but different
-``count``. Cache key will also depend on function arguments. You can also override cache timeout
-with ``timeout`` argument.
+We added ``extra`` here to make different keys for calls with same ``category`` but different
+``count``. Cache key will also depend on function arguments, so we could just pass ``count`` as
+an argument to inner function. We also omitted ``timeout`` here, so a default for the model
+will be used.
 
 Another possibility is to make function cache invalidate on changes to any of a several modules:
 
