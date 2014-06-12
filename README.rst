@@ -217,11 +217,11 @@ of the following:
 
 .. code:: python
 
-    from cacheops import invalidate_obj, invalidate_model
+    from cacheops import invalidate_obj, invalidate_model, invalidate_all
 
     invalidate_obj(some_article)  # invalidates queries affected by some_article
     invalidate_model(Article)     # invalidates all queries for model
-
+    invalidate_all()              # flush redis cache database
 
 And last there is ``invalidate`` command::
 
