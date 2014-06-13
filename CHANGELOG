@@ -1,3 +1,4 @@
+2.0
 - conditions on related models will now invalidate queryset
 - m2m invalidation is much more granular
 - removed requirement that timeout should not be greater than default
