@@ -24,7 +24,6 @@ except ImportError:
 from django.http import HttpRequest
 
 from .conf import redis_client
-
 try:
     from bitfield.types import Bit
 except ImportError:
