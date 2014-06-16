@@ -2,6 +2,8 @@ import six
 from datetime import date, datetime, time
 
 from django.db import models
+from django.db.models.query import QuerySet
+from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
@@ -17,7 +19,7 @@ class Category(models.Model):
 
 class Post(models.Model):
     title = models.CharField(max_length=128)
-    category = models.ForeignKey(Category)
+    category = models.ForeignKey(Category, related_name='posts')
     visible = models.BooleanField(default=True)
 
     def __unicode__(self):
@@ -53,6 +55,18 @@ class CustomField(six.with_metaclass(models.SubfieldBase, models.Field)):
     def get_prep_value(self, value):
         return value.value
 
+class CustomWhere(sql.where.WhereNode):
+    pass
+
+class CustomQuery(sql.Query):
+    pass
+
+class CustomManager(models.Manager):
+    def get_query_set(self):
+        q = CustomQuery(self.model, CustomWhere)
+        return QuerySet(self.model, q)
+    get_queryset = get_query_set
+
 
 class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
     def db_type(self, connection):
@@ -74,6 +88,8 @@ class Weird(models.Model):
     list_field = IntegerArrayField(default=lambda: [])
     custom_field = CustomField(default=CustomValue('default'))
 
+    objects = models.Manager()
+    customs = CustomManager()
 
 # 16
 class Profile(models.Model):
@@ -108,8 +124,8 @@ class Point(models.Model):
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
 
-class MachineBrand(models.Model):
-    labels = models.ManyToManyField(Label)
+class Brand(models.Model):
+    labels = models.ManyToManyField(Label, related_name='brands')
 
 
 # local_get

@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-from functools import wraps
 import os, time
+from functools import wraps
+from .cross import pickle, md5hex
 
 from django.conf import settings
 
-from cacheops import cross
-from cacheops.conf import redis_client
+from .conf import redis_client, handle_connection_failure
+from .utils import func_cache_key, cached_view_fab
 
 
-__all__ = ('cache', 'cached', 'file_cache', 'CacheMiss')
+__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss')
 
 
 class CacheMiss(Exception):
@@ -23,31 +20,14 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, extra=None, timeout=None):
+    def _cached(self, timeout=None, extra=None, _get_key=None):
         """
         A decorator for caching function calls
         """
         def decorator(func):
-            def get_cache_key(*args, **kwargs):
-                # Calculating cache key based on func and arguments
-                md5 = cross.md5()
-                md5.update('%s.%s' % (func.__module__, func.__name__))
-                # TODO: make it more civilized
-                if extra is not None:
-                    if isinstance(extra, (list, tuple)):
-                        md5.update(':'.join(map(str, extra)))
-                    else:
-                        md5.update(str(extra))
-                if args:
-                    md5.update(repr(args))
-                if kwargs:
-                    md5.update(repr(sorted(kwargs.items())))
-
-                return 'c:%s' % md5.hexdigest()
-
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cache_key = get_cache_key(*args, **kwargs)
+                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -57,12 +37,18 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = get_cache_key(*args, **kwargs)
+                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
             return wrapper
         return decorator
+
+    def cached(self, timeout=None, extra=None):
+        return self._cached(timeout, extra, _get_key=func_cache_key)
+
+    def cached_view(self, timeout=None, extra=None):
+        return cached_view_fab(self._cached)(timeout, extra)
 
 
 class RedisCache(BaseCache):
@@ -75,6 +61,7 @@ class RedisCache(BaseCache):
             raise CacheMiss
         return pickle.loads(data)
 
+    @handle_connection_failure
     def set(self, cache_key, data, timeout=None):
         pickled_data = pickle.dumps(data, -1)
         if timeout is not None:
@@ -82,11 +69,13 @@ class RedisCache(BaseCache):
         else:
             self.conn.set(cache_key, pickled_data)
 
+    @handle_connection_failure
     def delete(self, cache_key):
         self.conn.delete(cache_key)
 
 cache = RedisCache(redis_client)
 cached = cache.cached
+cached_view = cache.cached_view
 
 
 FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
@@ -106,7 +95,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = cross.md5(key).hexdigest()
+        digest = md5hex(key)
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

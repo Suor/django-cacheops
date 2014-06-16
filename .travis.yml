@@ -1,0 +1,25 @@
+language: python
+python: 2.7
+services:
+  - redis-server
+env:
+  - TOXENV=py26-dj13
+  - TOXENV=py26-dj14
+  - TOXENV=py26-dj15
+  - TOXENV=py26-dj16
+  - TOXENV=py27-dj13
+  - TOXENV=py27-dj14
+  - TOXENV=py27-dj15
+  - TOXENV=py27-dj16
+  - TOXENV=py33-dj15
+  - TOXENV=py33-dj16
+  - TOXENV=py34-dj15
+  - TOXENV=py34-dj16
+install:
+  - pip install tox
+script:
+  - tox
+notifications:
+  email:
+    on_success: never
+    on_failure: always

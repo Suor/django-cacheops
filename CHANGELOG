@@ -1,3 +1,30 @@
+2.0
+- conditions on related models will now invalidate queryset
+- m2m invalidation is much more granular
+- removed requirement that timeout should not be greater than default
+- lua scripting is used to save and invalidate cache, making things faster
+- better invalidation for complex and custom fields
+- silent stringify of unknown objects by default
+- support caching django.contrib.gis queries (koodjo)
+- cacheops is now thread-safe
+- added a way to no-op cacheops
+- added @cached_view() and @cached_view_as()
+- pass several samples for @cached_as() and @cached_view_as()
+- fixed working with querysets created by non-patched constructor (#3 and dups)
+- fixed invalidate_model() for proxy models
+- fixed deepcopy(queryset) bug
+- fixed possible collisions when cached functions passed complex structured arguments
+- fixed StringifyError on timedelta (mpyatishev)
+Backwards incompatible changes:
+- filters on TextFields no longer affect invalidation
+- @cached_as() cache key will now depend on function arguments
+- @cached_as() and @cached() will now depend on function line in a code,
+  permitting usage of lambdas and same named methods without passing extra
+- @cached_as() and @cached() will now take timeout as first argument and extra as second.
+  Anyway using them as keyword arguments is recommended
+- Django 1.2 no longer supported
+- Redis 2.6+ is required
+
 1.3.1
 - fixed bug with negating "some"-conditions
 - fixed bug with schemes unsync when invalidating model
@@ -10,7 +37,7 @@ Backwards incompatible changes:
 - support filtering by time equality
 - optimizations for python 3
 Backwards incompatible changes:
-- .cache(write_only=...) doesn't enable caching of all ops anymore (not really intended)
+- .cache(write_only=...) doesn't enable caching for all ops anymore (not really intended)
 
 1.2.1
 - set six minimum version right (crazyzubr)

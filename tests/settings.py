@@ -1,3 +1,5 @@
+import os
+
 INSTALLED_APPS = [
     'cacheops',
     'django.contrib.auth',
@@ -16,9 +18,11 @@ DATABASES = {
     },
     'slave': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite.db'
+        'NAME': 'sqlite_slave.db'
     }
 }
+
+CACHEOPS_FAKE = os.environ.get('CACHEOPS') == 'FAKE'
 
 CACHEOPS_REDIS = {
     'host': 'localhost',
@@ -34,5 +38,10 @@ CACHEOPS = {
     'tests.genericcontainer': ('all', 60*60),
     '*.*': ('just_enable', 60*60),
 }
+
+# We need to catch any changes in django
+CACHEOPS_STRICT_STRINGIFY = True
+
+ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'

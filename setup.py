@@ -2,12 +2,12 @@ from setuptools import setup
 
 setup(
     name='django-cacheops',
-    version='1.3.1',
+    version='2.0',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
     description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
-    long_description=open('README.rst').read(),
+    long_description=open('README.rst').read().replace('|Build Status|', '', 1),
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 
@@ -18,8 +18,9 @@ setup(
         'cacheops.templatetags'
     ],
     install_requires=[
-        'django>=1.2',
-        'redis>=2.4.12',
+        'django>=1.3',
+        'redis>=2.9.1',
+        'funcy>=1.0.0,<2.0.0',
         'simplejson>=2.2.0',
         'six>=1.4.0',
     ],
@@ -34,11 +35,15 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
 
         'Framework :: Django',
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Software Development :: Libraries :: Python Modules',
-    ]
+    ],
+
+    zip_safe=False,
+    include_package_data=True,
 )

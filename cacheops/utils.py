@@ -1,23 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from operator import concat, itemgetter
+from operator import concat
 from itertools import product
+from functools import wraps, reduce
 import inspect
-
-try:
-    from itertools import imap
-except ImportError:
-    # Use Python 2 map/filter here for now
-    imap = map
-    map = lambda f, seq: list(imap(f, seq))
-    ifilter = filter
-    filter = lambda f, seq: list(ifilter(f, seq))
-    from functools import reduce
 import six
-from cacheops import cross
+# Use Python 2 map here for now
+from funcy.py2 import memoize, map, cat
+from .cross import json, md5hex
 
 import django
-from django.db.models import Model
+from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -29,6 +21,9 @@ try:
 except ImportError:
     class SubqueryConstraint(object):
         pass
+from django.http import HttpRequest
+
+from .conf import redis_client
 
 try:
     from bitfield.types import Bit
@@ -41,24 +36,24 @@ LONG_DISJUNCTION = 8
 def non_proxy(model):
     while model._meta.proxy:
         # Every proxy model has exactly one non abstract parent model
-        model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
+        model = next(b for b in model.__bases__
+                       if issubclass(b, models.Model) and not b._meta.abstract)
     return model
 
 
 if django.VERSION < (1, 6):
     def get_model_name(model):
-        return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+        return model._meta.module_name
 else:
     def get_model_name(model):
-        return '%s.%s' % (model._meta.app_label, model._meta.model_name)
+        return model._meta.model_name
 
 
 class MonkeyProxy(object):
     def __init__(self, cls):
-        monkey_bases = tuple(b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey'))
+        monkey_bases = [b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey')]
         for monkey_base in monkey_bases:
-            for name, value in monkey_base.__dict__.items():
-                setattr(self, name, value)
+            self.__dict__.update(monkey_base.__dict__)
 
 
 def monkey_mix(cls, mixin, methods=None):
@@ -91,46 +86,65 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, six.get_unbound_function(method))
 
 
-def dnf(qs):
+# NOTE: we don't serialize this fields since their values could be very long
+#       and one should not filter by their equality anyway.
+NOT_SERIALIZED_FIELDS = (
+    models.FileField,
+    models.TextField, # One should not filter by long text equality
+)
+if hasattr(models, 'BinaryField'):
+    NOT_SERIALIZED_FIELDS += (models.BinaryField,) # Not possible to filter by it
+
+
+def dnfs(qs):
     """
-    Converts sql condition tree to DNF.
+    Converts query condition tree into a DNF of eq conds.
+    Separately for each alias.
 
     Any negations, conditions with lookups other than __exact or __in,
     conditions on joined models and subrequests are ignored.
     __in is converted into = or = or = ...
     """
     SOME = object()
+    SOME_COND = (None, None, SOME, True)
 
-    def negate(el):
-        return SOME if el is SOME else \
-               (el[0], el[1], not el[2])
-
-    def strip_negates(conj):
-        return [term[:2] for term in conj if term is not SOME and term[2]]
+    def negate(term):
+        return (term[0], term[1], term[2], not term[3])
 
     def _dnf(where):
+        """
+        Constructs DNF of where tree consisting of terms in form:
+            (alias, attribute, value, negation)
+        meaning `alias.attribute = value`
+         or `not alias.attribute = value` if negation is False
+
+        Any conditions other then eq are dropped.
+        """
         if isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             value_types_to_skip = (QuerySet, Query, SQLEvaluator)
             if Bit:
                 value_types_to_skip += (Bit,)
-            if constraint.alias != alias or isinstance(value, value_types_to_skip):
-                return [[SOME]]
+            attname = attname_of(model, constraint.col)
+            if isinstance(value, value_types_to_skip):
+                return [[SOME_COND]]
             elif lookup == 'exact':
-                # attribute, value, negation
-                return [[(attname_of(model, constraint.col), value, True)]]
+                if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
+                    return [[SOME_COND]]
+                else:
+                    return [[(constraint.alias, attname, value, True)]]
             elif lookup == 'isnull':
-                return [[(attname_of(model, constraint.col), None, value)]]
+                return [[(constraint.alias, attname, None, value)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(attname_of(model, constraint.col), v, True)] for v in value]
+                return [[(constraint.alias, attname, v, True)] for v in value]
             else:
-                return [[SOME]]
+                return [[SOME_COND]]
         elif isinstance(where, EverythingNode):
             return [[]]
         elif isinstance(where, NothingNode):
             return []
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
-            return [[SOME]]
+            return [[SOME_COND]]
         elif len(where) == 0:
             return [[]]
         else:
@@ -143,10 +157,10 @@ def dnf(qs):
             else:
                 # Just unite children joined with OR
                 if where.connector == OR:
-                    result = reduce(concat, chilren_dnfs)
+                    result = cat(chilren_dnfs)
                 # Use Cartesian product to AND children
                 else:
-                    result = [reduce(concat, p) for p in product(*chilren_dnfs)]
+                    result = map(cat, product(*chilren_dnfs))
 
             # Negating and expanding brackets
             if where.negated:
@@ -154,19 +168,37 @@ def dnf(qs):
 
             return result
 
+    def clean_conj(conj, for_alias):
+        # "SOME" conds, negated conds and conds for other aliases should be stripped
+        return [(attname, value) for alias, attname, value, negation in conj
+                                 if value is not SOME and negation and alias == for_alias]
+
+    def clean_dnf(tree, for_alias):
+        cleaned = [clean_conj(conj, for_alias) for conj in tree]
+        # Any empty conjunction eats up the rest
+        # NOTE: a more elaborate DNF reduction is not really needed,
+        #       just keep your querysets sane.
+        if not all(cleaned):
+            return [[]]
+        # To keep all schemes the same we sort conjunctions
+        return map(sorted, cleaned)
+
+    def table_for(alias):
+        if alias == main_alias:
+            return model._meta.db_table
+        else:
+            return qs.query.alias_map[alias][0]
+
     where = qs.query.where
     model = qs.model
-    alias = model._meta.db_table
+    main_alias = model._meta.db_table
 
-    result = _dnf(where)
-    # Cutting out negative terms and negation itself
-    result = [strip_negates(conj) for conj in result]
-    # Any empty conjunction eats up the rest
-    # NOTE: a more elaborate DNF reduction is not really needed,
-    #       just keep your querysets sane.
-    if not all(result):
-        return [[]]
-    return result
+    dnf = _dnf(where)
+    aliases = set(alias for conj in dnf
+                        for alias, _, _, _ in conj
+                        if alias)
+    aliases.add(main_alias)
+    return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
 
 
 def attname_of(model, col, cache={}):
@@ -175,23 +207,65 @@ def attname_of(model, col, cache={}):
     return cache[model].get(col, col)
 
 
-def conj_scheme(conj):
-    """
-    Return a scheme of conjunction.
-    Which is just a sorted tuple of field names.
-    """
-    return tuple(sorted(imap(itemgetter(0), conj)))
-
-
-def stamp_fields(model, cache={}):
+@memoize
+def stamp_fields(model):
     """
     Returns serialized description of model fields.
     """
-    if model not in cache:
-        stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
-        cache[model] = cross.md5(stamp).hexdigest()
-    return cache[model]
+    stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
+    return md5hex(stamp)
 
+
+### Cache keys calculation
+
+def func_cache_key(func, args, kwargs, extra=None):
+    """
+    Calculate cache key based on func and arguments
+    """
+    factors = [func.__module__, func.__name__, func.__code__.co_firstlineno, args, kwargs, extra]
+    return md5hex(json.dumps(factors, sort_keys=True, default=str))
+
+def view_cache_key(func, args, kwargs, extra=None):
+    """
+    Calculate cache key for view func.
+    Use url instead of not properly serializable request argument.
+    """
+    uri = args[0].build_absolute_uri()
+    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+
+def cached_view_fab(_cached):
+    def cached_view(*dargs, **dkwargs):
+        def decorator(func):
+            dkwargs['_get_key'] = view_cache_key
+            cached_func = _cached(*dargs, **dkwargs)(func)
+
+            @wraps(func)
+            def wrapper(request, *args, **kwargs):
+                assert isinstance(request, HttpRequest),                            \
+                       "A view should be passed with HttpRequest as first argument"
+                if request.method not in ('GET', 'HEAD'):
+                    return func(request, *args, **kwargs)
+
+                return cached_func(request, *args, **kwargs)
+            return wrapper
+        return decorator
+    return cached_view
+
+
+### Lua script loader
+
+import os.path
+
+@memoize
+def load_script(name):
+    # TODO: strip comments
+    filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
+    with open(filename) as f:
+        code = f.read()
+    return redis_client.register_script(code)
+
+
+### Whitespace handling for template tags
 
 import re
 from django.utils.safestring import mark_safe

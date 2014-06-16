@@ -1,4 +1,49 @@
 # master, Python 2.7.5, Django 1.6.1
+get_no_cache       time: 0.32ms
+get_hit            time: 0.36ms
+get_miss           time: 0.73ms
+count_no_cache     time: 0.15ms
+count_hit          time: 0.15ms
+count_miss         time: 0.43ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.23ms
+fetch_miss         time: 0.58ms
+fetch_cache_key    time: 0.05ms
+filter_cache_key   time: 0.10ms
+common_construct   time: 0.28ms
+common_inplace     time: 0.14ms
+common_cache_key   time: 0.11ms
+invalidate_obj     time: 0.14ms
+save_obj           time: 0.96ms
+complex_construct  time: 0.49ms
+complex_inplace    time: 0.38ms
+complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.28ms
+model_invalidate   time: 0.79ms
+
+# master, fake cacheops, Python 2.7.5, Django 1.6.1
+count_no_cache     time: 0.12ms
+count_hit          time: 0.12ms
+count_miss         time: 0.14ms
+fetch_construct    time: 0.01ms
+fetch_no_cache     time: 0.17ms
+fetch_hit          time: 0.17ms
+fetch_miss         time: 0.19ms
+fetch_cache_key    time: 0.00ms
+filter_cache_key   time: 0.00ms
+common_construct   time: 0.23ms
+common_inplace     time: 0.23ms
+common_cache_key   time: 0.00ms
+invalidate_obj     time: 0.10ms
+save_obj           time: 0.31ms
+complex_construct  time: 0.44ms
+complex_inplace    time: 0.44ms
+complex_cache_key  time: 0.00ms
+big_invalidate     time: 0.00ms
+model_invalidate   time: 0.00ms
+
+# 1.3.0, Python 2.7.5, Django 1.6.1
 count_no_cache     time: 0.14ms
 count_hit          time: 0.15ms
 count_miss         time: 0.49ms
@@ -36,7 +81,7 @@ big_invalidate     time: 0.23ms
 model_invalidate   time: 0.77ms
 
 
-# master, Python 3.3.2, Django 1.6.1
+# 1.3.0, Python 3.3.2, Django 1.6.1
 count_no_cache     time: 0.15ms
 count_hit          time: 0.15ms
 count_miss         time: 0.50ms
@@ -63,18 +108,3 @@ save_obj           time: 0.99ms
 complex_construct  time: 0.49ms
 complex_inplace    time: 0.37ms
 complex_cache_key  time: 0.10ms
-
-
-# master, Python 2.6.9, Django 1.6.1
-count_no_cache     time: 0.15ms
-count_hit          time: 0.16ms
-count_miss         time: 0.50ms
-fetch_construct    time: 0.02ms
-fetch_no_cache     time: 0.23ms
-fetch_hit          time: 0.24ms
-fetch_miss         time: 0.67ms
-invalidate_obj     time: 0.24ms
-save_obj           time: 1.20ms
-complex_construct  time: 0.52ms
-complex_inplace    time: 0.39ms
-complex_cache_key  time: 0.14ms
