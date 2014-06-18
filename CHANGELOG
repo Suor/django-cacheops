@@ -1,5 +1,6 @@
 - do not fetch from cache when doing .select_for_update() and similar,
   but dow write to cache if it's enabled
+- fixed fake cacheops
 - fixed deprecation warning in Django 1.6 admin
 
 2.0

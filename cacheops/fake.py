@@ -48,5 +48,5 @@ class DummyCache(BaseCache):
 
 cache = DummyCache()
 cached = cache.cached
-cached_view = cached.cached_view
+cached_view = cache.cached_view
 file_cache = DummyCache()

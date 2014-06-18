@@ -15,6 +15,7 @@ env:
   - TOXENV=py33-dj16
   - TOXENV=py34-dj15
   - TOXENV=py34-dj16
+  - TOXENV=fake
 install:
   - pip install tox
 script:
