@@ -231,13 +231,6 @@ class QuerySetMixin(object):
     def _cloning(self):
         return 1000
 
-    def get_or_create(self, **kwargs):
-        """
-        Disabling cache for get or create
-        TODO: check whether we can use cache (or write_only) here without causing problems
-        """
-        return self.nocache()._no_monkey.get_or_create(self, **kwargs)
-
     def _require_cacheprofile(self):
         if self._cacheprofile is None:
             raise ImproperlyConfigured(
@@ -343,7 +336,7 @@ class QuerySetMixin(object):
 
         if cache_this:
             cache_key = self._cache_key()
-            if not self._cacheconf['write_only']:
+            if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
