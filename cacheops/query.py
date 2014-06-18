@@ -566,10 +566,11 @@ def install_cacheops():
     from django.conf import settings
     if 'django.contrib.admin' in settings.INSTALLED_APPS:
         from django.contrib.admin.options import ModelAdmin
-        def ModelAdmin_queryset(self, request):
-            return o_ModelAdmin_queryset(self, request).nocache()
-        o_ModelAdmin_queryset = ModelAdmin.queryset
-        ModelAdmin.queryset = ModelAdmin_queryset
+        method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+        def ModelAdmin_get_queryset(self, request):
+            return old_ModelAdmin_get_queryset(self, request).nocache()
+        old_ModelAdmin_get_queryset = getattr(ModelAdmin, method_name)
+        setattr(ModelAdmin, method_name, ModelAdmin_get_queryset)
 
     # bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
