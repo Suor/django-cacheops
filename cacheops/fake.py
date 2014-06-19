@@ -9,7 +9,7 @@ def cached_as(*samples, **kwargs):
 cached_view_as = cached_as
 
 def install_cacheops():
-    if django.VERSION < (1, 6):
+    if not hasattr(Manager, 'get_queryset'):
         Manager.get_queryset = lambda self: self.get_query_set()
 
     # query

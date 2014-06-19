@@ -490,7 +490,7 @@ class ManagerMixin(object):
         invalidate_obj(instance)
 
     # Django 1.5- compatability
-    if django.VERSION < (1, 6):
+    if not hasattr(Manager, 'get_queryset'):
         def get_queryset(self):
             return self.get_query_set()
 
