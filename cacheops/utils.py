@@ -122,7 +122,6 @@ def dnfs(qs):
 
         Any conditions other then eq are dropped.
         """
-        if isinstance(where, tuple):
         # Lookups appeared in Django 1.7
         if isinstance(where, Lookup):
             attname = where.lhs.target.attname
