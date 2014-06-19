@@ -1,6 +1,18 @@
 from cacheops import invalidate_obj, invalidate_model
 from cacheops.conf import redis_client
+from cacheops.cross import pickle
+
 from .models import Category, Post, Extra
+
+
+posts = list(Post.objects.cache().all())
+posts_pickle = pickle.dumps(posts, -1)
+
+def do_pickle():
+    pickle.dumps(posts, -1)
+
+def do_unpickle():
+    pickle.loads(posts_pickle)
 
 
 get_key = Category.objects.filter(pk=1).order_by()._cache_key()
@@ -123,6 +135,9 @@ def do_invalidate_model(obj):
 
 
 TESTS = [
+    ('pickle', {'run': do_pickle}),
+    ('unpickle', {'run': do_unpickle}),
+
     ('get_no_cache', {'run': do_get_no_cache}),
     ('get_hit',  {'prepare_once': do_get, 'run': do_get}),
     ('get_miss', {'prepare': invalidate_get, 'run': do_get}),
