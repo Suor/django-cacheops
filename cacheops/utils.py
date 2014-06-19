@@ -21,6 +21,12 @@ try:
 except ImportError:
     class SubqueryConstraint(object):
         pass
+# A new things in Django 1.7
+try:
+    from django.db.models.lookups import Lookup, Exact, In, IsNull
+except ImportError:
+    class Lookup(object):
+        pass
 from django.http import HttpRequest
 
 from .conf import redis_client
@@ -117,11 +123,32 @@ def dnfs(qs):
         Any conditions other then eq are dropped.
         """
         if isinstance(where, tuple):
+        # Lookups appeared in Django 1.7
+        if isinstance(where, Lookup):
+            attname = where.lhs.target.attname
+            # TODO: check of all of this are possible
+            if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
+                return [[SOME_COND]]
+            # TODO: deal with transforms, aggregates and such in lhs
+            elif isinstance(where, Exact):
+                if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
+                    return [[SOME_COND]]
+                else:
+                    return [[(where.lhs.alias, attname, where.rhs, True)]]
+            elif isinstance(where, IsNull):
+                return [[(where.lhs.alias, attname, None, where.rhs)]]
+            elif isinstance(where, In) and len(where.rhs) < LONG_DISJUNCTION:
+                return [[(where.lhs.alias, attname, v, True)] for v in where.rhs]
+            else:
+                return [[SOME_COND]]
+        # Django 1.6 and earlier used tuples to encode conditions
+        elif isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             attname = attname_of(model, constraint.col)
             if isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
             elif lookup == 'exact':
+                # TODO: check for non-serialized for both exact and in
                 if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
                     return [[SOME_COND]]
                 else:

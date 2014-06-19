@@ -7,7 +7,6 @@ from .cross import pickle, json, md5
 
 import django
 from django.core.exceptions import ImproperlyConfigured
-from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -154,6 +153,22 @@ def _stringify_query():
     except ImportError:
         pass
 
+    # Moved in Django 1.7
+    try:
+        from django.contrib.contenttypes.fields import GenericRel
+    except ImportError:
+        from django.contrib.contenttypes.generic import GenericRel
+
+    # New things in Django 1.7
+    try:
+        from django.db.models.lookups import Lookup
+        from django.db.models.sql.datastructures import Col
+        attrs[Lookup] = ('lhs', 'rhs')
+        attrs[Col] = ('alias', 'target', 'source')
+    except ImportError:
+        pass
+
+
     attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
         = ('connector', 'negated', 'children')
     attrs[SQLEvaluator] = ('expression',)
@@ -177,6 +192,9 @@ def _stringify_query():
         # No intern() in Python 3
         pass
 
+    def encode_attrs(obj, cls=None):
+        return (obj.__class__, [getattr(obj, attr) for attr in attrs[cls or obj.__class__]])
+
     def encode_object(obj):
         if isinstance(obj, set):
             return sorted(obj)
@@ -191,14 +209,15 @@ def _stringify_query():
         elif isinstance(obj, Field):
             return (obj.model, obj.name)
         elif obj.__class__ in attrs:
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[obj.__class__]])
+            return encode_attrs(obj)
         elif isinstance(obj, QuerySet):
             return (obj.__class__, obj.query)
         elif isinstance(obj, Aggregate):
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[Aggregate]])
+            return encode_attrs(obj, Aggregate)
         elif isinstance(obj, Query):
-            # for custom subclasses of Query
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+            return encode_attrs(obj, Query) # for custom subclasses of Query
+        elif isinstance(obj, Lookup):
+            return encode_attrs(obj, Lookup)
         # Fall back for unknown objects
         elif not STRICT_STRINGIFY and hasattr(obj, '__dict__'):
             return (obj.__class__, obj.__dict__)
@@ -416,6 +435,10 @@ class ManagerMixin(object):
         with _install_lock:
             if cls not in _installed_classes:
                 _installed_classes.add(cls)
+
+                # Django 1.7 migrations create lots of fake models, just skip them
+                if cls.__module__ == '__fake__':
+                    return
 
                 cls._cacheprofile = model_profile(cls)
                 if cls._cacheprofile is not None:
