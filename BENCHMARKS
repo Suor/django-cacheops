@@ -1,3 +1,27 @@
+# master, python 2.7.5, Django 1.7
+get_no_cache       time: 0.34ms
+get_hit            time: 5.64ms
+get_miss           time: 6.42ms
+count_no_cache     time: 0.15ms
+count_hit          time: 0.17ms
+count_miss         time: 0.17ms
+fetch_construct    time: 0.01ms
+fetch_no_cache     time: 0.20ms
+fetch_hit          time: 54.91ms
+fetch_miss         time: 55.49ms
+fetch_cache_key    time: 0.05ms
+filter_cache_key   time: 0.12ms
+common_construct   time: 0.22ms
+common_inplace     time: 0.13ms
+common_cache_key   time: 0.15ms
+invalidate_obj     time: 0.21ms
+save_obj           time: 1.68ms
+complex_construct  time: 0.44ms
+complex_inplace    time: 0.36ms
+complex_cache_key  time: 0.28ms
+big_invalidate     time: 0.37ms
+model_invalidate   time: 0.57ms
+
 # master, Python 2.7.5, Django 1.6.1
 get_no_cache       time: 0.32ms
 get_hit            time: 0.36ms
