@@ -11,14 +11,22 @@ env:
   - TOXENV=py27-dj14
   - TOXENV=py27-dj15
   - TOXENV=py27-dj16
+  - TOXENV=py27-dj17
   - TOXENV=py27-djmaster
   - TOXENV=py33-dj15
   - TOXENV=py33-dj16
+  - TOXENV=py33-dj17
   - TOXENV=py33-djmaster
   - TOXENV=py34-dj15
   - TOXENV=py34-dj16
+  - TOXENV=py34-dj17
   - TOXENV=py34-djmaster
   - TOXENV=fake
+matrix:
+  allow_failures:
+    - env: "TOXENV=py27-djmaster"
+    - env: "TOXENV=py33-djmaster"
+    - env: "TOXENV=py34-djmaster"
 install:
   - pip install tox
 script:
