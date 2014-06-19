@@ -74,12 +74,13 @@ call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
 flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
 args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
-selector = args[0] if args else None
+selector = args[0] if args else ''
+select = selector[1:].__eq__ if selector.startswith('=') else lambda s: selector in s
 
 from tests.bench import TESTS
 try:
     if selector:
-        tests = [(name, test) for name, test in TESTS if selector in name]
+        tests = [(name, test) for name, test in TESTS if select(name)]
     else:
         tests = TESTS
     run_benchmarks(tests)
