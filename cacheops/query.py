@@ -580,9 +580,17 @@ def install_cacheops():
         model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
-    from django.conf import settings
-    if 'django.contrib.admin' in settings.INSTALLED_APPS:
+    try:
+        # Use app registry in Django 1.7
+        from django.apps import apps
+        admin_used = apps.is_installed('django.contrib.admin')
+    except ImportError:
+        # Introspect INSTALLED_APPS in older djangos
+        from django.conf import settings
+        admin_used = 'django.contrib.admin' in settings.INSTALLED_APPS
+    if admin_used:
         from django.contrib.admin.options import ModelAdmin
+        # Renamed queryset to get_queryset in Django 1.6
         method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
         def ModelAdmin_get_queryset(self, request):
             return old_ModelAdmin_get_queryset(self, request).nocache()
