@@ -420,18 +420,23 @@ class RelatedTests(BaseTestCase):
 
 
 class M2MTests(BaseTestCase):
+    brand_cls = Brand
+    label_cls = Label
+
     def setUp(self):
-        self.bf = Brand.objects.create()
-        self.bs = Brand.objects.create()
+        self.bf = self.brand_cls.objects.create()
+        self.bs = self.brand_cls.objects.create()
 
-        self.fast = Label.objects.create(text='fast')
-        self.slow = Label.objects.create(text='slow')
-        self.furious = Label.objects.create(text='furios')
+        self.fast = self.label_cls.objects.create(text='fast')
+        self.slow = self.label_cls.objects.create(text='slow')
+        self.furious = self.label_cls.objects.create(text='furios')
 
+        self.setup_m2m()
+        super(M2MTests, self).setUp()
+
+    def setup_m2m(self):
         self.bf.labels.add(self.fast, self.furious)
         self.bs.labels.add(self.slow, self.furious)
-
-        super(M2MTests, self).setUp()
 
     def _template(self, qs_or_action, change, should_invalidate=True):
         if hasattr(qs_or_action, 'all'):
@@ -457,7 +462,8 @@ class M2MTests(BaseTestCase):
         )
 
     def test_granular_through_on_clear(self):
-        through_qs = Brand.labels.through.objects.cache().filter(brand=self.bs, label=self.slow)
+        through_qs = self.brand_cls.labels.through.objects.cache() \
+                                                  .filter(brand=self.bs, label=self.slow)
         self._template(
             lambda: through_qs.get(),
             lambda: self.bf.labels.clear(),
@@ -466,7 +472,7 @@ class M2MTests(BaseTestCase):
 
     def test_granular_target_on_clear(self):
         self._template(
-            lambda: Label.objects.cache().get(pk=self.slow.pk),
+            lambda: self.label_cls.objects.cache().get(pk=self.slow.pk),
             lambda: self.bf.labels.clear(),
             should_invalidate=False
         )
@@ -496,20 +502,46 @@ class M2MTests(BaseTestCase):
         )
 
 
-class M2MThroughTests(BaseTestCase):
-    def setUp(self):
-        self.suor = User.objects.create(username='Suor')
-        self.peterdds = User.objects.create(username='peterdds')
-        self.photo = Photo.objects.create()
-        PhotoLike.objects.create(user=self.suor, photo=self.photo)
-        super(M2MThroughTests, self).setUp()
+class M2MThroughTests(M2MTests):
+    brand_cls = BrandT
+    label_cls = LabelT
 
-    def test_44(self):
-        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
-        self.assertEqual(make_query(), [self.suor])
+    def setup_m2m(self):
+        Labeling.objects.create(brand=self.bf, label=self.fast, tag=10)
+        Labeling.objects.create(brand=self.bf, label=self.furious, tag=11)
+        Labeling.objects.create(brand=self.bs, label=self.slow, tag=20)
+        Labeling.objects.create(brand=self.bs, label=self.furious, tag=21)
 
-        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
-        self.assertEqual(make_query(), [self.suor, self.peterdds])
+    # No add and remove methods for explicit through models
+    test_target_invalidates_on_add = None
+    test_base_invalidates_on_add = None
+    test_target_invalidates_on_remove = None
+    test_base_invalidates_on_remove = None
+
+    def test_target_invalidates_on_create(self):
+        self._template(
+            self.bf.labels,
+            lambda: Labeling.objects.create(brand=self.bf, label=self.slow, tag=1)
+        )
+
+    def test_base_invalidates_on_create(self):
+        self._template(
+            self.slow.brands,
+            lambda: Labeling.objects.create(brand=self.bf, label=self.slow, tag=1)
+        )
+
+    def test_target_invalidates_on_delete(self):
+        self._template(
+            self.bf.labels,
+            lambda: Labeling.objects.get(brand=self.bf, label=self.furious).delete()
+        )
+
+    def test_base_invalidates_on_delete(self):
+        self._template(
+            self.furious.brands,
+            # lambda: Labeling.objects.filter(brand=self.bf, label=self.furious).delete()
+            lambda: Labeling.objects.get(brand=self.bf, label=self.furious).delete()
+        )
 
 
 # Tests for proxy models, see #30

@@ -120,27 +120,29 @@ class Point(models.Model):
 
 
 
-# 29
+# M2M models
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
 
 class Brand(models.Model):
     labels = models.ManyToManyField(Label, related_name='brands')
 
+# M2M with explicit through models
+class LabelT(models.Model):
+    text = models.CharField(max_length=127, blank=True, default='')
+
+class BrandT(models.Model):
+    labels = models.ManyToManyField(LabelT, related_name='brands', through='Labeling')
+
+class Labeling(models.Model):
+    label = models.ForeignKey(LabelT)
+    brand = models.ForeignKey(BrandT)
+    tag = models.IntegerField()
+
 
 # local_get
 class Local(models.Model):
     tag = models.IntegerField(null=True)
-
-
-# 44
-class Photo(models.Model):
-    liked_user = models.ManyToManyField(User, through="PhotoLike")
-
-class PhotoLike(models.Model):
-    user = models.ForeignKey(User)
-    photo = models.ForeignKey(Photo)
-    timestamp = models.DateTimeField(auto_now_add=True)
 
 
 # 45
