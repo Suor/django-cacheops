@@ -166,7 +166,8 @@ def _stringify_query():
         attrs[Lookup] = ('lhs', 'rhs')
         attrs[Col] = ('alias', 'target', 'source')
     except ImportError:
-        pass
+        class Lookup(object):
+            pass
 
 
     attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
