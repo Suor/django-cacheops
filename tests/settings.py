@@ -8,6 +8,8 @@ INSTALLED_APPS = [
     'tests',
 ]
 
+MIDDLEWARE_CLASSES = []
+
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
 # Django replaces this, but it still wants it. *shrugs*

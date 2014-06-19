@@ -15,4 +15,6 @@ elif names and not names.startswith('tests.'):
 else:
     names = names_prefix
 
+if hasattr(django, 'setup'):
+    django.setup()
 call_command('test', names, failfast='-x' in sys.argv)
