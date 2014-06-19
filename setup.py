@@ -20,7 +20,7 @@ setup(
     install_requires=[
         'django>=1.3',
         'redis>=2.9.1',
-        'funcy>=1.0.0,<2.0.0',
+        'funcy>=1.1,<2.0',
         'simplejson>=2.2.0',
         'six>=1.4.0',
     ],

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
-from funcy import cached_property, project
+from funcy import cached_property, project, once, once_per
 from funcy.py2 import cat, mapcat, map
 from .cross import pickle, json, md5
 
@@ -421,37 +421,33 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
 
-# This will help with thread-safe cacheprofiles installation and _old_objs access
-import threading
-_install_lock = threading.Lock()
-_installed_classes = set()
+# We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
 
+# This will help with thread-safe _old_objs access
+import threading
 def get_thread_id():
     return threading.current_thread().ident
 
 
 class ManagerMixin(object):
+    @once_per('cls')
     def _install_cacheops(self, cls):
-        with _install_lock:
-            if cls not in _installed_classes:
-                _installed_classes.add(cls)
+        # Django 1.7 migrations create lots of fake models, just skip them
+        if cls.__module__ == '__fake__':
+            return
 
-                # Django 1.7 migrations create lots of fake models, just skip them
-                if cls.__module__ == '__fake__':
-                    return
+        cls._cacheprofile = model_profile(cls)
+        if cls._cacheprofile is not None:
+            # Set up signals
+            pre_save.connect(self._pre_save, sender=cls)
+            post_save.connect(self._post_save, sender=cls)
+            post_delete.connect(self._post_delete, sender=cls)
 
-                cls._cacheprofile = model_profile(cls)
-                if cls._cacheprofile is not None:
-                    # Set up signals
-                    pre_save.connect(self._pre_save, sender=cls)
-                    post_save.connect(self._post_save, sender=cls)
-                    post_delete.connect(self._post_delete, sender=cls)
-
-                    # Install auto-created models as their module attributes to make them picklable
-                    module = sys.modules[cls.__module__]
-                    if not hasattr(module, cls.__name__):
-                        setattr(module, cls.__name__, cls)
+            # Install auto-created models as their module attributes to make them picklable
+            module = sys.modules[cls.__module__]
+            if not hasattr(module, cls.__name__):
+                setattr(module, cls.__name__, cls)
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
@@ -555,17 +551,11 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
             invalidate_dict(sender, {base_att: instance.pk, item_att: pk})
 
 
-installed = False
-
+@once
 def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
-    global installed
-    if installed:
-        return # just return for now, second call is probably done due cycle imports
-    installed = True
-
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
