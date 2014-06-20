@@ -1,4 +1,8 @@
 from setuptools import setup
+import sys
+
+
+variable_requires = ['simplejson>=2.2.0'] if sys.version_info[0] == 2 else []
 
 setup(
     name='django-cacheops',
@@ -21,9 +25,8 @@ setup(
         'django>=1.3',
         'redis>=2.9.1',
         'funcy>=1.1,<2.0',
-        'simplejson>=2.2.0',
         'six>=1.4.0',
-    ],
+    ] + variable_requires,
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
