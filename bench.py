@@ -7,9 +7,6 @@ interactive = False
 fixtures = ['basic']
 
 
-from operator import itemgetter
-from profilehooks import profile
-
 HEADER_TEMPLATE = '==================== %-20s ===================='
 
 
@@ -76,6 +73,9 @@ flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
 args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
 selector = args[0] if args else ''
 select = selector[1:].__eq__ if selector.startswith('=') else lambda s: selector in s
+
+if 'p' in flags:
+    from profilehooks import profile
 
 from tests.bench import TESTS
 try:
