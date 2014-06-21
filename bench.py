@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os, time, gc, sys
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
@@ -13,7 +14,7 @@ HEADER_TEMPLATE = '==================== %-20s ===================='
 def run_benchmarks(tests):
     for name, test in tests:
         if 'h' in flags:
-            print HEADER_TEMPLATE % name
+            print(HEADER_TEMPLATE % name)
         time = bench_test(test)
         print('%-18s time: %.2fms' % (name, time * 1000))
 
@@ -22,7 +23,7 @@ def bench_test(test):
     if 'prepare_once' in test:
         prepared = test['prepare_once']()
         if 'h' in flags:
-                print '-' * 62
+                print('-' * 62)
 
     if 'p' in flags:
         test['run'] = profile(test['run'])
@@ -47,7 +48,7 @@ def bench_once(test, prepared=None):
     if 'prepare' in test:
         prepared = test['prepare']()
         if 'h' in flags:
-            print '-' * 62
+            print('-' * 62)
     start = time.time()
     if prepared is None:
         test['run']()
