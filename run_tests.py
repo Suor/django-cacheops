@@ -17,4 +17,4 @@ else:
 
 if hasattr(django, 'setup'):
     django.setup()
-call_command('test', names, failfast='-x' in sys.argv)
+call_command('test', names, failfast='-x' in sys.argv, verbosity=2 if '-v' in sys.argv else 1)
