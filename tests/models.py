@@ -1,6 +1,8 @@
 import six
 from datetime import date, datetime, time
 
+from funcy import suppress
+
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
@@ -90,6 +92,15 @@ class Weird(models.Model):
 
     objects = models.Manager()
     customs = CustomManager()
+
+# contrib.postgres ArrayField
+with suppress(ImportError):
+    from django.contrib.postgres.fields import ArrayField
+
+    class TaggedPost(models.Model):
+        name = models.CharField(max_length=200)
+        tags = ArrayField(models.IntegerField())
+
 
 # 16
 class Profile(models.Model):

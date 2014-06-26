@@ -237,6 +237,22 @@ class WeirdTests(BaseTestCase):
         finally:
             cacheops.query.STRICT_STRINGIFY = True
 
+try:
+    from django.contrib.postgres.fields import ArrayField
+except ImportError:
+    ArrayField = None
+
+from django.db import connection
+
+@unittest.skipIf(ArrayField is None, "No postgres array fields")
+@unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
+class ArrayTests(BaseTestCase):
+    def test_contains(self):
+        list(TaggedPost.objects.filter(tags__contains=[42]).cache())
+
+    def test_len(self):
+        list(TaggedPost.objects.filter(tags__len=42).cache())
+
 
 class TemplateTests(BaseTestCase):
     @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
