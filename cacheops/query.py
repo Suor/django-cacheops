@@ -537,8 +537,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         return
 
     for m2m in instance._meta.many_to_many:
-        if (m2m.rel.through == sender
-                and m2m.rel.to == model):
+        if m2m.rel.through == sender:
             field_name = m2m.m2m_field_name()
             column_name = m2m.m2m_column_name()
             reverse_column_name = m2m.m2m_reverse_name()
