@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os, time, gc, sys
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
@@ -7,16 +8,13 @@ interactive = False
 fixtures = ['basic']
 
 
-from operator import itemgetter
-from profilehooks import profile
-
 HEADER_TEMPLATE = '==================== %-20s ===================='
 
 
 def run_benchmarks(tests):
     for name, test in tests:
         if 'h' in flags:
-            print HEADER_TEMPLATE % name
+            print(HEADER_TEMPLATE % name)
         time = bench_test(test)
         print('%-18s time: %.2fms' % (name, time * 1000))
 
@@ -25,7 +23,7 @@ def bench_test(test):
     if 'prepare_once' in test:
         prepared = test['prepare_once']()
         if 'h' in flags:
-                print '-' * 62
+                print('-' * 62)
 
     if 'p' in flags:
         test['run'] = profile(test['run'])
@@ -50,7 +48,7 @@ def bench_once(test, prepared=None):
     if 'prepare' in test:
         prepared = test['prepare']()
         if 'h' in flags:
-            print '-' * 62
+            print('-' * 62)
     start = time.time()
     if prepared is None:
         test['run']()
@@ -59,8 +57,12 @@ def bench_once(test, prepared=None):
     now = time.time()
     return now - start, now - zero_start
 
+import django
 from django.db import connection
 from django.core.management import call_command
+
+if hasattr(django, 'setup'):
+    django.setup()
 
 # Create a test database.
 db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)
@@ -70,12 +72,16 @@ call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
 flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
 args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
-selector = args[0] if args else None
+selector = args[0] if args else ''
+select = selector[1:].__eq__ if selector.startswith('=') else lambda s: selector in s
+
+if 'p' in flags:
+    from profilehooks import profile
 
 from tests.bench import TESTS
 try:
     if selector:
-        tests = [(name, test) for name, test in TESTS if selector in name]
+        tests = [(name, test) for name, test in TESTS if select(name)]
     else:
         tests = TESTS
     run_benchmarks(tests)

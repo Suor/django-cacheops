@@ -462,7 +462,6 @@ Writing a test for an issue you are having can speed up its resolution a lot. He
 TODO
 ----
 
-- disable cache if select_for_update() called (or if _for_write set?)
 - add local cache (cleared at the and of request?)
 - better support transactions
 - a way to turn off or postpone invalidation

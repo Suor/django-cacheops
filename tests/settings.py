@@ -4,23 +4,44 @@ INSTALLED_APPS = [
     'cacheops',
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.admin',
     'tests',
 ]
+
+MIDDLEWARE_CLASSES = []
 
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite.db'
-    },
-    'slave': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite_slave.db'
+if os.environ.get('CACHEOPS_DB') == 'postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': 'cacheops',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': ''
+        },
+        'slave': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': 'cacheops_slave',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': ''
+        },
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'sqlite.db'
+        },
+        'slave': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'sqlite_slave.db'
+        }
+    }
 
 CACHEOPS_FAKE = os.environ.get('CACHEOPS') == 'FAKE'
 

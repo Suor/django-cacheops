@@ -1,3 +1,9 @@
+- support Django 1.7
+- do not fetch from cache when doing .select_for_update() and similar,
+  but do write to cache if it's enabled
+- fixed fake cacheops
+- fixed deprecation warning in Django 1.6 admin
+
 2.0
 - conditions on related models will now invalidate queryset
 - m2m invalidation is much more granular

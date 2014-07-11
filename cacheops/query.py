@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
-from funcy import cached_property, project
+from funcy import cached_property, project, once, once_per, monkey
 from funcy.py2 import cat, mapcat, map
 from .cross import pickle, json, md5
 
 import django
 from django.core.exceptions import ImproperlyConfigured
-from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -154,6 +153,23 @@ def _stringify_query():
     except ImportError:
         pass
 
+    # Moved in Django 1.7
+    try:
+        from django.contrib.contenttypes.fields import GenericRel
+    except ImportError:
+        from django.contrib.contenttypes.generic import GenericRel
+
+    # New things in Django 1.7
+    try:
+        from django.db.models.lookups import Lookup
+        from django.db.models.sql.datastructures import Col
+        attrs[Lookup] = ('lhs', 'rhs')
+        attrs[Col] = ('alias', 'target', 'source')
+    except ImportError:
+        class Lookup(object):
+            pass
+
+
     attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
         = ('connector', 'negated', 'children')
     attrs[SQLEvaluator] = ('expression',)
@@ -177,6 +193,9 @@ def _stringify_query():
         # No intern() in Python 3
         pass
 
+    def encode_attrs(obj, cls=None):
+        return (obj.__class__, [getattr(obj, attr) for attr in attrs[cls or obj.__class__]])
+
     def encode_object(obj):
         if isinstance(obj, set):
             return sorted(obj)
@@ -191,14 +210,15 @@ def _stringify_query():
         elif isinstance(obj, Field):
             return (obj.model, obj.name)
         elif obj.__class__ in attrs:
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[obj.__class__]])
+            return encode_attrs(obj)
         elif isinstance(obj, QuerySet):
             return (obj.__class__, obj.query)
         elif isinstance(obj, Aggregate):
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[Aggregate]])
+            return encode_attrs(obj, Aggregate)
         elif isinstance(obj, Query):
-            # for custom subclasses of Query
-            return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
+            return encode_attrs(obj, Query) # for custom subclasses of Query
+        elif isinstance(obj, Lookup):
+            return encode_attrs(obj, Lookup)
         # Fall back for unknown objects
         elif not STRICT_STRINGIFY and hasattr(obj, '__dict__'):
             return (obj.__class__, obj.__dict__)
@@ -230,13 +250,6 @@ class QuerySetMixin(object):
     @cached_property
     def _cloning(self):
         return 1000
-
-    def get_or_create(self, **kwargs):
-        """
-        Disabling cache for get or create
-        TODO: check whether we can use cache (or write_only) here without causing problems
-        """
-        return self.nocache()._no_monkey.get_or_create(self, **kwargs)
 
     def _require_cacheprofile(self):
         if self._cacheprofile is None:
@@ -343,7 +356,7 @@ class QuerySetMixin(object):
 
         if cache_this:
             cache_key = self._cache_key()
-            if not self._cacheconf['write_only']:
+            if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
@@ -408,33 +421,33 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
 
-# This will help with thread-safe cacheprofiles installation and _old_objs access
-import threading
-_install_lock = threading.Lock()
-_installed_classes = set()
+# We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
 
+# This will help with thread-safe _old_objs access
+import threading
 def get_thread_id():
     return threading.current_thread().ident
 
 
 class ManagerMixin(object):
+    @once_per('cls')
     def _install_cacheops(self, cls):
-        with _install_lock:
-            if cls not in _installed_classes:
-                _installed_classes.add(cls)
+        # Django 1.7 migrations create lots of fake models, just skip them
+        if cls.__module__ == '__fake__':
+            return
 
-                cls._cacheprofile = model_profile(cls)
-                if cls._cacheprofile is not None:
-                    # Set up signals
-                    pre_save.connect(self._pre_save, sender=cls)
-                    post_save.connect(self._post_save, sender=cls)
-                    post_delete.connect(self._post_delete, sender=cls)
+        cls._cacheprofile = model_profile(cls)
+        if cls._cacheprofile is not None:
+            # Set up signals
+            pre_save.connect(self._pre_save, sender=cls)
+            post_save.connect(self._post_save, sender=cls)
+            post_delete.connect(self._post_delete, sender=cls)
 
-                    # Install auto-created models as their module attributes to make them picklable
-                    module = sys.modules[cls.__module__]
-                    if not hasattr(module, cls.__name__):
-                        setattr(module, cls.__name__, cls)
+            # Install auto-created models as their module attributes to make them picklable
+            module = sys.modules[cls.__module__]
+            if not hasattr(module, cls.__name__):
+                setattr(module, cls.__name__, cls)
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
@@ -497,7 +510,7 @@ class ManagerMixin(object):
         invalidate_obj(instance)
 
     # Django 1.5- compatability
-    if django.VERSION < (1, 6):
+    if not hasattr(Manager, 'get_queryset'):
         def get_queryset(self):
             return self.get_query_set()
 
@@ -538,17 +551,11 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
             invalidate_dict(sender, {base_att: instance.pk, item_att: pk})
 
 
-installed = False
-
+@once
 def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
-    global installed
-    if installed:
-        return # just return for now, second call is probably done due cycle imports
-    installed = True
-
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
@@ -563,13 +570,21 @@ def install_cacheops():
         model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
-    from django.conf import settings
-    if 'django.contrib.admin' in settings.INSTALLED_APPS:
+    try:
+        # Use app registry in Django 1.7
+        from django.apps import apps
+        admin_used = apps.is_installed('django.contrib.admin')
+    except ImportError:
+        # Introspect INSTALLED_APPS in older djangos
+        from django.conf import settings
+        admin_used = 'django.contrib.admin' in settings.INSTALLED_APPS
+    if admin_used:
         from django.contrib.admin.options import ModelAdmin
-        def ModelAdmin_queryset(self, request):
-            return o_ModelAdmin_queryset(self, request).nocache()
-        o_ModelAdmin_queryset = ModelAdmin.queryset
-        ModelAdmin.queryset = ModelAdmin_queryset
+        # Renamed queryset to get_queryset in Django 1.6
+        method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+        @monkey(ModelAdmin, name=method_name)
+        def get_queryset(self, request):
+            return get_queryset.original(self, request).nocache()
 
     # bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
