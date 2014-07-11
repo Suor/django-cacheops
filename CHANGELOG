@@ -1,6 +1,8 @@
 - support Django 1.7
 - do not fetch from cache when doing .select_for_update() and similar,
   but do write to cache if it's enabled
+- fixed inherited models exception in admin,
+  multi-table models are still not really supported!
 - fixed fake cacheops
 - fixed deprecation warning in Django 1.6 admin
 
