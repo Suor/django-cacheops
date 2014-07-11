@@ -536,23 +536,22 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if not sender._meta.auto_created:
         return
 
-    for m2m in instance._meta.many_to_many:
-        if m2m.rel.through == sender:
-            field_name = m2m.m2m_field_name()
-            column_name = m2m.m2m_column_name()
-            reverse_column_name = m2m.m2m_reverse_name()
+    m2m = next(m2m for m2m in instance._meta.many_to_many
+                   if m2m.rel.through == sender)
 
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        objects = sender.objects.filter(**{field_name: instance.pk})
+        objects = sender.objects.filter(**{m2m.m2m_field_name(): instance.pk})
         for obj in objects:
             invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
-        # NOTE: we don't need to query thorugh objects here,
+        # NOTE: we don't need to query through objects here,
         #       cause we already know all their meaningfull attributes.
         for pk in pk_set:
-            invalidate_dict(sender, {column_name: instance.pk,
-                                     reverse_column_name: pk})
+            invalidate_dict(sender, {
+                m2m.m2m_column_name(): instance.pk,
+                m2m.m2m_reverse_name(): pk
+            })
 
 
 @once
