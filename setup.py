@@ -6,7 +6,7 @@ variable_requires = ['simplejson>=2.2.0'] if sys.version_info[0] == 2 else []
 
 setup(
     name='django-cacheops',
-    version='2.0',
+    version='2.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
