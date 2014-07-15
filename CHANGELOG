@@ -1,4 +1,5 @@
 - fixed bug in m2m invalidation
+- fixed bug with null gemoetry fields
 
 2.1
 - support Django 1.7
