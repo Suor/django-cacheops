@@ -7,7 +7,7 @@ except ImportError:
 import django
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
@@ -309,8 +309,8 @@ class IssueTests(BaseTestCase):
     fixtures = ['basic']
 
     def setUp(self):
-        user = User.objects.create(username='Suor')
-        Profile.objects.create(pk=2, user=user, tag=10)
+        self.user = User.objects.create(username='Suor')
+        Profile.objects.create(pk=2, user=self.user, tag=10)
         super(IssueTests, self).setUp()
 
     def test_16(self):
@@ -367,6 +367,10 @@ class IssueTests(BaseTestCase):
 
     def test_82(self):
         list(copy.deepcopy(Post.objects.all()).cache())
+
+    def test_100(self):
+        g = Group.objects.create()
+        g.user_set.add(self.user)
 
 
 @unittest.skipIf(not os.environ.get('LONG'), "Too long")
