@@ -98,12 +98,6 @@ NOT_SERIALIZED_FIELDS = (
 if hasattr(models, 'BinaryField'):
     NOT_SERIALIZED_FIELDS += (models.BinaryField,) # Not possible to filter by it
 
-try:
-    from django.contrib.gis.db import models as gis_models
-    NOT_SERIALIZED_FIELDS += (gis_models.PointField,)
-except Exception:
-    pass
-
 
 def dnfs(qs):
     """

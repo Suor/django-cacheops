@@ -49,8 +49,14 @@ def serializable_fields(model):
     return tuple(f for f in model._meta.fields
                    if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
+def serialize_value(field, value):
+    if value is None:
+        return value
+    else:
+        field.get_prep_value(value)
+
 def get_obj_dict(model, obj):
     return dict(
-        (field.attname, field.get_prep_value(getattr(obj, field.attname)))
+        (field.attname, serialize_value(field, getattr(obj, field.attname)))
         for field in serializable_fields(model)
     )
