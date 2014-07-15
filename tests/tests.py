@@ -655,3 +655,12 @@ class DbAgnosticTests(BaseTestCase):
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
+
+
+class GISTestCases(BaseTestCase):
+
+    def test_invalidate_model_with_geometry(self):
+        geom = Geometry()
+        geom.save()
+        # Raises ValueError if this doesn't work
+        invalidate_obj(geom)

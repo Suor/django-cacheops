@@ -94,8 +94,15 @@ NOT_SERIALIZED_FIELDS = (
     models.FileField,
     models.TextField, # One should not filter by long text equality
 )
+
 if hasattr(models, 'BinaryField'):
     NOT_SERIALIZED_FIELDS += (models.BinaryField,) # Not possible to filter by it
+
+try:
+    from django.contrib.gis.db import models as gis_models
+    NOT_SERIALIZED_FIELDS += (gis_models.PointField,)
+except Exception:
+    pass
 
 
 def dnfs(qs):
