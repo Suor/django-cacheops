@@ -657,8 +657,9 @@ class DbAgnosticTests(BaseTestCase):
             list(DbBinded.objects.cache().using('slave'))
 
 
+@unittest.skipIf(connection.settings_dict['ENGINE'] != 'django.contrib.gis.db.backends.postgis',
+                 "Only for PostGIS")
 class GISTestCases(BaseTestCase):
-
     def test_invalidate_model_with_geometry(self):
         geom = Geometry()
         geom.save()

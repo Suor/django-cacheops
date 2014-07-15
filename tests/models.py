@@ -1,3 +1,4 @@
+import os
 import six
 from datetime import date, datetime, time
 
@@ -9,7 +10,7 @@ from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
-from django.contrib.gis.db import models as gis_models
+
 
 ### For basic tests and bench
 
@@ -191,5 +192,10 @@ class Contained(models.Model):
     name = models.CharField(max_length=30)
     containers = generic.GenericRelation(GenericContainer)
 
-class Geometry(gis_models.Model):
-    point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
+
+# contrib.postgis
+if os.environ.get('CACHEOPS_DB') == 'postgis':
+    from django.contrib.gis.db import models as gis_models
+
+    class Geometry(gis_models.Model):
+        point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
