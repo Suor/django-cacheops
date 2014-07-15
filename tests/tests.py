@@ -309,7 +309,7 @@ class IssueTests(BaseTestCase):
     fixtures = ['basic']
 
     def setUp(self):
-        self.user = User.objects.create(username='Suor')
+        self.user = User.objects.create(pk=1, username='Suor')
         Profile.objects.create(pk=2, user=self.user, tag=10)
         super(IssueTests, self).setUp()
 
