@@ -1,3 +1,5 @@
+- fixed bug in m2m invalidation
+
 2.1
 - support Django 1.7
 - do not fetch from cache when doing .select_for_update() and similar,

@@ -536,7 +536,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if not sender._meta.auto_created:
         return
 
-    m2m = next(m2m for m2m in instance._meta.many_to_many
+    m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
                    if m2m.rel.through == sender)
 
     # TODO: optimize several invalidate_objs/dicts at once
