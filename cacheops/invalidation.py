@@ -53,7 +53,7 @@ def serialize_value(field, value):
     if value is None:
         return value
     else:
-        field.get_prep_value(value)
+        return field.get_prep_value(value)
 
 def get_obj_dict(model, obj):
     return dict(
