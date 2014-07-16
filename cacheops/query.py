@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
+import six
 from funcy import cached_property, project, once, once_per, monkey
 from funcy.py2 import cat, mapcat, map
 from .cross import pickle, json, md5
@@ -591,3 +592,9 @@ def install_cacheops():
 
     # bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
+
+    # Make buffers pickleable
+    if six.PY2:
+        import copy_reg
+        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
+
