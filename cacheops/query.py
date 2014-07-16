@@ -135,7 +135,7 @@ def _stringify_query():
     # Try to not require geo libs
     try:
         from django.contrib.gis.db.models.sql.where import GeoWhereNode
-    except ImportError:
+    except: # either ImportError or GEOSException
         GeoWhereNode = WhereNode
 
     # A new things in Django 1.6
