@@ -1,5 +1,6 @@
 - fixed bug in m2m invalidation
-- fixed bug with null gemoetry fields
+- fixed bug with null geometry fields
+- fixed unpickling objects with BinaryFields
 
 2.1
 - support Django 1.7
