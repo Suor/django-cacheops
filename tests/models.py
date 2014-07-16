@@ -76,6 +76,8 @@ class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
         return 'text'
 
     def to_python(self, value):
+        if value in (None, ''):
+            return None
         if isinstance(value, list):
             return value
         return map(int, value.split(','))
@@ -90,6 +92,8 @@ class Weird(models.Model):
     time_field = models.TimeField(default=time(10, 10))
     list_field = IntegerArrayField(default=lambda: [])
     custom_field = CustomField(default=CustomValue('default'))
+    if hasattr(models, 'BinaryField'):
+        binary_field = models.BinaryField()
 
     objects = models.Manager()
     customs = CustomManager()

@@ -5,6 +5,7 @@ except ImportError:
     import unittest
 
 import django
+from django.db import models, connection
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
@@ -220,6 +221,12 @@ class WeirdTests(BaseTestCase):
     def test_list(self):
         self._template('list_field', [1, 2])
 
+    @unittest.skipUnless(hasattr(models, 'BinaryField'), "No BinaryField")
+    def test_binary(self):
+        obj = Weird.objects.create(binary_field=b'12345')
+        Weird.objects.cache().get(pk=obj.pk)
+        Weird.objects.cache().get(pk=obj.pk)
+
     def test_custom(self):
         self._template('custom_field', CustomValue('some'))
 
@@ -241,8 +248,6 @@ try:
     from django.contrib.postgres.fields import ArrayField
 except ImportError:
     ArrayField = None
-
-from django.db import connection
 
 @unittest.skipIf(ArrayField is None, "No postgres array fields")
 @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
