@@ -259,8 +259,8 @@ class ArrayTests(BaseTestCase):
         list(TaggedPost.objects.filter(tags__len=42).cache())
 
 
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class TemplateTests(BaseTestCase):
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached(self):
         counts = {'a': 0, 'b': 0}
         def inc_a():
@@ -282,7 +282,6 @@ class TemplateTests(BaseTestCase):
         self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
         self.assertEqual(counts, {'a': 2, 'b': 1})
 
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached_as(self):
         counts = {'a': 0}
         def inc_a():
@@ -378,7 +377,7 @@ class IssueTests(BaseTestCase):
         g.user_set.add(self.user)
 
 
-@unittest.skipIf(not os.environ.get('LONG'), "Too long")
+@unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
     fixtures = ['basic']
 
@@ -646,15 +645,14 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 3)
 
 
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
 
         with self.assertNumQueries(0, using='slave'):
             list(DbAgnostic.objects.cache().using('slave'))
 
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_disabled(self):
         list(DbBinded.objects.cache())
 
