@@ -1,3 +1,4 @@
+2.1.1
 - fixed bug in m2m invalidation
 - fixed bug with null geometry fields
 - fixed unpickling objects with BinaryFields
