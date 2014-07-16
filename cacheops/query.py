@@ -278,9 +278,9 @@ class QuerySetMixin(object):
 
         return 'q:%s' % md.hexdigest()
 
-    def _cache_results(self, cache_key, results, timeout=None):
+    def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, timeout or self._cacheconf['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
