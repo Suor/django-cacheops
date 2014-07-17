@@ -94,9 +94,8 @@ NOT_SERIALIZED_FIELDS = (
     models.FileField,
     models.TextField, # One should not filter by long text equality
 )
-
 if hasattr(models, 'BinaryField'):
-    NOT_SERIALIZED_FIELDS += (models.BinaryField,) # Not possible to filter by it
+    NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
 def dnfs(qs):
