@@ -3,10 +3,9 @@ import sys
 from functools import wraps
 import six
 from funcy import cached_property, project, once, once_per, monkey
-from funcy.py2 import cat, mapcat, map
+from funcy.py2 import mapcat, map
 from .cross import pickle, json, md5
 
-import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
@@ -17,9 +16,9 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
-from .utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script, \
+from .utils import monkey_mix, dnfs, get_model_name, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab
-from .invalidation import invalidate_obj, invalidate_model, invalidate_dict
+from .invalidation import invalidate_obj, invalidate_dict
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -50,7 +49,7 @@ def _cached_as(*samples, **kwargs):
     """
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
-    _get_key =  kwargs.get('_get_key')
+    _get_key = kwargs.get('_get_key')
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -170,7 +169,6 @@ def _stringify_query():
         class Lookup(object):
             pass
 
-
     attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
         = ('connector', 'negated', 'children')
     attrs[SQLEvaluator] = ('expression',)
@@ -185,7 +183,7 @@ def _stringify_query():
     q_keys = q.__dict__.keys()
     q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
                  'used_aliases']
-    attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
+    attrs[Query] = tuple(sorted(set(q_keys) - set(q_ignored)))
 
     try:
         for k, v in attrs.items():
@@ -396,10 +394,10 @@ class QuerySetMixin(object):
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
-            if self._cacheprofile['local_get']    \
-                and not args                      \
-                and not self.query.select_related \
-                and not self.query.where.children:
+            if self._cacheprofile['local_get']        \
+                    and not args                      \
+                    and not self.query.select_related \
+                    and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
                 #       Some day it could produce same key for diffrent requests.
                 key = (self.__class__, self.model) + tuple(sorted(kwargs.items()))
@@ -409,8 +407,9 @@ class QuerySetMixin(object):
                     _local_get_cache[key] = self._no_monkey.get(self, *args, **kwargs)
                     return _local_get_cache[key]
                 except TypeError:
-                    pass # If some arg is unhashable we can't save it to dict key,
-                         # we just skip local cache in that case
+                    # If some arg is unhashable we can't save it to dict key,
+                    # we just skip local cache in that case
+                    pass
 
             if 'fetch' in self._cacheconf['ops']:
                 qs = self
@@ -584,8 +583,10 @@ def install_cacheops():
         admin_used = 'django.contrib.admin' in settings.INSTALLED_APPS
     if admin_used:
         from django.contrib.admin.options import ModelAdmin
+
         # Renamed queryset to get_queryset in Django 1.6
         method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+
         @monkey(ModelAdmin, name=method_name)
         def get_queryset(self, request):
             return get_queryset.original(self, request).nocache()
@@ -597,4 +598,3 @@ def install_cacheops():
     if six.PY2:
         import copy_reg
         copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
-

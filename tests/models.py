@@ -135,7 +135,6 @@ class Point(models.Model):
     x = models.DecimalField(decimal_places=6, max_digits=8, blank=True, default=0.0)
 
 
-
 # M2M models
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')

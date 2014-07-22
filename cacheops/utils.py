@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-from operator import concat
 from itertools import product
-from functools import wraps, reduce
+from functools import wraps
 import inspect
 import six
 # Use Python 2 map here for now
@@ -11,7 +10,7 @@ from .cross import json, md5hex
 import django
 from django.db import models
 from django.db.models.query import QuerySet
-from django.db.models.sql import AND, OR
+from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import EverythingNode, NothingNode
 from django.db.models.sql.expressions import SQLEvaluator

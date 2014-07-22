@@ -139,22 +139,22 @@ TESTS = [
     ('unpickle', {'run': do_unpickle}),
 
     ('get_no_cache', {'run': do_get_no_cache}),
-    ('get_hit',  {'prepare_once': do_get, 'run': do_get}),
+    ('get_hit', {'prepare_once': do_get, 'run': do_get}),
     ('get_miss', {'prepare': invalidate_get, 'run': do_get}),
 
     ('count_no_cache', {'run': do_count_no_cache}),
-    ('count_hit',  {'prepare_once': do_count, 'run': do_count}),
+    ('count_hit', {'prepare_once': do_count, 'run': do_count}),
     ('count_miss', {'prepare': invalidate_count, 'run': do_count}),
 
-    ('fetch_construct',  {'run': do_fetch_construct}),
-    ('fetch_no_cache',  {'run': do_fetch_no_cache}),
-    ('fetch_hit',  {'prepare_once': do_fetch, 'run': do_fetch}),
+    ('fetch_construct', {'run': do_fetch_construct}),
+    ('fetch_no_cache', {'run': do_fetch_no_cache}),
+    ('fetch_hit', {'prepare_once': do_fetch, 'run': do_fetch}),
     ('fetch_miss', {'prepare': invalidate_fetch, 'run': do_fetch}),
     ('fetch_cache_key', {'run': do_fetch_cache_key}),
 
     ('filter_cache_key', {'run': do_filter_cache_key}),
-    ('common_construct',  {'run': do_common_construct}),
-    ('common_inplace',  {'run': do_common_inplace}),
+    ('common_construct', {'run': do_common_construct}),
+    ('common_inplace', {'run': do_common_inplace}),
     ('common_cache_key', {'run': do_common_cache_key}),
 
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),

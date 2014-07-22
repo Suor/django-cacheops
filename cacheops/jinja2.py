@@ -25,7 +25,6 @@ class CacheopsExtension(Extension):
 
         return nodes.CallBlock(block_call, [], [], body).set_lineno(lineno)
 
-
     def handle_tag(self, tag_name, tag_location, *args, **kwargs):
         caller = kwargs.pop('caller')
 
@@ -43,7 +42,6 @@ class CacheopsExtension(Extension):
             return carefully_strip_whitespace(content)
 
         return _handle_tag()
-
 
     def parse_args(self, parser):
         args = []

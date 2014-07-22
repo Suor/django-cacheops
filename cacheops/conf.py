@@ -8,7 +8,6 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
-
 profile_defaults = {
     'ops': (),
     'local_get': False,
