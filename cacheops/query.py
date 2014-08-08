@@ -306,7 +306,7 @@ class QuerySetMixin(object):
 
         return self
 
-    def nocache(self, clone=False):
+    def nocache(self):
         """
         Convinience method, turns off caching for this queryset
         """
@@ -523,8 +523,8 @@ class ManagerMixin(object):
     def cache(self, *args, **kwargs):
         return self.get_queryset().cache(*args, **kwargs)
 
-    def nocache(self, *args, **kwargs):
-        return self.get_queryset().nocache(*args, **kwargs)
+    def nocache(self):
+        return self.get_queryset().nocache()
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):

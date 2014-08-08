@@ -1,3 +1,5 @@
+- removed bogus clone param from .nocache() call
+
 2.1.1
 - fixed bug in m2m invalidation
 - fixed bug with null geometry fields
