@@ -237,12 +237,7 @@ class WeirdTests(BaseTestCase):
         self._template('custom_field', WeirdCustom('some'))
 
     def test_custom_query(self):
-        import cacheops.query
-        try:
-            cacheops.query.STRICT_STRINGIFY = False
-            list(Weird.customs.cache())
-        finally:
-            cacheops.query.STRICT_STRINGIFY = True
+        list(Weird.customs.cache())
 
 try:
     from django.contrib.postgres.fields import ArrayField

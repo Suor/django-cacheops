@@ -9,13 +9,14 @@ from .cross import pickle, json, md5
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
+from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
+from .conf import model_profile, redis_client, handle_connection_failure
 from .utils import monkey_mix, dnfs, get_model_name, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab
 from .invalidation import invalidate_obj, invalidate_dict
@@ -102,141 +103,6 @@ def cached_view_as(*samples, **kwargs):
     return cached_view_fab(_cached_as)(*samples, **kwargs)
 
 
-def _stringify_query():
-    """
-    Serializes query object, so that it can be used to create cache key.
-    We can't just do pickle because order of keys in dicts is arbitrary,
-    we can use str(query) which compiles it to SQL, but it's too slow,
-    so we use json.dumps with sort_keys=True and object hooks.
-
-    NOTE: I like this function no more than you, it's messy
-          and pretty hard linked to django internals.
-          I just don't have nicer solution for now.
-
-          Probably the best way out of it is optimizing SQL generation,
-          which would be valuable by itself. The problem with it is that
-          any significant optimization will most likely require a major
-          refactor of sql.Query class, which is a substantial part of ORM.
-    """
-    from datetime import datetime, date, time, timedelta
-    from decimal import Decimal
-    from django.db.models.expressions import ExpressionNode, F
-    from django.db.models.fields import Field
-    from django.db.models.fields.related import ManyToOneRel, OneToOneRel
-    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
-                                           EverythingNode, NothingNode
-    from django.db.models.sql import Query
-    from django.db.models.sql.aggregates import Aggregate
-    from django.db.models.sql.datastructures import Date
-    from django.db.models.sql.expressions import SQLEvaluator
-
-    attrs = {}
-
-    # Try to not require geo libs
-    try:
-        from django.contrib.gis.db.models.sql.where import GeoWhereNode
-    except: # either ImportError or GEOSException
-        GeoWhereNode = WhereNode
-
-    # A new things in Django 1.6
-    try:
-        from django.db.models.sql.where import EmptyWhere, SubqueryConstraint
-        attrs[EmptyWhere] = ()
-        attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
-    except ImportError:
-        pass
-
-    # RawValue removed in Django 1.7
-    try:
-        from django.db.models.sql.datastructures import RawValue
-        attrs[RawValue] = ('value',)
-    except ImportError:
-        pass
-
-    # Moved in Django 1.7
-    try:
-        from django.contrib.contenttypes.fields import GenericRel
-    except ImportError:
-        from django.contrib.contenttypes.generic import GenericRel
-
-    # New things in Django 1.7
-    try:
-        from django.db.models.lookups import Lookup
-        from django.db.models.sql.datastructures import Col
-        attrs[Lookup] = ('lhs', 'rhs')
-        attrs[Col] = ('alias', 'target', 'source')
-    except ImportError:
-        class Lookup(object):
-            pass
-
-    attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
-        = ('connector', 'negated', 'children')
-    attrs[SQLEvaluator] = ('expression',)
-    attrs[ExtraWhere] = ('sqls', 'params')
-    attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
-    attrs[Date] = ('col', 'lookup_type')
-    attrs[F] = ('name',)
-    attrs[ManyToOneRel] = attrs[OneToOneRel] = attrs[GenericRel] = ('field',)
-    attrs[EverythingNode] = attrs[NothingNode] = ()
-
-    q = Query(None)
-    q_keys = q.__dict__.keys()
-    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
-                 'used_aliases']
-    attrs[Query] = tuple(sorted(set(q_keys) - set(q_ignored)))
-
-    try:
-        for k, v in attrs.items():
-            attrs[k] = map(intern, v)
-    except NameError:
-        # No intern() in Python 3
-        pass
-
-    def encode_attrs(obj, cls=None):
-        return (obj.__class__, [getattr(obj, attr) for attr in attrs[cls or obj.__class__]])
-
-    def encode_object(obj):
-        if isinstance(obj, set):
-            return sorted(obj)
-        elif isinstance(obj, type):
-            return '%s.%s' % (obj.__module__, obj.__name__)
-        elif hasattr(obj, '__uniq_key__'):
-            return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date, time, timedelta, Decimal)):
-            return str(obj)
-        elif isinstance(obj, Constraint):
-            return (obj.alias, obj.col)
-        elif isinstance(obj, Field):
-            return (obj.model, obj.name)
-        elif obj.__class__ in attrs:
-            return encode_attrs(obj)
-        elif isinstance(obj, QuerySet):
-            return (obj.__class__, obj.query)
-        elif isinstance(obj, Aggregate):
-            return encode_attrs(obj, Aggregate)
-        elif isinstance(obj, Query):
-            return encode_attrs(obj, Query) # for custom subclasses of Query
-        elif isinstance(obj, Lookup):
-            return encode_attrs(obj, Lookup)
-        # Fall back for unknown objects
-        elif not STRICT_STRINGIFY and hasattr(obj, '__dict__'):
-            return (obj.__class__, obj.__dict__)
-        else:
-            raise TypeError("Can't stringify %s" % repr(obj))
-
-    def stringify_query(query):
-        # HACK: Catch TypeError and reraise it as ValueError
-        #       since django hides it and behave weird when gets a TypeError in Queryset.iterator()
-        try:
-            return json.dumps(query, default=encode_object, skipkeys=True,
-                                     sort_keys=True, separators=(',', ':'))
-        except TypeError as e:
-            raise ValueError(*e.args)
-
-    return stringify_query
-stringify_query = _stringify_query()
-
-
 class QuerySetMixin(object):
     @cached_property
     def _cacheprofile(self):
@@ -264,7 +130,11 @@ class QuerySetMixin(object):
         md = md5()
         md.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
         md.update(stamp_fields(self.model)) # Protect from field list changes in model
-        md.update(stringify_query(self.query))
+        # Use query SQL as part of a key
+        try:
+            md.update(str(self.query))
+        except EmptyResultSet:
+            pass
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)

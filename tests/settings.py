@@ -77,9 +77,6 @@ CACHEOPS = {
     '*.*': ('just_enable', 60*60),
 }
 
-# We need to catch any changes in django
-CACHEOPS_STRICT_STRINGIFY = True
-
 ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'

@@ -23,7 +23,6 @@ for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
 
-STRICT_STRINGIFY = getattr(settings, 'CACHEOPS_STRICT_STRINGIFY', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 
