@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from itertools import product
 from functools import wraps
+import json
 import inspect
 import six
 # Use Python 2 map here for now
 from funcy.py2 import memoize, map, cat
-from .cross import json, md5hex
+from .cross import md5hex
 
 import django
 from django.db import models

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
+import json
 import six
 from funcy import cached_property, project, once, once_per, monkey
 from funcy.py2 import mapcat, map
-from .cross import pickle, json, md5
+from .cross import pickle, md5
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
