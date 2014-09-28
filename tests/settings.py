@@ -32,20 +32,21 @@ if os.environ.get('CACHEOPS_DB') == 'postgresql':
         },
     }
 elif os.environ.get('CACHEOPS_DB') == 'postgis':
+    POSTGIS_VERSION = (2, 1, 1)
     DATABASES = {
         'default': {
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops',
             'USER': 'cacheops',
             'PASSWORD': '',
-            'HOST': ''
+            'HOST': '',
         },
         'slave': {
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
             'PASSWORD': '',
-            'HOST': ''
+            'HOST': '',
         },
     }
 else:
