@@ -2,6 +2,8 @@ language: python
 python: 2.7
 services:
   - redis-server
+addons:
+  postgresql: "9.3"
 env:
   - TOXENV=py26-dj13
   - TOXENV=py26-dj14
@@ -29,5 +31,7 @@ matrix:
     - env: "TOXENV=py34-djmaster"
 install:
   - pip install tox
+before_script:
+  - psql -U postgres -c "create extension postgis"
 script:
   - tox
