@@ -24,7 +24,7 @@ setup(
         'redis>=2.9.1',
         'funcy>=1.1,<2.0',
         'six>=1.4.0',
-    ]
+    ],
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
