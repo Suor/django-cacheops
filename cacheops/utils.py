@@ -123,12 +123,15 @@ def dnfs(qs):
         """
         # Lookups appeared in Django 1.7
         if isinstance(where, Lookup):
-            attname = where.lhs.target.attname
-            # TODO: check of all of this are possible
+            # If where.lhs don't refer to a field then don't bother
+            if not hasattr(where.lhs, 'target'):
+                return [[SOME_COND]]
+            # TODO: check if all of this are possible
             if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
-            # TODO: deal with transforms, aggregates and such in lhs
-            elif isinstance(where, Exact):
+
+            attname = where.lhs.target.attname
+            if isinstance(where, Exact):
                 if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
                     return [[SOME_COND]]
                 else:
