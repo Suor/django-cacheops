@@ -32,6 +32,7 @@ matrix:
 install:
   - pip install tox
 before_script:
+  - psql -U postgres -c "create role cacheops login superuser"
   # postgis django backend requires these to exist
   - psql -U postgres -c "create database cacheops"
   - psql -U postgres -c "create database cacheops_slave"
