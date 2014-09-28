@@ -461,10 +461,13 @@ def install_cacheops():
         def get_queryset(self, request):
             return get_queryset.original(self, request).nocache()
 
-    # bind m2m changed handler
+    # Bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
 
-    # Make buffers pickleable
+    # Make buffers/memoryviews pickleable to serialize binary field data
     if six.PY2:
         import copy_reg
         copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
+    if six.PY3:
+        import copyreg
+        copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
