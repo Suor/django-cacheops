@@ -7,6 +7,7 @@ from funcy import cached_property, project, once, once_per, monkey
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
+import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
@@ -290,6 +291,15 @@ class QuerySetMixin(object):
             qs = self
 
         return qs._no_monkey.get(qs, *args, **kwargs)
+
+    if django.VERSION >= (1, 6):
+        def exists(self):
+            if self._cacheprofile and 'get' in self._cacheconf['ops']:
+                if self._result_cache is not None and not getattr(self, '_iter', None):
+                    return len(self._result_cache)
+                return cached_as(self)(lambda: self._no_monkey.exists(self))()
+            else:
+                return self._no_monkey.exists(self)
 
 
 # We need to stash old object before Model.save() to invalidate on its properties
