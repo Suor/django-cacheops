@@ -578,7 +578,6 @@ class M2MThroughTests(M2MTests):
         )
 
 
-# Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
     def test_30(self):
         list(VideoProxy.objects.cache())
@@ -594,7 +593,6 @@ class ProxyTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Video.objects.cache())
 
-    @unittest.expectedFailure
     def test_interchange(self):
         list(Video.objects.cache())
 
