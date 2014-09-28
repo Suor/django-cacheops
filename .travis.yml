@@ -5,6 +5,7 @@ services:
 addons:
   postgresql: "9.3"
 env:
+  - TOXENV=flakes
   - TOXENV=py26-dj13
   - TOXENV=py26-dj14
   - TOXENV=py26-dj15
@@ -23,7 +24,6 @@ env:
   - TOXENV=py34-dj16
   - TOXENV=py34-dj17
   - TOXENV=py34-djmaster
-  - TOXENV=flakes
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
