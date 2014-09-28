@@ -295,8 +295,8 @@ class QuerySetMixin(object):
     if django.VERSION >= (1, 6):
         def exists(self):
             if self._cacheprofile and 'get' in self._cacheconf['ops']:
-                if self._result_cache is not None and not getattr(self, '_iter', None):
-                    return len(self._result_cache)
+                if self._result_cache is not None:
+                    return bool(self._result_cache)
                 return cached_as(self)(lambda: self._no_monkey.exists(self))()
             else:
                 return self._no_monkey.exists(self)
