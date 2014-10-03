@@ -122,7 +122,8 @@ class QuerySetMixin(object):
         if self._cacheprofile is None:
             raise ImproperlyConfigured(
                 'Cacheops is not enabled for %s.%s model.\n'
-                'If you don\'t want to cache anything by default you can "just_enable" it.'
+                'If you don\'t want to cache anything by default '
+                'you can configure it with empty ops.'
                     % (self.model._meta.app_label, get_model_name(self.model)))
 
     def _cache_key(self, extra=''):
