@@ -56,23 +56,39 @@ Setup redis connection and enable caching for desired models:
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This includes request.user or post.author access,
         # where Post.author is a foreign key to auth.User
-        'auth.user': ('get', 60*15),
+        'auth.user': {'ops': 'get', 'timeoout': 60*15},
 
-        # Automatically cache all gets, queryset fetches and counts
+        # Automatically cache all gets and queryset fetches
         # to other django.contrib.auth models for an hour
-        'auth.*': ('all', 60*60),
+        'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
 
-        # Enable manual caching on all news models with default timeout of an hour
-        # Use News.objects.cache().get(...)
+        # Cache gets, fetches, counts and exists to Permission
+        # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
+        'auth.permission': {'ops': 'all', 'timeout': 60*60}
+
+        # Enable manual caching on all other models with default timeout of an hour
+        # Use Post.objects.cache().get(...)
         #  or Tags.objects.filter(...).order_by(...).cache()
         # to cache particular ORM request.
         # Invalidation is still automatic
-        'news.*': ('just_enable', 60*60),
-
-        # Automatically cache count requests for all other models for 15 min
-        '*.*': ('count', 60*15),
+        '*.*': {'ops': (), 'timeout': 60*60},
     }
 
+You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
+
+.. code:: python
+
+    CACHEOPS_DEFAULTS = {
+        'timeout': 60*60
+    }
+    CACHEOPS = {
+        'auth.user': {'ops': 'get', 'timeoout': 60*15},
+        'auth.*': {'ops': ('fetch', 'get')},
+        'auth.permission': {'ops': 'all'}
+        '*.*': {}, # Note that ops: () is also default
+    }
+
+**Note:** the old ``CACHEOPS`` configuration format is also supported, but discouraged.
 
 Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 
