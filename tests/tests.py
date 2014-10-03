@@ -43,8 +43,8 @@ class BasicTests(BaseTestCase):
     @unittest.skipUnless(django.VERSION >= (1, 6), ".exists() only cached in Django 1.6+")
     def test_exists(self):
         with self.assertNumQueries(1):
-            Category.objects.cache().exists()
-            Category.objects.cache().exists()
+            Category.objects.cache(ops='exists').exists()
+            Category.objects.cache(ops='exists').exists()
 
     def test_some(self):
         # Ignoring SOME condition lead to wrong DNF for this queryset,
