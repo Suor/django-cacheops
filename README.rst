@@ -72,6 +72,9 @@ Setup redis connection and enable caching for desired models:
         # to cache particular ORM request.
         # Invalidation is still automatic
         '*.*': {'ops': (), 'timeout': 60*60},
+
+        # And since ops is empty by default you can rewrite last line as:
+        '*.*': {'timeout': 60*60},
     }
 
 You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
@@ -85,7 +88,7 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
         'auth.user': {'ops': 'get', 'timeoout': 60*15},
         'auth.*': {'ops': ('fetch', 'get')},
         'auth.permission': {'ops': 'all'}
-        '*.*': {}, # Note that ops: () is also default
+        '*.*': {},
     }
 
 **Note:** the old ``CACHEOPS`` configuration format is also supported, but discouraged.
