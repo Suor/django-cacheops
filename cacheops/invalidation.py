@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
-from funcy import memoize
+from funcy import memoize, post_processing
 from django.db.models.expressions import ExpressionNode
 
 from .conf import redis_client, handle_connection_failure
@@ -50,14 +50,13 @@ def serializable_fields(model):
     return tuple(f for f in model._meta.fields
                    if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
-def serialize_value(field, value):
-    if value is None or isinstance(value, ExpressionNode):
-        return value
-    else:
-        return field.get_prep_value(value)
-
+@post_processing(dict)
 def get_obj_dict(model, obj):
-    return dict(
-        (field.attname, serialize_value(field, getattr(obj, field.attname)))
-        for field in serializable_fields(model)
-    )
+    for field in serializable_fields(model):
+        value = getattr(obj, field.attname)
+        if value is None:
+            yield field.attname, None
+        elif isinstance(value, ExpressionNode):
+            continue
+        else:
+            yield field.attname, field.get_prep_value(value)
