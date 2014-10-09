@@ -133,7 +133,6 @@ class BasicTests(BaseTestCase):
         extra.tag = F('tag') + 1
         extra.save()
 
-
     def test_combine(self):
         qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
         self.assertEqual(list(qs.cache()), list(qs))
