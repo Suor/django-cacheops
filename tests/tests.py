@@ -10,6 +10,7 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
+from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
                      cached, cached_as, cached_view_as
@@ -103,7 +104,6 @@ class BasicTests(BaseTestCase):
             Extra.objects.cache().get(to_tag=5)
 
     def test_expressions(self):
-        from django.db.models import F
         queries = (
             {'tag': F('tag')},
             {'tag': F('to_tag')},
@@ -123,12 +123,13 @@ class BasicTests(BaseTestCase):
                 for q in queries:
                     Extra.objects.cache().filter(**q).count()
 
-        # Check saveing F
+    def test_expressions_save(self):
+        # Check saving F
         extra = Extra.objects.all()[0]
         extra.tag = F('tag')
         extra.save()
 
-        # Check saveing ExressionNode
+        # Check saving ExressionNode
         extra = Extra.objects.all()[0]
         extra.tag = F('tag') + 1
         extra.save()
