@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 from funcy import memoize
-from django.db.models import F
+from django.db.models.expressions import ExpressionNode
 
 from .conf import redis_client, handle_connection_failure
 from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
@@ -51,7 +51,7 @@ def serializable_fields(model):
                    if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
 def serialize_value(field, value):
-    if value is None or isinstance(value, F):
+    if value is None or isinstance(value, ExpressionNode):
         return value
     else:
         return field.get_prep_value(value)

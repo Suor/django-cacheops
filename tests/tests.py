@@ -123,9 +123,16 @@ class BasicTests(BaseTestCase):
                 for q in queries:
                     Extra.objects.cache().filter(**q).count()
 
+        # Check saveing F
+        extra = Extra.objects.all()[0]
+        extra.tag = F('tag')
+        extra.save()
+
+        # Check saveing ExressionNode
         extra = Extra.objects.all()[0]
         extra.tag = F('tag') + 1
         extra.save()
+
 
     def test_combine(self):
         qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
