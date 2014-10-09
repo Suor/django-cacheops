@@ -51,9 +51,7 @@ def serializable_fields(model):
                    if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
 def serialize_value(field, value):
-    if type(value) == F:
-        return value
-    if value is None:
+    if value is None or isinstance(value, F):
         return value
     else:
         return field.get_prep_value(value)
