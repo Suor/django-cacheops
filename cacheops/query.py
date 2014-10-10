@@ -39,8 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
         args=[
             pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
-            timeout,
-            # model._cacheprofile['timeout'] + 10
+            timeout
         ]
     )
 
