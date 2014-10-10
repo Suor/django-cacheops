@@ -408,6 +408,11 @@ class ManagerMixin(object):
     def nocache(self):
         return self.get_queryset().nocache()
 
+    def bulk_create(self, objs):
+        self._no_monkey.bulk_create(self, objs)
+        for obj in objs:
+            invalidate_obj(obj)
+
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
     """

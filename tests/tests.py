@@ -92,6 +92,15 @@ class BasicTests(BaseTestCase):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
 
+    @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
+    def test_bulk_create(self):
+        cnt = Category.objects.cache().count()
+        Category.objects.bulk_create([Category(title='hi'), Category(title='there')])
+
+        with self.assertNumQueries(1):
+            cnt2 = Category.objects.cache().count()
+            self.assertEqual(cnt2, cnt + 2)
+
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)
         e.save()
