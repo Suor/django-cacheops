@@ -87,7 +87,8 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     CACHEOPS = {
         'auth.user': {'ops': 'get', 'timeoout': 60*15},
         'auth.*': {'ops': ('fetch', 'get')},
-        'auth.permission': {'ops': 'all'}
+        # None timeout means cache forever
+        'auth.permission': {'ops': 'all', 'timeout': None}
         '*.*': {},
     }
 
