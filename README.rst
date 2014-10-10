@@ -276,8 +276,7 @@ on database queried. That could be changed with ``db_agnostic`` cache profile op
 .. code:: python
 
     CACHEOPS = {
-        'some.model': ('get', TIMEOUT, {'db_agnostic': False}),
-        # ...
+        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
     }
 
 
