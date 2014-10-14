@@ -19,8 +19,9 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, redis_client, handle_connection_failure
-from .utils import monkey_mix, dnfs, get_model_name, stamp_fields, load_script, \
+from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab
+from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict
 
 
