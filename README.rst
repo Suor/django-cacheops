@@ -37,6 +37,9 @@ Or you can get latest one from github::
 Setup
 -----
 
+**Note:** this describes new style configuration, only supported on master branch.
+For currently published cacheops version see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
+
 Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
 Setup redis connection and enable caching for desired models:
