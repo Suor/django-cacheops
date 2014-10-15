@@ -269,6 +269,18 @@ And the one that FLUSHES cacheops redis database::
 Don't use that if you share redis database for both cache and something else.
 
 
+Using memory limit
+------------------
+
+If your cache never grows too large you may not bother. But if you do you have few options.
+Cacheops stores cached data along with invalidation data,
+so you can't just set ``maxmemory`` and let redis evict at its will.
+
+First strategy that will work is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+
+Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``. However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database a lot.
+
+
 Multiple database support
 -------------------------
 

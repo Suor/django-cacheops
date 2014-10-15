@@ -126,11 +126,13 @@ def cached_view_fab(_cached):
 import os.path
 
 @memoize
-def load_script(name):
+def load_script(name, strip=False):
     # TODO: strip comments
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
+    if strip:
+        code = re.sub(r'TOSTRIP.*/TOSTRIP', '', code, flags=re.S)
     return redis_client.register_script(code)
 
 

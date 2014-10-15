@@ -25,6 +25,7 @@ for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
 
+LRU = getattr(settings, 'CACHEOPS_LRU', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 

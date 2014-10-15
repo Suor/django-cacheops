@@ -91,6 +91,7 @@ else:
         '*.*': {},
     }
 
+CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
 ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'
