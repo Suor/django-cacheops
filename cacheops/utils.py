@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from functools import wraps
 import json
 import inspect
@@ -125,6 +126,8 @@ def cached_view_fab(_cached):
 
 import os.path
 
+STRIP_RE = re.compile(r'TOSTRIP.*/TOSTRIP', re.S)
+
 @memoize
 def load_script(name, strip=False):
     # TODO: strip comments
@@ -132,13 +135,12 @@ def load_script(name, strip=False):
     with open(filename) as f:
         code = f.read()
     if strip:
-        code = re.sub(r'TOSTRIP.*/TOSTRIP', '', code, flags=re.S)
+        code = STRIP_RE.sub('', code)
     return redis_client.register_script(code)
 
 
 ### Whitespace handling for template tags
 
-import re
 from django.utils.safestring import mark_safe
 
 NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
