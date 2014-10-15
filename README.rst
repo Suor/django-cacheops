@@ -539,14 +539,15 @@ Writing a test for an issue you are having can speed up its resolution a lot. He
 TODO
 ----
 
-- add local cache (cleared at the and of request?)
 - better support transactions
-- a way to turn off or postpone invalidation
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
-- fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
-- lazy methods on querysets (calculate cache key from methods called)
+- add local cache (cleared at the and of request?)
+- respect subqueries?
+- a way to postpone invalidation?
+- fast mode: store cache in local memory, but check in with redis if it's valid
+- lazy methods on querysets (calculate cache key from methods called)?
 
 
 .. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
