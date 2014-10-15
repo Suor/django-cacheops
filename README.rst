@@ -39,6 +39,7 @@ Setup
 
 **Note:** this describes new style configuration, only supported on master branch.
 For currently published cacheops version see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
+Old configuration format is also supported, but considered deprecated.
 
 Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
@@ -93,8 +94,6 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
         'auth.permission': {'ops': 'all'}
         '*.*': {},
     }
-
-**Note:** the old ``CACHEOPS`` configuration format is also supported, but discouraged.
 
 Besides ``ops`` and ``tiemout`` options you can also use:
 
