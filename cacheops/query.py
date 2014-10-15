@@ -8,6 +8,7 @@ from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
 import django
+from django.utils.encoding import smart_str
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
@@ -135,7 +136,7 @@ class QuerySetMixin(object):
         md.update(stamp_fields(self.model)) # Protect from field list changes in model
         # Use query SQL as part of a key
         try:
-            md.update(str(self.query))
+            md.update(smart_str(self.query))
         except EmptyResultSet:
             pass
         # If query results differ depending on database

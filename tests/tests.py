@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os, re, copy
 try:
     import unittest2 as unittest
@@ -424,6 +425,9 @@ class IssueTests(BaseTestCase):
     def test_100(self):
         g = Group.objects.create()
         g.user_set.add(self.user)
+
+    def test_114(self):
+        list(Category.objects.cache().filter(title=u'ó'))
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
