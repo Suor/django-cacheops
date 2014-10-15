@@ -150,9 +150,6 @@ class BasicTests(BaseTestCase):
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
 
-    def test_none_timeout(self):
-        Category.objects.cache(timeout=None).count()
-
 
 class DecoratorTests(BaseTestCase):
     def _make_func(self, deco):

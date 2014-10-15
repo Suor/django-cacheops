@@ -27,8 +27,6 @@ from .invalidation import invalidate_obj, invalidate_dict
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
-
-EMPTY = object()
 _local_get_cache = {}
 
 
@@ -155,7 +153,7 @@ class QuerySetMixin(object):
         cond_dnfs = dnfs(self)
         cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
 
-    def cache(self, ops=None, timeout=EMPTY, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None):
         """
         Enables caching for given ops
             ops        - a subset of ['get', 'fetch', 'count'],
@@ -174,7 +172,7 @@ class QuerySetMixin(object):
             ops = [ops]
         self._cacheconf['ops'] = set(ops)
 
-        if timeout is not EMPTY:
+        if timeout is not None:
             self._cacheconf['timeout'] = timeout
         if write_only is not None:
             self._cacheconf['write_only'] = write_only
