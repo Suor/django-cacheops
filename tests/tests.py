@@ -12,7 +12,7 @@ from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
 
-from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_as, cached_view_as
 from .models import *
 
@@ -149,6 +149,34 @@ class BasicTests(BaseTestCase):
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
+
+
+class NoInvalidationTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def _template(self, invalidate):
+        post = Post.objects.cache().get(pk=1)
+        invalidate(post)
+
+        with self.assertNumQueries(0):
+            changed_post = Post.objects.cache().get(pk=1)
+
+    def test_context_manager(self):
+        def invalidate(post):
+            with no_invalidation:
+                invalidate_obj(post)
+        self._template(invalidate)
+
+    def test_decorator(self):
+        self._template(no_invalidation(invalidate_obj))
+
+    def test_nested(self):
+        def invalidate(post):
+            with no_invalidation:
+                with no_invalidation:
+                    pass
+                invalidate_obj(post)
+        self._template(invalidate)
 
 
 class DecoratorTests(BaseTestCase):

@@ -267,6 +267,40 @@ And the one that FLUSHES cacheops redis database::
 
 Don't use that if you share redis database for both cache and something else.
 
+On the other hand, there is a way to turn off invalidation for a while:
+
+.. code:: python
+
+    from cacheops import no_invalidation
+
+    with no_invalidation:
+        # ... do some changes
+        obj.save()
+
+Also works as decorator:
+
+
+.. code:: python
+
+    @no_invalidation
+    def some_work(...):
+        # ... do some changes
+        obj.save()
+
+Combined with ``try ... finally`` it could be used to postpone invalidation:
+
+.. code:: python
+
+    try:
+        with no_invalidation:
+            # ...
+    finally:
+        invalidate_obj(...)
+        # ... or
+        invalidate_model(...)
+
+Postponing invalidation can considerably speed up batch jobs.
+
 
 Using memory limit
 ------------------
