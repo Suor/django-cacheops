@@ -160,7 +160,7 @@ class NoInvalidationTests(BaseTestCase):
         invalidate(post)
 
         with self.assertNumQueries(0):
-            changed_post = Post.objects.cache().get(pk=1)
+            Post.objects.cache().get(pk=1)
 
     def test_context_manager(self):
         def invalidate(post):
