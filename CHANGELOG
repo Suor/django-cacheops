@@ -1,3 +1,17 @@
+2.2
+- switched to new CACHEOPS setting style
+- added CACHEOPS_DEFAULTS setting
+- work as LRU cache
+- cache .exists() calls in Django 1.6+
+- invalidate on .bulk_create()
+- added no_invalidation context manager/decorator
+- documented local_get and cache_on_save
+- fixed saving objects with F-expression fields (Fedor Nasyrov)
+- fixed queries with Django 1.7 transforms
+- fixed binary fields in python 3
+- stopped using simplejson
+- simpler queryset key calculation,
+  third party fields should be more compatible now
 - removed bogus clone param from .nocache() call
 
 2.1.1

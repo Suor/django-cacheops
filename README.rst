@@ -37,9 +37,9 @@ Or you can get latest one from github::
 Setup
 -----
 
-**Note:** this describes new style configuration, only supported on master branch.
-For currently published cacheops version see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
-Old configuration format is also supported, but considered deprecated.
+**Note:** settings format has changed in cacheops 2.2,
+for old style settings see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
+Old format is supported in cacheops 2.2+, but considered deprecated.
 
 Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
