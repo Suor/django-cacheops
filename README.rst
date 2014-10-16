@@ -60,7 +60,7 @@ Setup redis connection and enable caching for desired models:
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This includes request.user or post.author access,
         # where Post.author is a foreign key to auth.User
-        'auth.user': {'ops': 'get', 'timeoout': 60*15},
+        'auth.user': {'ops': 'get', 'timeout': 60*15},
 
         # Automatically cache all gets and queryset fetches
         # to other django.contrib.auth models for an hour
@@ -89,13 +89,13 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
         'timeout': 60*60
     }
     CACHEOPS = {
-        'auth.user': {'ops': 'get', 'timeoout': 60*15},
+        'auth.user': {'ops': 'get', 'timeout': 60*15},
         'auth.*': {'ops': ('fetch', 'get')},
         'auth.permission': {'ops': 'all'}
         '*.*': {},
     }
 
-Besides ``ops`` and ``tiemout`` options you can also use:
+Besides ``ops`` and ``timeout`` options you can also use:
 
 ``local_get: True`` to cache simple gets for this model in process local memory.
 This is very fast, but is not invalidated in any way until process is restarted.
