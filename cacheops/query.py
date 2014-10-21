@@ -19,7 +19,7 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, redis_client, handle_connection_failure, LRU
+from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab
 from .tree import dnfs
@@ -157,7 +157,7 @@ class QuerySetMixin(object):
     def cache(self, ops=None, timeout=None, write_only=None):
         """
         Enables caching for given ops
-            ops        - a subset of ['get', 'fetch', 'count'],
+            ops        - a subset of {'get', 'fetch', 'count', 'exists'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
             write_only - don't try fetching from cache, still write result there
@@ -167,8 +167,8 @@ class QuerySetMixin(object):
         """
         self._require_cacheprofile()
 
-        if ops is None:
-            ops = ['get', 'fetch', 'count']
+        if ops is None or ops == 'all':
+            ops = ALL_OPS
         if isinstance(ops, str):
             ops = [ops]
         self._cacheconf['ops'] = set(ops)

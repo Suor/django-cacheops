@@ -429,6 +429,18 @@ class IssueTests(BaseTestCase):
     def test_114(self):
         list(Category.objects.cache().filter(title=u'ó'))
 
+    def test_117(self):
+        list(All.objects.all())
+
+        with self.assertNumQueries(0):
+            list(All.objects.all())
+
+    def test_117_manual(self):
+        list(All.objects.cache(ops='all').all())
+
+        with self.assertNumQueries(0):
+            list(All.objects.cache(ops='all').all())
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):

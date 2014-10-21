@@ -196,6 +196,11 @@ class Contained(models.Model):
     containers = generic.GenericRelation(GenericContainer)
 
 
+# 117
+class All(models.Model):
+    tag = models.IntegerField(null=True)
+
+
 # contrib.postgis
 if os.environ.get('CACHEOPS_DB') == 'postgis':
     from django.contrib.gis.db import models as gis_models

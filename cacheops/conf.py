@@ -8,6 +8,9 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
+ALL_OPS = ('get', 'fetch', 'count', 'exists')
+
+
 profile_defaults = {
     'ops': (),
     'local_get': False,
@@ -17,7 +20,7 @@ profile_defaults = {
 # TODO: remove in cacheops 3.0
 profiles = {
     'just_enable': {},
-    'all': {'ops': ('get', 'fetch', 'count')},
+    'all': {'ops': ALL_OPS},
     'get': {'ops': ('get',)},
     'count': {'ops': ('count',)},
 }
@@ -84,7 +87,10 @@ def prepare_profiles():
             mp['timeout'] = timeout
             mp['ops'] = set(mp['ops'])
         else:
-            model_profiles[app_model] = merge(profile_defaults, profile)
+            model_profiles[app_model] = mp = merge(profile_defaults, profile)
+            if mp['ops'] == 'all':
+                mp['ops'] = ALL_OPS
+            mp['ops'] = set(mp['ops'])
 
     return model_profiles
 
