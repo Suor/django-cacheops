@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
 import json
-import threading
+from collections import defaultdict
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import ExpressionNode
 
 from .conf import redis_client, handle_connection_failure
-from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
+from .utils import non_proxy, load_script, get_thread_id, NOT_SERIALIZED_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
-_no_invalidation_mode = threading.local()
-_no_invalidation_mode.depth = 0
+_no_invalidation_depth = defaultdict(int)
 
 
 @handle_connection_failure
 def invalidate_dict(model, obj_dict):
-    if _no_invalidation_mode.depth:
+    if _no_invalidation_depth.get(get_thread_id()):
         return
     model = non_proxy(model)
     load_script('invalidate')(args=[
@@ -39,7 +38,7 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    if _no_invalidation_mode.depth:
+    if _no_invalidation_depth.get(get_thread_id()):
         return
     model = non_proxy(model)
     conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
@@ -49,17 +48,17 @@ def invalidate_model(model):
 
 @handle_connection_failure
 def invalidate_all():
-    if _no_invalidation_mode.depth:
+    if _no_invalidation_depth.get(get_thread_id()):
         return
     redis_client.flushdb()
 
 
 class _no_invalidation(ContextDecorator):
     def __enter__(self):
-        _no_invalidation_mode.depth += 1
+        _no_invalidation_depth[get_thread_id()] += 1
 
     def __exit__(self, type, value, traceback):
-        _no_invalidation_mode.depth -= 1
+        _no_invalidation_depth[get_thread_id()] -= 1
 
 no_invalidation = _no_invalidation()
 

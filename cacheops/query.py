@@ -21,7 +21,7 @@ except ImportError:
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab
+                   func_cache_key, cached_view_fab, get_thread_id
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict
 
@@ -306,12 +306,6 @@ class QuerySetMixin(object):
 
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
-
-# This will help with thread-safe _old_objs access
-import threading
-def get_thread_id():
-    return threading.current_thread().ident
-
 
 class ManagerMixin(object):
     @once_per('cls')
