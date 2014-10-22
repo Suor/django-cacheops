@@ -1,3 +1,7 @@
+2.2.1
+- fixed thread local error
+- fixed ops = 'all' both in config and .cache()
+
 2.2
 - switched to new CACHEOPS setting style
 - added CACHEOPS_DEFAULTS setting
