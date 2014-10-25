@@ -68,7 +68,7 @@ Setup redis connection and enable caching for desired models:
 
         # Cache gets, fetches, counts and exists to Permission
         # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
-        'auth.permission': {'ops': 'all', 'timeout': 60*60}
+        'auth.permission': {'ops': 'all', 'timeout': 60*60},
 
         # Enable manual caching on all other models with default timeout of an hour
         # Use Post.objects.cache().get(...)
@@ -91,7 +91,7 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     CACHEOPS = {
         'auth.user': {'ops': 'get', 'timeout': 60*15},
         'auth.*': {'ops': ('fetch', 'get')},
-        'auth.permission': {'ops': 'all'}
+        'auth.permission': {'ops': 'all'},
         '*.*': {},
     }
 
