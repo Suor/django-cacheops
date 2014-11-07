@@ -27,8 +27,7 @@ class BaseCache(object):
         A decorator for caching function calls
         """
         def decorator(func):
-            @wraps(func)
-            def wrapper(*args, **kwargs):
+            def get_cache_key(*args, **kwargs):
                 # Calculating cache key based on func and arguments
                 md5 = hashlib.md5()
                 md5.update('%s.%s' % (func.__module__, func.__name__))
@@ -43,8 +42,11 @@ class BaseCache(object):
                 if kwargs:
                     md5.update(repr(sorted(kwargs.items())))
 
-                cache_key = 'c:%s' % md5.hexdigest()
+                return 'c:%s' % md5.hexdigest()
 
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                cache_key = get_cache_key(*args, **kwargs)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -52,6 +54,12 @@ class BaseCache(object):
                     self.set(cache_key, result, timeout)
 
                 return result
+
+            def invalidate(*args, **kwargs):
+                cache_key = get_cache_key(*args, **kwargs)
+                self.delete(cache_key)
+            wrapper.invalidate = invalidate
+
             return wrapper
         return decorator
 
@@ -72,6 +80,9 @@ class RedisCache(BaseCache):
             self.conn.setex(cache_key, timeout, pickled_data)
         else:
             self.conn.set(cache_key, pickled_data)
+
+    def delete(self, cache_key):
+        self.conn.delete(cache_key)
 
 cache = RedisCache(redis_client)
 cached = cache.cached
@@ -94,7 +105,7 @@ class FileCache(BaseCache):
         """
         Returns a filename corresponding to cache key
         """
-        digest = md5_constructor(key).hexdigest()
+        digest = hashlib.md5(key).hexdigest()
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
     def get(self, key):

@@ -1,3 +1,32 @@
+1.1.1
+- fixed Django 1.5- compatibility (aykutozat)
+
+1.1
+- Django 1.6+ support
+- added Django template tags
+- fixed caching querysets combined with | and & operators
+
+1.0.3
+- added db_agnostic option to cache profile
+- partial support for Django 1.6+
+
+1.0.2
+- fixed cached_on_save
+- fixed .inplace() altering cache key
+
+1.0.1
+- .delete() method for simple cache
+- .invalidate() method for @cached() and file_cache.cached() functions
+
+1.0.0
+- defend against model changes corrupting cache (ttyS15)
+- support F-expressions (Yuego)
+- fixed local_get with unhashable arg TypeError
+- fixed caching of raw queries (Yuego)
+
+0.9.9
+- fixed file cache md5 reference
+
 0.9.8
 - support isnull lookup for better invalidation
 - fixed 'Query' has no len()

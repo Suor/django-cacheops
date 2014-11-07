@@ -7,13 +7,19 @@ except ImportError:
 from functools import wraps
 import hashlib
 
+import django
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
-from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
+
+try:
+    from django.db.models.query import MAX_GET_RESULTS
+except ImportError:
+    MAX_GET_RESULTS = None
 
 from cacheops.conf import model_profile, redis_client, handle_connection_failure
-from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy
+from cacheops.utils import monkey_mix, dnf, conj_scheme, get_model_name, non_proxy, stamp_fields
 from cacheops.invalidation import cache_schemes, conj_cache_key, invalidate_obj, invalidate_model
 
 
@@ -136,23 +142,47 @@ def _stringify_query():
     """
     import simplejson as json
     from datetime import datetime, date
+    from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
-    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere
+    from django.db.models.fields.related import ManyToOneRel, OneToOneRel
+    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
+                                           EverythingNode, NothingNode
     from django.db.models.sql import Query
     from django.db.models.sql.aggregates import Aggregate
-    from django.db.models.sql.datastructures import RawValue, Date
+    from django.db.models.sql.datastructures import Date
     from django.db.models.sql.expressions import SQLEvaluator
 
     attrs = {}
-    attrs[WhereNode] = ('connector', 'negated', 'children', 'subtree_parents')
+
+    # A new things in Django 1.6
+    try:
+        from django.db.models.sql.where import EmptyWhere, SubqueryConstraint
+        attrs[EmptyWhere] = ()
+        attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
+    except ImportError:
+        pass
+
+    # RawValue removed in Django 1.7
+    try:
+        from django.db.models.sql.datastructures import RawValue
+        attrs[RawValue] = ('value',)
+    except ImportError:
+        pass
+
+    attrs[WhereNode] = attrs[ExpressionNode] \
+        = ('connector', 'negated', 'children')
+    attrs[SQLEvaluator] = ('expression',)
     attrs[ExtraWhere] = ('sqls', 'params')
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
-    attrs[RawValue] = ('value')
     attrs[Date] = ('col', 'lookup_type')
+    attrs[F] = ('name',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
     q_keys = q.__dict__.keys()
-    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache']
+    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
+                 'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
     for k, v in attrs.items():
@@ -171,19 +201,17 @@ def _stringify_query():
             return (obj.alias, obj.col)
         elif isinstance(obj, Field):
             return (obj.model, obj.name)
-        elif isinstance(obj, QuerySet):
-            return (obj.__class__, obj.query)
         elif obj.__class__ in attrs:
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[obj.__class__]])
+        elif isinstance(obj, QuerySet):
+            return (obj.__class__, obj.query)
         elif isinstance(obj, Aggregate):
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Aggregate]])
         elif isinstance(obj, Query):
             # for custom subclasses of Query
             return (obj.__class__, [getattr(obj, attr) for attr in attrs[Query]])
-        elif isinstance(obj, SQLEvaluator):
-            return (obj.__class__, obj.expression.__dict__.items())
         else:
-            raise TypeError("Can't encode %s" % repr(obj))
+            raise TypeError("Can't stringify %s" % repr(obj))
 
     def stringify_query(query):
         # HACK: Catch TypeError and reraise it as ValueError
@@ -222,9 +250,10 @@ class QuerySetMixin(object):
 
     def _require_cacheprofile(self):
         if self._cacheprofile is None:
-            raise ImproperlyConfigured('Cacheops is not enabled for %s model.\n'
-                                       'If you don\'t want to cache anything by default you can "just_enable" it.'
-                                        % get_model_name(self.model))
+            raise ImproperlyConfigured(
+                'Cacheops is not enabled for %s model.\n'
+                'If you don\'t want to cache anything by default you can "just_enable" it.'
+                    % get_model_name(self.model))
 
     def _cache_key(self, extra=''):
         """
@@ -232,7 +261,11 @@ class QuerySetMixin(object):
         """
         md5 = hashlib.md5()
         md5.update(str(self.__class__))
+        md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
+        # If query results differ depending on database
+        if not self._cacheprofile['db_agnostic']:
+            md5.update(self.db)
         if extra:
             md5.update(str(extra))
         # 'flat' attribute changes results formatting for ValuesQuerySet
@@ -317,6 +350,7 @@ class QuerySetMixin(object):
         return clone
 
     def iterator(self):
+        # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheops
 
@@ -345,7 +379,8 @@ class QuerySetMixin(object):
     def count(self):
         # Optmization borrowed from overriden method:
         # if queryset cache is already filled just return its len
-        if self._result_cache is not None and not self._iter:
+        # NOTE: there is no self._iter in Django 1.6+, so we use getattr() for compatibility
+        if self._result_cache is not None and not getattr(self, '_iter', None):
             return len(self._result_cache)
         return cached_method(op='count')(self._no_monkey.count)(self)
 
@@ -369,7 +404,11 @@ class QuerySetMixin(object):
                 except KeyError:
                     _local_get_cache[key] = self._no_monkey.get(self, *args, **kwargs)
                     return _local_get_cache[key]
-            elif 'fetch' in self._cacheops:
+                except TypeError:
+                    pass # If some arg is unhashable we can't save it to dict key,
+                         # we just skip local cache in that case
+
+            if 'fetch' in self._cacheops:
                 qs = self
             else:
                 qs = self._clone().cache()
@@ -388,10 +427,11 @@ class QuerySetMixin(object):
         # TODO: refactor this one to more understandable something
         if self._cacheprofile:
             query_dnf = dnf(self)
-            if len(query_dnf) == 1 and len(query_dnf[0]) == 1 and query_dnf[0][0][0] == self.model._meta.pk.name:
+            if len(query_dnf) == 1 and len(query_dnf[0]) == 1 \
+               and query_dnf[0][0][0] == self.model._meta.pk.name:
                 result = len(self.nocache()) > 0
                 if result:
-                    _old_objs[get_model_name(self.model)][query_dnf[0][0][1]] = self._result_cache[0]
+                    _old_objs[self.model][query_dnf[0][0][1]] = self._result_cache[0]
                 return result
         return self._no_monkey.exists(self)
 
@@ -399,11 +439,15 @@ class QuerySetMixin(object):
 class ManagerMixin(object):
     def _install_cacheops(self, cls):
         cls._cacheprofile = model_profile(cls)
-        if cls._cacheprofile is not None and get_model_name(cls) not in _old_objs:
+        if cls._cacheprofile is not None and cls not in _old_objs:
             # Set up signals
+            if not getattr(cls._meta, 'select_on_save', True):
+                # Django 1.6+ doesn't make select on save by default,
+                # which we use to fetch old state, so we fetch it ourselves in pre_save handler
+                pre_save.connect(self._pre_save, sender=cls)
             post_save.connect(self._post_save, sender=cls)
             post_delete.connect(self._post_delete, sender=cls)
-            _old_objs[get_model_name(cls)] = {}
+            _old_objs[cls] = {}
 
             # Install auto-created models as their module attributes to make them picklable
             module = sys.modules[cls.__module__]
@@ -414,11 +458,17 @@ class ManagerMixin(object):
         self._no_monkey.contribute_to_class(self, cls, name)
         self._install_cacheops(cls)
 
+    def _pre_save(self, sender, instance, **kwargs):
+        try:
+            _old_objs[sender][instance.pk] = sender.objects.get(pk=instance.pk)
+        except sender.DoesNotExist:
+            pass
+
     def _post_save(self, sender, instance, **kwargs):
         """
         Invokes invalidations for both old and new versions of saved object
         """
-        old = _old_objs[get_model_name(instance.__class__)].pop(instance.pk, None)
+        old = _old_objs[sender].pop(instance.pk, None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
@@ -436,7 +486,8 @@ class ManagerMixin(object):
             #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
             # Stripping up undesirable attributes
-            unwanted_attrs = [k for k in instance.__dict__.keys() if k.startswith('_') and k.endswith('_cache')]
+            unwanted_attrs = [k for k in instance.__dict__.keys()
+                                if k.startswith('_') and k.endswith('_cache')]
             unwanted_dict = dict((k, instance.__dict__[k]) for k in unwanted_attrs)
             for k in unwanted_attrs:
                 del instance.__dict__[k]
@@ -446,9 +497,12 @@ class ManagerMixin(object):
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
             filter_key = key[:-3] if key.endswith('_id') else key
-            cached_as(instance.__class__.objects \
-                .filter(**{filter_key: getattr(instance, key)}), extra='') \
-                (lambda: [instance])()
+
+            cond = {filter_key: getattr(instance, key)}
+            qs = sender.objects.inplace().filter(**cond).order_by()
+            if MAX_GET_RESULTS:
+                qs = qs[:MAX_GET_RESULTS + 1]
+            qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)
@@ -461,17 +515,22 @@ class ManagerMixin(object):
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance)
 
+    # Django 1.5- compatability
+    if django.VERSION < (1, 6):
+        def get_queryset(self):
+            return self.get_query_set()
+
     def inplace(self):
-        return self.get_query_set().inplace()
+        return self.get_queryset().inplace()
 
     def get(self, *args, **kwargs):
-        return self.get_query_set().inplace().get(*args, **kwargs)
+        return self.get_queryset().inplace().get(*args, **kwargs)
 
     def cache(self, *args, **kwargs):
-        return self.get_query_set().cache(*args, **kwargs)
+        return self.get_queryset().cache(*args, **kwargs)
 
     def nocache(self, *args, **kwargs):
-        return self.get_query_set().nocache(*args, **kwargs)
+        return self.get_queryset().nocache(*args, **kwargs)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):

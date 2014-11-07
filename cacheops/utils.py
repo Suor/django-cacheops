@@ -2,7 +2,9 @@
 from operator import concat, itemgetter
 from itertools import product, imap
 from inspect import getmembers, ismethod
+import hashlib
 
+import django
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql import AND, OR
@@ -18,8 +20,13 @@ def non_proxy(model):
         model = next(b for b in model.__bases__ if issubclass(b, Model) and not b._meta.abstract)
     return model
 
-def get_model_name(model):
-    return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+
+if django.VERSION < (1, 6):
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.module_name)
+else:
+    def get_model_name(model):
+        return '%s.%s' % (model._meta.app_label, model._meta.model_name)
 
 
 class MonkeyProxy(object):
@@ -56,6 +63,16 @@ def monkey_mix(cls, mixin, methods=None):
         setattr(cls, name, method.im_func)
 
 
+# Some special subconditions that don't provide dnf narrowing
+from django.db.models.sql.where import EverythingNode, NothingNode
+dnfless_subconds = (ExtraWhere, EverythingNode, NothingNode)
+
+# A new thing in Django 1.6 that should be ignored for dnf purposes
+try:
+    from django.db.models.sql.where import SubqueryConstraint
+    dnfless_subconds += (SubqueryConstraint,)
+except ImportError:
+    pass
 
 def dnf(qs):
     """
@@ -85,7 +102,7 @@ def dnf(qs):
                 return [[(attname_of(model, constraint.col), v, True)] for v in value]
             else:
                 return [[]]
-        elif isinstance(where, ExtraWhere):
+        elif isinstance(where, dnfless_subconds):
             return [[]]
         elif len(where) == 0:
             return None
@@ -139,3 +156,25 @@ def conj_scheme(conj):
     Which is just a sorted tuple of field names.
     """
     return tuple(sorted(imap(itemgetter(0), conj)))
+
+
+def stamp_fields(model, cache={}):
+    """
+    Returns serialized description of model fields.
+    """
+    if model not in cache:
+        stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
+        cache[model] = hashlib.md5(stamp).hexdigest()
+    return cache[model]
+
+
+import re
+from django.utils.safestring import mark_safe
+
+NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
+SPACE_BETWEEN_TAGS = mark_safe('> <')
+
+def carefully_strip_whitespace(text):
+    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
+    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
+    return text
