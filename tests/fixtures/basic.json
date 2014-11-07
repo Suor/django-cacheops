@@ -35,10 +35,31 @@
     }
   },
   {
+    "model": "tests.label",
+    "pk": 1,
+    "fields": {
+      "text": "Apple"
+    }
+  },
+  {
+    "model": "tests.label",
+    "pk": 2,
+    "fields": {
+      "text": "Dell"
+    }
+  },
+  {
+    "model": "tests.label",
+    "pk": 3,
+    "fields": {
+      "text": "HP"
+    }
+  },
+  {
     "model": "tests.machinebrand",
     "pk": 1,
     "fields": {
-      "categories": [1,2,3]
+      "labels": [1,2,3]
     }
   },
   {

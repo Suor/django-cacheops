@@ -71,57 +71,46 @@ class BasicTests(BaseTestCase):
             mb = MachineBrand.objects.cache().get(id=1)
 
         with self.assertNumQueries(1):
-            cat = Category.objects.cache().get(id=1)
+            label = Label.objects.cache().get(id=1)
         with self.assertNumQueries(0):
-            cat = Category.objects.cache().get(id=1)
+            label = Label.objects.cache().get(id=1)
         with self.assertNumQueries(1):
-            cat = Category.objects.cache().get(id=2)
-
-#        with self.assertNumQueries(0):
-#            cat = Category.objects.cache().get(id=2)
+            label = Label.objects.cache().get(id=2)
 
         with self.assertNumQueries(2):
-            mb.categories.remove(cat)
+            mb.labels.remove(label)
 
         with self.assertNumQueries(1):
-            cat = Category.objects.cache().get(id=1)
+            label = Label.objects.cache().get(id=1)
         with self.assertNumQueries(0):
-            cat = Category.objects.cache().get(id=1)
-
-#        with self.assertNumQueries(1):
-#            cat = Category.objects.cache().get(id=2)
-#        with self.assertNumQueries(0):
-#            cat = Category.objects.cache().get(id=2)
+            label = Label.objects.cache().get(id=1)
 
         with self.assertNumQueries(2):
-            mb.categories.remove(cat)
+            mb.labels.remove(label)
 
         with self.assertNumQueries(1):
-            print(mb.categories.cache().all())
+            list(mb.labels.cache().all())
         with self.assertNumQueries(0):
-            cats = mb.categories.cache().all()
-            print(cats)
+            labels = mb.labels.cache().all()
 
         with self.assertNumQueries(3):
-            mb.categories.remove(cats[0])
+            mb.labels.remove(labels[0])
 
         with self.assertNumQueries(1):
-            print(mb.categories.cache().all())
+            list(mb.labels.cache().all())
         with self.assertNumQueries(0):
-            cats = mb.categories.cache().all()
-            print(cats)
+            list(mb.labels.cache().all())
 
         with self.assertNumQueries(1):
-            cat = Category.objects.cache().create(title='Erlang')
+            label = Label.objects.cache().create(text="Gateway")
 
         with self.assertNumQueries(2):
-            mb.categories.add(cat)
+            mb.labels.add(label)
 
         with self.assertNumQueries(1):
-            print(mb.categories.cache().all())
+            list(mb.labels.cache().all())
         with self.assertNumQueries(0):
-            cats = mb.categories.cache().all()
-            print(cats)
+            list(mb.labels.cache().all())
 
 
     def test_db_column(self):
@@ -231,7 +220,6 @@ class IssueTests(BaseTestCase):
             Profile.objects.cache().get(user=1)
 
     def test_29(self):
-        MachineBrand.objects.exclude(categories__in=[1, 2, 3]).cache().count()
         MachineBrand.objects.exclude(labels__in=[1, 2, 3]).cache().count()
 
 
