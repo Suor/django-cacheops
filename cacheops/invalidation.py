@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import six
 from cacheops.conf import redis_client, handle_connection_failure
 from cacheops.utils import get_model_name, non_proxy
 
@@ -30,12 +31,12 @@ class ConjSchemes(object):
         self.versions = {}
 
     def get_lookup_key(self, model_or_name):
-        if not isinstance(model_or_name, basestring):
+        if not isinstance(model_or_name, six.string_types):
             model_or_name = get_model_name(model_or_name)
         return 'schemes:%s' % model_or_name
 
     def get_version_key(self, model_or_name):
-        if not isinstance(model_or_name, basestring):
+        if not isinstance(model_or_name, six.string_types):
             model_or_name = get_model_name(model_or_name)
         return 'schemes:%s:version' % model_or_name
 
@@ -96,13 +97,6 @@ class ConjSchemes(object):
                 # We increment here instead of using incr result from redis,
                 # because even our updated collection could be already obsolete
                 self.versions[model_name] += 1
-
-    def clear(self, model):
-        """
-        Clears schemes for models
-        """
-        redis_client.delete(self.get_lookup_key(model))
-        redis_client.incr(self.get_version_key(model))
 
     def clear_all(self):
         self.local = {}
@@ -176,9 +170,6 @@ def invalidate_model(model):
         redis_client.delete(*(list(cache_keys) + conjs_keys))
         for k in conjs_keys:
             redis_client.srem(set_key, k)
-
-    # BUG: a race bug here, ignoring since invalidate_model() is not for hot production use
-    cache_schemes.clear(model)
 
 def invalidate_all():
     redis_client.flushdb()

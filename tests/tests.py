@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 from django.template import Context, Template
 from django.db import connection
 
-from cacheops import invalidate_all, invalidate_model, cached
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, cached
 from .models import *
 
 
@@ -29,6 +29,19 @@ class BasicTests(BaseTestCase):
             cnt1 = Category.objects.cache().count()
             cnt2 = Category.objects.cache().count()
             self.assertEqual(cnt1, cnt2)
+
+    def test_empty(self):
+        with self.assertNumQueries(0):
+            list(Category.objects.cache().filter(id__in=[]))
+
+    def test_some(self):
+        # Ignoring SOME condition lead to wrong DNF for this queryset,
+        # which leads to no invalidation
+        list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
+        c = Category.objects.get(pk=1)
+        c.save()
+        with self.assertNumQueries(1):
+            list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
@@ -147,10 +160,44 @@ class BasicTests(BaseTestCase):
 
     def test_combine(self):
         qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
-        self.assertEquals(list(qs.cache()), list(qs))
+        self.assertEqual(list(qs.cache()), list(qs))
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
-        self.assertEquals(list(qs.cache()), list(qs))
+        self.assertEqual(list(qs.cache()), list(qs))
+
+
+from datetime import date, datetime, time
+
+class WeirdTests(BaseTestCase):
+    def _template(self, field, value, invalidation=True):
+        qs = Weird.objects.cache().filter(**{field: value})
+        count = qs.count()
+
+        Weird.objects.create(**{field: value})
+
+        if invalidation:
+            with self.assertNumQueries(1):
+                self.assertEqual(qs.count(), count + 1)
+
+    def test_date(self):
+        self._template('date_field', date.today())
+
+    def test_datetime(self):
+        self._template('datetime_field', datetime.now())
+
+    def test_time(self):
+        self._template('time_field', time(10, 30))
+
+    def test_list(self):
+        self._template('list_field', [1, 2], invalidation=False)
+
+    @unittest.expectedFailure
+    def test_list_invalidation(self):
+        self._template('list_field', [1, 2], invalidation=True)
+
+    def test_custom(self):
+        # NOTE: invalidation works if stringification of value is the same as .get_prep_value()
+        self._template('custom_field', CustomValue('some'))
 
 
 class TemplateTests(BaseTestCase):
@@ -173,8 +220,8 @@ class TemplateTests(BaseTestCase):
         """)
 
         s = t.render(Context({'a': inc_a, 'b': inc_b}))
-        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a.b')
-        self.assertEquals(counts, {'a': 2, 'b': 1})
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
+        self.assertEqual(counts, {'a': 2, 'b': 1})
 
     @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached_as(self):
@@ -193,15 +240,15 @@ class TemplateTests(BaseTestCase):
         """)
 
         s = t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(re.sub(r'\s+', '', s), '.a.a.a')
-        self.assertEquals(counts['a'], 1)
+        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a')
+        self.assertEqual(counts['a'], 1)
 
         t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(counts['a'], 1)
+        self.assertEqual(counts['a'], 1)
 
         invalidate_model(Post)
         t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEquals(counts['a'], 2)
+        self.assertEqual(counts['a'], 2)
 
 
 class IssueTests(BaseTestCase):
@@ -257,6 +304,14 @@ class IssueTests(BaseTestCase):
         # The bug is related manager not respected when .get() is called
         product.reviews.get(status=0)
 
+    def test_70(self):
+        Contained(name="aaa").save()
+        contained_obj = Contained.objects.get(name="aaa")
+        GenericContainer(content_object=contained_obj, name="bbb").save()
+
+        qs = Contained.objects.cache().filter(containers__name="bbb")
+        list(qs)
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
@@ -280,9 +335,17 @@ class ManyToManyTests(BaseTestCase):
         make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
         self.assertEqual(make_query(), [self.suor])
 
+        # query cache won't be invalidated on this create, since PhotoLike is through model
         PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
         self.assertEqual(make_query(), [self.suor, self.peterdds])
 
+    def test_44_workaround(self):
+        make_query = lambda: list(self.photo.liked_user.order_by('id').cache())
+        self.assertEqual(make_query(), [self.suor])
+
+        PhotoLike.objects.create(user=self.peterdds, photo=self.photo)
+        invalidate_obj(self.peterdds)
+        self.assertEqual(make_query(), [self.suor, self.peterdds])
 
 # Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):

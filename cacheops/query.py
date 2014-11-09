@@ -5,10 +5,13 @@ try:
 except ImportError:
     import pickle
 from functools import wraps
-import hashlib
+
+from cacheops import cross
+from cacheops.cross import json
 
 import django
 from django.core.exceptions import ImproperlyConfigured
+from django.contrib.contenttypes.generic import GenericRel
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -140,8 +143,8 @@ def _stringify_query():
           any significant optimization will most likely require a major
           refactor of sql.Query class, which is a substantial part of ORM.
     """
-    import simplejson as json
-    from datetime import datetime, date
+    from datetime import datetime, date, time
+    from decimal import Decimal
     from django.db.models.expressions import ExpressionNode, F
     from django.db.models.fields import Field
     from django.db.models.fields.related import ManyToOneRel, OneToOneRel
@@ -176,7 +179,7 @@ def _stringify_query():
     attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
     attrs[Date] = ('col', 'lookup_type')
     attrs[F] = ('name',)
-    attrs[ManyToOneRel] = attrs[OneToOneRel] = ('field',)
+    attrs[ManyToOneRel] = attrs[OneToOneRel] = attrs[GenericRel] = ('field',)
     attrs[EverythingNode] = attrs[NothingNode] = ()
 
     q = Query(None)
@@ -185,8 +188,12 @@ def _stringify_query():
                  'used_aliases']
     attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
 
-    for k, v in attrs.items():
-        attrs[k] = map(intern, v)
+    try:
+        for k, v in attrs.items():
+            attrs[k] = map(intern, v)
+    except NameError:
+        # No intern() in Python 3
+        pass
 
     def encode_object(obj):
         if isinstance(obj, set):
@@ -195,7 +202,7 @@ def _stringify_query():
             return '%s.%s' % (obj.__module__, obj.__name__)
         elif hasattr(obj, '__uniq_key__'):
             return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date)):
+        elif isinstance(obj, (datetime, date, time, Decimal)):
             return str(obj)
         elif isinstance(obj, Constraint):
             return (obj.alias, obj.col)
@@ -259,8 +266,8 @@ class QuerySetMixin(object):
         """
         Compute a cache key for this queryset
         """
-        md5 = hashlib.md5()
-        md5.update(str(self.__class__))
+        md5 = cross.md5()
+        md5.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
         md5.update(stamp_fields(self.model)) # Protect from field list changes in model
         md5.update(stringify_query(self.query))
         # If query results differ depending on database
@@ -293,13 +300,13 @@ class QuerySetMixin(object):
         if timeout and timeout > self._cacheprofile['timeout']:
             raise NotImplementedError('timeout override should be smaller than default')
 
-        if ops is None and timeout is None:
+        if ops is None:
             ops = ['get', 'fetch', 'count']
         if isinstance(ops, str):
             ops = [ops]
-
         if ops is not None:
             self._cacheops = set(ops)
+
         if timeout is not None:
             self._cachetimeout = timeout
         if write_only is not None:
@@ -492,7 +499,7 @@ class ManagerMixin(object):
             for k in unwanted_attrs:
                 del instance.__dict__[k]
 
-            key = cache_on_save if isinstance(cache_on_save, basestring) else 'pk'
+            key = 'pk' if cache_on_save is True else cache_on_save
             # Django doesn't allow filters like related_id = 1337.
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help

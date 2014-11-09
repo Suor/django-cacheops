@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='django-cacheops',
-    version='1.1.1',
+    version='1.3.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
@@ -21,6 +21,7 @@ setup(
         'django>=1.2',
         'redis>=2.4.12',
         'simplejson>=2.2.0',
+        'six>=1.4.0',
     ],
 
     classifiers=[
@@ -28,6 +29,11 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
 
         'Framework :: Django',
         'Environment :: Web Environment',

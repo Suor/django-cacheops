@@ -1,0 +1,80 @@
+# master, Python 2.7.5, Django 1.6.1
+count_no_cache     time: 0.14ms
+count_hit          time: 0.15ms
+count_miss         time: 0.49ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.23ms
+fetch_miss         time: 0.65ms
+fetch_cache_key    time: 0.05ms
+filter_cache_key   time: 0.10ms
+common_construct   time: 0.28ms
+common_inplace     time: 0.14ms
+common_cache_key   time: 0.11ms
+invalidate_obj     time: 0.23ms
+save_obj           time: 1.15ms
+complex_construct  time: 0.48ms
+complex_inplace    time: 0.37ms
+complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.81ms
+model_invalidate   time: 0.89ms
+
+# scripting, Python 2.7.5, Django 1.6.1
+count_no_cache     time: 0.14ms
+count_hit          time: 0.15ms
+count_miss         time: 0.43ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.23ms
+fetch_miss         time: 0.58ms
+invalidate_obj     time: 0.11ms
+save_obj           time: 0.93ms
+complex_construct  time: 0.48ms
+complex_inplace    time: 0.37ms
+complex_cache_key  time: 0.18ms
+big_invalidate     time: 0.23ms
+model_invalidate   time: 0.77ms
+
+
+# master, Python 3.3.2, Django 1.6.1
+count_no_cache     time: 0.15ms
+count_hit          time: 0.15ms
+count_miss         time: 0.50ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.22ms
+fetch_miss         time: 0.61ms
+invalidate_obj     time: 0.21ms
+save_obj           time: 1.11ms
+complex_construct  time: 0.49ms
+complex_inplace    time: 0.38ms
+complex_cache_key  time: 0.10ms
+
+# scripting, Python 3.3.2, Django 1.6.1
+count_no_cache     time: 0.15ms
+count_hit          time: 0.15ms
+count_miss         time: 0.43ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.22ms
+fetch_hit          time: 0.22ms
+fetch_miss         time: 0.54ms
+invalidate_obj     time: 0.14ms
+save_obj           time: 0.99ms
+complex_construct  time: 0.49ms
+complex_inplace    time: 0.37ms
+complex_cache_key  time: 0.10ms
+
+
+# master, Python 2.6.9, Django 1.6.1
+count_no_cache     time: 0.15ms
+count_hit          time: 0.16ms
+count_miss         time: 0.50ms
+fetch_construct    time: 0.02ms
+fetch_no_cache     time: 0.23ms
+fetch_hit          time: 0.24ms
+fetch_miss         time: 0.67ms
+invalidate_obj     time: 0.24ms
+save_obj           time: 1.20ms
+complex_construct  time: 0.52ms
+complex_inplace    time: 0.39ms
+complex_cache_key  time: 0.14ms
