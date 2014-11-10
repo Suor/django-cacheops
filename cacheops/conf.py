@@ -43,9 +43,11 @@ if DEGRADE_ON_FAILURE:
 else:
     handle_connection_failure = identity
 
+
 class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
+CacheopsRedis = SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis
 
 # Connecting to redis
 try:
@@ -53,7 +55,22 @@ try:
 except AttributeError:
     raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
 
-redis_client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
+try:
+    redis_replica_conf = settings.CACHEOPS_REDIS_REPLICA
+    redis_replica = redis.StrictRedis(**redis_replica_conf)
+
+    class ReplicaProxyRedis(CacheopsRedis):
+        """ Proxy `get` calls to redis replica.
+        """
+        def get(self, *args, **kwargs):
+            try:
+                return redis_replica.get(*args, **kwargs)
+            except redis.ConnectionError:
+                return super(ReplicaProxyRedis, self).get(*args, **kwargs)
+
+    redis_client = ReplicaProxyRedis(**redis_conf)
+except AttributeError:
+    redis_client = CacheopsRedis(**redis_conf)
 
 
 @memoize
