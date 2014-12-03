@@ -92,6 +92,7 @@ else:
     }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
+CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE'))
 ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'
