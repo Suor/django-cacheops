@@ -446,6 +446,14 @@ and ``@cached`` decorators, however, they require explicit naming of each fragme
 
 You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
 
+To invalidate cached fragment use:
+
+.. code:: python
+
+    from cacheops import invalidate_fragment
+
+    invalidate_fragment(fragment_name, extra1, ...)
+
 
 Jinja2 extension
 ----------------

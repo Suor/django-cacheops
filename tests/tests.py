@@ -14,7 +14,8 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as
+                     cached, cached_as, cached_view_as, \
+                     invalidate_fragment
 from .models import *
 
 
@@ -331,6 +332,24 @@ class TemplateTests(BaseTestCase):
         s = t.render(Context({'a': inc_a, 'b': inc_b}))
         self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
         self.assertEqual(counts, {'a': 2, 'b': 1})
+
+    def test_invalidate_fragment(self):
+        counts = {'a': 0}
+        def inc_a():
+            counts['a'] += 1
+            return counts['a']
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached 60 'a' %}.{{ a }}{% endcached %}
+        """)
+
+        render = lambda: re.sub(r'\s+', '', t.render(Context({'a': inc_a})))
+
+        self.assertEqual(render(), '.1')
+
+        invalidate_fragment('a')
+        self.assertEqual(render(), '.2')
 
     def test_cached_as(self):
         counts = {'a': 0}

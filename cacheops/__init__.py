@@ -11,6 +11,7 @@ if not FAKE:
     from .simple import *
     from .query import *
     from .invalidation import *
+    from .templatetags.cacheops import *
 else:
     from .fake import *
 
