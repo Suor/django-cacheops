@@ -362,11 +362,12 @@ functions:
         return _articles_json()
 
 
-You can manually invalidate cached function result this way:
+You can manually invalidate or update a result of cached function:
 
 .. code:: python
 
     top_articles.invalidate(some_category)
+    top_articles.key(some_category).set(new_value)
 
 
 Cacheops also provides get/set primitives for simple cache:
@@ -412,6 +413,8 @@ File based cache can be used the same way as simple time-invalidated one:
 
     # later, on appropriate event
     top_articles.invalidate(some_category)
+    # or
+    top_articles.key(some_category).set(some_value)
 
     # primitives
     file_cache.set(cache_key, data, timeout=None)

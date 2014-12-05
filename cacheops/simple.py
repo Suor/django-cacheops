@@ -15,6 +15,22 @@ __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss')
 class CacheMiss(Exception):
     pass
 
+class CacheKey(str):
+    @classmethod
+    def make(cls, value, cache=None, timeout=None):
+        self = CacheKey(value)
+        self.cache = cache
+        self.timeout = timeout
+        return self
+
+    def get(self):
+        self.cache.get(self)
+
+    def set(self, value):
+        self.cache.set(self, value, self.timeout)
+
+    def delete(self):
+        self.cache.delete(self)
 
 class BaseCache(object):
     """
@@ -40,6 +56,11 @@ class BaseCache(object):
                 cache_key = 'c:' + _get_key(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
+
+            def key(*args, **kwargs):
+                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                return CacheKey.make(cache_key, cache=self, timeout=timeout)
+            wrapper.key = key
 
             return wrapper
         return decorator

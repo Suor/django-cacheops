@@ -726,6 +726,12 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.invalidate(2)
         self.assertEqual(get_calls(2), 3)
 
+        get_calls.key(2).delete()
+        self.assertEqual(get_calls(2), 4)
+
+        get_calls.key(2).set(42)
+        self.assertEqual(get_calls(2), 42)
+
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
