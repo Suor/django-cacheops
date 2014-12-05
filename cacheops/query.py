@@ -11,7 +11,7 @@ import django
 from django.utils.encoding import smart_str
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
-from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
+from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 try:
@@ -447,7 +447,14 @@ def install_cacheops():
     QuerySet._cloning = QuerySetMixin._cloning
     monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
     monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
-    monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
+
+    # Removed in Django 1.8+
+    try:
+        from django.db.models.query import DateQuerySet
+    except ImportError:
+        pass
+    else:
+        monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
 
     # Install profile and signal handlers for any earlier created models
     from django.db.models import get_models
