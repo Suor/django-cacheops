@@ -14,8 +14,7 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as, \
-                     invalidate_fragment
+                     cached, cached_as, cached_view_as
 from .models import *
 
 
@@ -334,6 +333,8 @@ class TemplateTests(BaseTestCase):
         self.assertEqual(counts, {'a': 2, 'b': 1})
 
     def test_invalidate_fragment(self):
+        from cacheops import invalidate_fragment
+
         counts = {'a': 0}
         def inc_a():
             counts['a'] += 1
