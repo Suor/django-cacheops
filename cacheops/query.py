@@ -403,8 +403,8 @@ class ManagerMixin(object):
     def nocache(self):
         return self.get_queryset().nocache()
 
-    def bulk_create(self, objs):
-        self._no_monkey.bulk_create(self, objs)
+    def bulk_create(self, objs, batch_size=None):
+        self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
         for obj in objs:
             invalidate_obj(obj)
 
