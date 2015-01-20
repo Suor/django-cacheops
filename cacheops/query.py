@@ -303,6 +303,11 @@ class QuerySetMixin(object):
             else:
                 return self._no_monkey.exists(self)
 
+    def bulk_create(self, objs, batch_size=None):
+        self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+        for obj in objs:
+            invalidate_obj(obj)
+
 
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
@@ -402,11 +407,6 @@ class ManagerMixin(object):
 
     def nocache(self):
         return self.get_queryset().nocache()
-
-    def bulk_create(self, objs, batch_size=None):
-        self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
-        for obj in objs:
-            invalidate_obj(obj)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
