@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from copy import deepcopy
 import warnings
+import six
 import redis
 from funcy import memoize, decorator, identity, is_tuple, merge
 
@@ -92,6 +93,9 @@ def prepare_profiles():
             model_profiles[app_model] = mp = merge(profile_defaults, profile)
             if mp['ops'] == 'all':
                 mp['ops'] = ALL_OPS
+            # People will do that anyway :)
+            if isinstance(mp['ops'], six.string_types):
+                mp['ops'] = [mp['ops']]
             mp['ops'] = set(mp['ops'])
 
     return model_profiles
