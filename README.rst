@@ -556,8 +556,17 @@ TODO
 - shard cache between multiple redises
 - add local cache (cleared at the and of request?)
 - respect subqueries?
+- respect headers in @cached_view*?
+- support CBV?
+- group invalidate_obj() calls?
 - a way to postpone invalidation?
 - fast mode: store cache in local memory, but check in with redis if it's valid
+- an interface for complex fields to extract exact on parts or transforms:
+    - ArrayField.len => field__len=?
+    - ArrayField[0] => field__0=?
+    - JSONField['some_key'] => field__some_key=?
+- cache a string directly (no pickle) for direct serving (custom key function?)
+- try msgpack?
 - lazy methods on querysets (calculate cache key from methods called)?
 
 
