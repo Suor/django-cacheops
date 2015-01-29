@@ -1,3 +1,4 @@
+import os
 import six
 from datetime import date, datetime, time
 
@@ -75,6 +76,8 @@ class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
         return 'text'
 
     def to_python(self, value):
+        if value in (None, ''):
+            return None
         if isinstance(value, list):
             return value
         return map(int, value.split(','))
@@ -89,6 +92,8 @@ class Weird(models.Model):
     time_field = models.TimeField(default=time(10, 10))
     list_field = IntegerArrayField(default=lambda: [])
     custom_field = CustomField(default=CustomValue('default'))
+    if hasattr(models, 'BinaryField'):
+        binary_field = models.BinaryField()
 
     objects = models.Manager()
     customs = CustomManager()
@@ -130,7 +135,6 @@ class Point(models.Model):
     x = models.DecimalField(decimal_places=6, max_digits=8, blank=True, default=0.0)
 
 
-
 # M2M models
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
@@ -150,6 +154,8 @@ class Labeling(models.Model):
     brand = models.ForeignKey(BrandT)
     tag = models.IntegerField()
 
+class PremiumBrand(Brand):
+    extra = models.CharField(max_length=127, blank=True, default='')
 
 # local_get
 class Local(models.Model):
@@ -188,3 +194,16 @@ class GenericContainer(models.Model):
 class Contained(models.Model):
     name = models.CharField(max_length=30)
     containers = generic.GenericRelation(GenericContainer)
+
+
+# 117
+class All(models.Model):
+    tag = models.IntegerField(null=True)
+
+
+# contrib.postgis
+if os.environ.get('CACHEOPS_DB') == 'postgis':
+    from django.contrib.gis.db import models as gis_models
+
+    class Geometry(gis_models.Model):
+        point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)

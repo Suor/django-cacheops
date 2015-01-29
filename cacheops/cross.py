@@ -1,11 +1,5 @@
 import six, hashlib
 
-# simplejson is slow in python 3 and json supports sort_keys
-if six.PY2:
-    import simplejson as json
-else:
-    import json
-
 # Use cPickle in python 2 and pickle in python 3
 try:
     import cPickle as pickle

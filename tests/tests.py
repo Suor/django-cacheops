@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os, re, copy
 try:
     import unittest2 as unittest
@@ -5,12 +6,14 @@ except ImportError:
     import unittest
 
 import django
+from django.db import models, connection
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.template import Context, Template
+from django.db.models import F
 
-from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
+from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_as, cached_view_as
 from .models import *
 
@@ -38,6 +41,12 @@ class BasicTests(BaseTestCase):
         list(Category.objects.filter(pk=1).cache())
         with self.assertNumQueries(0):
             list(Category.objects.filter(pk__exact=1).cache())
+
+    @unittest.skipUnless(django.VERSION >= (1, 6), ".exists() only cached in Django 1.6+")
+    def test_exists(self):
+        with self.assertNumQueries(1):
+            Category.objects.cache(ops='exists').exists()
+            Category.objects.cache(ops='exists').exists()
 
     def test_some(self):
         # Ignoring SOME condition lead to wrong DNF for this queryset,
@@ -84,6 +93,15 @@ class BasicTests(BaseTestCase):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
 
+    @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
+    def test_bulk_create(self):
+        cnt = Category.objects.cache().count()
+        Category.objects.bulk_create([Category(title='hi'), Category(title='there')])
+
+        with self.assertNumQueries(1):
+            cnt2 = Category.objects.cache().count()
+            self.assertEqual(cnt2, cnt + 2)
+
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)
         e.save()
@@ -96,7 +114,6 @@ class BasicTests(BaseTestCase):
             Extra.objects.cache().get(to_tag=5)
 
     def test_expressions(self):
-        from django.db.models import F
         queries = (
             {'tag': F('tag')},
             {'tag': F('to_tag')},
@@ -116,12 +133,51 @@ class BasicTests(BaseTestCase):
                 for q in queries:
                     Extra.objects.cache().filter(**q).count()
 
+    def test_expressions_save(self):
+        # Check saving F
+        extra = Extra.objects.all()[0]
+        extra.tag = F('tag')
+        extra.save()
+
+        # Check saving ExressionNode
+        extra = Extra.objects.all()[0]
+        extra.tag = F('tag') + 1
+        extra.save()
+
     def test_combine(self):
         qs = Post.objects.filter(pk__in=[1, 2]) & Post.objects.all()
         self.assertEqual(list(qs.cache()), list(qs))
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
+
+
+class NoInvalidationTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def _template(self, invalidate):
+        post = Post.objects.cache().get(pk=1)
+        invalidate(post)
+
+        with self.assertNumQueries(0):
+            Post.objects.cache().get(pk=1)
+
+    def test_context_manager(self):
+        def invalidate(post):
+            with no_invalidation:
+                invalidate_obj(post)
+        self._template(invalidate)
+
+    def test_decorator(self):
+        self._template(no_invalidation(invalidate_obj))
+
+    def test_nested(self):
+        def invalidate(post):
+            with no_invalidation:
+                with no_invalidation:
+                    pass
+                invalidate_obj(post)
+        self._template(invalidate)
 
 
 class DecoratorTests(BaseTestCase):
@@ -220,6 +276,12 @@ class WeirdTests(BaseTestCase):
     def test_list(self):
         self._template('list_field', [1, 2])
 
+    @unittest.skipUnless(hasattr(models, 'BinaryField'), "No BinaryField")
+    def test_binary(self):
+        obj = Weird.objects.create(binary_field=b'12345')
+        Weird.objects.cache().get(pk=obj.pk)
+        Weird.objects.cache().get(pk=obj.pk)
+
     def test_custom(self):
         self._template('custom_field', CustomValue('some'))
 
@@ -230,19 +292,12 @@ class WeirdTests(BaseTestCase):
         self._template('custom_field', WeirdCustom('some'))
 
     def test_custom_query(self):
-        import cacheops.query
-        try:
-            cacheops.query.STRICT_STRINGIFY = False
-            list(Weird.customs.cache())
-        finally:
-            cacheops.query.STRICT_STRINGIFY = True
+        list(Weird.customs.cache())
 
 try:
     from django.contrib.postgres.fields import ArrayField
 except ImportError:
     ArrayField = None
-
-from django.db import connection
 
 @unittest.skipIf(ArrayField is None, "No postgres array fields")
 @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
@@ -254,8 +309,8 @@ class ArrayTests(BaseTestCase):
         list(TaggedPost.objects.filter(tags__len=42).cache())
 
 
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class TemplateTests(BaseTestCase):
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached(self):
         counts = {'a': 0, 'b': 0}
         def inc_a():
@@ -277,7 +332,6 @@ class TemplateTests(BaseTestCase):
         self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
         self.assertEqual(counts, {'a': 2, 'b': 1})
 
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_cached_as(self):
         counts = {'a': 0}
         def inc_a():
@@ -309,8 +363,8 @@ class IssueTests(BaseTestCase):
     fixtures = ['basic']
 
     def setUp(self):
-        user = User.objects.create(username='Suor')
-        Profile.objects.create(pk=2, user=user, tag=10)
+        self.user = User.objects.create(pk=1, username='Suor')
+        Profile.objects.create(pk=2, user=self.user, tag=10)
         super(IssueTests, self).setUp()
 
     def test_16(self):
@@ -368,8 +422,27 @@ class IssueTests(BaseTestCase):
     def test_82(self):
         list(copy.deepcopy(Post.objects.all()).cache())
 
+    def test_100(self):
+        g = Group.objects.create()
+        g.user_set.add(self.user)
 
-@unittest.skipIf(not os.environ.get('LONG'), "Too long")
+    def test_114(self):
+        list(Category.objects.cache().filter(title=u'ó'))
+
+    def test_117(self):
+        list(All.objects.all())
+
+        with self.assertNumQueries(0):
+            list(All.objects.all())
+
+    def test_117_manual(self):
+        list(All.objects.cache(ops='all').all())
+
+        with self.assertNumQueries(0):
+            list(All.objects.cache(ops='all').all())
+
+
+@unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
     fixtures = ['basic']
 
@@ -517,6 +590,21 @@ class M2MTests(BaseTestCase):
             lambda: self.bf.labels.remove(self.furious)
         )
 
+class MultiTableInheritanceWithM2MTest(M2MTests):
+
+    def setUp(self):
+        self.bf = PremiumBrand.objects.create()
+        self.bs = PremiumBrand.objects.create()
+
+        self.fast = Label.objects.create(text='fast')
+        self.slow = Label.objects.create(text='slow')
+        self.furious = Label.objects.create(text='furios')
+
+        self.bf.labels.add(self.fast, self.furious)
+        self.bs.labels.add(self.slow, self.furious)
+
+        super(M2MTests, self).setUp()
+
 
 class M2MThroughTests(M2MTests):
     brand_cls = BrandT
@@ -560,25 +648,23 @@ class M2MThroughTests(M2MTests):
         )
 
 
-# Tests for proxy models, see #30
 class ProxyTests(BaseTestCase):
     def test_30(self):
-        proxies = list(VideoProxy.objects.cache())
+        list(VideoProxy.objects.cache())
         Video.objects.create(title='Pulp Fiction')
 
         with self.assertNumQueries(1):
             list(VideoProxy.objects.cache())
 
     def test_30_reversed(self):
-        proxies = list(Video.objects.cache())
+        list(Video.objects.cache())
         VideoProxy.objects.create(title='Pulp Fiction')
 
         with self.assertNumQueries(1):
             list(Video.objects.cache())
 
-    @unittest.expectedFailure
     def test_interchange(self):
-        proxies = list(Video.objects.cache())
+        list(Video.objects.cache())
 
         with self.assertNumQueries(0):
             list(VideoProxy.objects.cache())
@@ -622,17 +708,26 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 3)
 
 
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
 
         with self.assertNumQueries(0, using='slave'):
             list(DbAgnostic.objects.cache().using('slave'))
 
-    @unittest.skipIf(django.VERSION < (1, 4), "not supported Django prior to 1.4")
     def test_db_agnostic_disabled(self):
         list(DbBinded.objects.cache())
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
+
+
+@unittest.skipIf(connection.settings_dict['ENGINE'] != 'django.contrib.gis.db.backends.postgis',
+                 "Only for PostGIS")
+class GISTests(BaseTestCase):
+    def test_invalidate_model_with_geometry(self):
+        geom = Geometry()
+        geom.save()
+        # Raises ValueError if this doesn't work
+        invalidate_obj(geom)

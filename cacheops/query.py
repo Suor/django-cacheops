@@ -1,24 +1,29 @@
 # -*- coding: utf-8 -*-
 import sys
 from functools import wraps
+import json
+import six
 from funcy import cached_property, project, once, once_per, monkey
-from funcy.py2 import cat, mapcat, map
-from .cross import pickle, json, md5
+from funcy.py2 import mapcat, map
+from .cross import pickle, md5
 
 import django
+from django.utils.encoding import smart_str
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet, DateQuerySet
+from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, redis_client, handle_connection_failure, STRICT_STRINGIFY
-from .utils import monkey_mix, dnfs, get_model_name, non_proxy, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab
-from .invalidation import invalidate_obj, invalidate_model, invalidate_dict
+from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
+from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
+                   func_cache_key, cached_view_fab, get_thread_id
+from .tree import dnfs
+from .invalidation import invalidate_obj, invalidate_dict
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -31,13 +36,12 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    load_script('cache_thing')(
+    load_script('cache_thing', LRU)(
         keys=[cache_key],
         args=[
             pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
-            timeout,
-            # model._cacheprofile['timeout'] + 10
+            timeout
         ]
     )
 
@@ -49,7 +53,7 @@ def _cached_as(*samples, **kwargs):
     """
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
-    _get_key =  kwargs.get('_get_key')
+    _get_key = kwargs.get('_get_key')
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -102,142 +106,6 @@ def cached_view_as(*samples, **kwargs):
     return cached_view_fab(_cached_as)(*samples, **kwargs)
 
 
-def _stringify_query():
-    """
-    Serializes query object, so that it can be used to create cache key.
-    We can't just do pickle because order of keys in dicts is arbitrary,
-    we can use str(query) which compiles it to SQL, but it's too slow,
-    so we use json.dumps with sort_keys=True and object hooks.
-
-    NOTE: I like this function no more than you, it's messy
-          and pretty hard linked to django internals.
-          I just don't have nicer solution for now.
-
-          Probably the best way out of it is optimizing SQL generation,
-          which would be valuable by itself. The problem with it is that
-          any significant optimization will most likely require a major
-          refactor of sql.Query class, which is a substantial part of ORM.
-    """
-    from datetime import datetime, date, time, timedelta
-    from decimal import Decimal
-    from django.db.models.expressions import ExpressionNode, F
-    from django.db.models.fields import Field
-    from django.db.models.fields.related import ManyToOneRel, OneToOneRel
-    from django.db.models.sql.where import Constraint, WhereNode, ExtraWhere, \
-                                           EverythingNode, NothingNode
-    from django.db.models.sql import Query
-    from django.db.models.sql.aggregates import Aggregate
-    from django.db.models.sql.datastructures import Date
-    from django.db.models.sql.expressions import SQLEvaluator
-
-    attrs = {}
-
-    # Try to not require geo libs
-    try:
-        from django.contrib.gis.db.models.sql.where import GeoWhereNode
-    except ImportError:
-        GeoWhereNode = WhereNode
-
-    # A new things in Django 1.6
-    try:
-        from django.db.models.sql.where import EmptyWhere, SubqueryConstraint
-        attrs[EmptyWhere] = ()
-        attrs[SubqueryConstraint] = ('alias', 'columns', 'targets', 'query_object')
-    except ImportError:
-        pass
-
-    # RawValue removed in Django 1.7
-    try:
-        from django.db.models.sql.datastructures import RawValue
-        attrs[RawValue] = ('value',)
-    except ImportError:
-        pass
-
-    # Moved in Django 1.7
-    try:
-        from django.contrib.contenttypes.fields import GenericRel
-    except ImportError:
-        from django.contrib.contenttypes.generic import GenericRel
-
-    # New things in Django 1.7
-    try:
-        from django.db.models.lookups import Lookup
-        from django.db.models.sql.datastructures import Col
-        attrs[Lookup] = ('lhs', 'rhs')
-        attrs[Col] = ('alias', 'target', 'source')
-    except ImportError:
-        class Lookup(object):
-            pass
-
-
-    attrs[WhereNode] = attrs[GeoWhereNode] = attrs[ExpressionNode] \
-        = ('connector', 'negated', 'children')
-    attrs[SQLEvaluator] = ('expression',)
-    attrs[ExtraWhere] = ('sqls', 'params')
-    attrs[Aggregate] = ('source', 'is_summary', 'col', 'extra')
-    attrs[Date] = ('col', 'lookup_type')
-    attrs[F] = ('name',)
-    attrs[ManyToOneRel] = attrs[OneToOneRel] = attrs[GenericRel] = ('field',)
-    attrs[EverythingNode] = attrs[NothingNode] = ()
-
-    q = Query(None)
-    q_keys = q.__dict__.keys()
-    q_ignored = ['join_map', 'dupe_avoidance', '_extra_select_cache', '_aggregate_select_cache',
-                 'used_aliases']
-    attrs[Query] = tuple(sorted( set(q_keys) - set(q_ignored) ))
-
-    try:
-        for k, v in attrs.items():
-            attrs[k] = map(intern, v)
-    except NameError:
-        # No intern() in Python 3
-        pass
-
-    def encode_attrs(obj, cls=None):
-        return (obj.__class__, [getattr(obj, attr) for attr in attrs[cls or obj.__class__]])
-
-    def encode_object(obj):
-        if isinstance(obj, set):
-            return sorted(obj)
-        elif isinstance(obj, type):
-            return '%s.%s' % (obj.__module__, obj.__name__)
-        elif hasattr(obj, '__uniq_key__'):
-            return (obj.__class__, obj.__uniq_key__())
-        elif isinstance(obj, (datetime, date, time, timedelta, Decimal)):
-            return str(obj)
-        elif isinstance(obj, Constraint):
-            return (obj.alias, obj.col)
-        elif isinstance(obj, Field):
-            return (obj.model, obj.name)
-        elif obj.__class__ in attrs:
-            return encode_attrs(obj)
-        elif isinstance(obj, QuerySet):
-            return (obj.__class__, obj.query)
-        elif isinstance(obj, Aggregate):
-            return encode_attrs(obj, Aggregate)
-        elif isinstance(obj, Query):
-            return encode_attrs(obj, Query) # for custom subclasses of Query
-        elif isinstance(obj, Lookup):
-            return encode_attrs(obj, Lookup)
-        # Fall back for unknown objects
-        elif not STRICT_STRINGIFY and hasattr(obj, '__dict__'):
-            return (obj.__class__, obj.__dict__)
-        else:
-            raise TypeError("Can't stringify %s" % repr(obj))
-
-    def stringify_query(query):
-        # HACK: Catch TypeError and reraise it as ValueError
-        #       since django hides it and behave weird when gets a TypeError in Queryset.iterator()
-        try:
-            return json.dumps(query, default=encode_object, skipkeys=True,
-                                     sort_keys=True, separators=(',', ':'))
-        except TypeError as e:
-            raise ValueError(*e.args)
-
-    return stringify_query
-stringify_query = _stringify_query()
-
-
 class QuerySetMixin(object):
     @cached_property
     def _cacheprofile(self):
@@ -255,7 +123,8 @@ class QuerySetMixin(object):
         if self._cacheprofile is None:
             raise ImproperlyConfigured(
                 'Cacheops is not enabled for %s.%s model.\n'
-                'If you don\'t want to cache anything by default you can "just_enable" it.'
+                'If you don\'t want to cache anything by default '
+                'you can configure it with empty ops.'
                     % (self.model._meta.app_label, get_model_name(self.model)))
 
     def _cache_key(self, extra=''):
@@ -265,7 +134,11 @@ class QuerySetMixin(object):
         md = md5()
         md.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
         md.update(stamp_fields(self.model)) # Protect from field list changes in model
-        md.update(stringify_query(self.query))
+        # Use query SQL as part of a key
+        try:
+            md.update(smart_str(self.query))
+        except EmptyResultSet:
+            pass
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
@@ -277,14 +150,14 @@ class QuerySetMixin(object):
 
         return 'q:%s' % md.hexdigest()
 
-    def _cache_results(self, cache_key, results, timeout=None):
+    def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, timeout or self._cacheconf['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
         Enables caching for given ops
-            ops        - a subset of ['get', 'fetch', 'count'],
+            ops        - a subset of {'get', 'fetch', 'count', 'exists'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
             write_only - don't try fetching from cache, still write result there
@@ -294,8 +167,8 @@ class QuerySetMixin(object):
         """
         self._require_cacheprofile()
 
-        if ops is None:
-            ops = ['get', 'fetch', 'count']
+        if ops is None or ops == 'all':
+            ops = ALL_OPS
         if isinstance(ops, str):
             ops = [ops]
         self._cacheconf['ops'] = set(ops)
@@ -307,7 +180,7 @@ class QuerySetMixin(object):
 
         return self
 
-    def nocache(self, clone=False):
+    def nocache(self):
         """
         Convinience method, turns off caching for this queryset
         """
@@ -395,10 +268,10 @@ class QuerySetMixin(object):
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
-            if self._cacheprofile['local_get']    \
-                and not args                      \
-                and not self.query.select_related \
-                and not self.query.where.children:
+            if self._cacheprofile['local_get']        \
+                    and not args                      \
+                    and not self.query.select_related \
+                    and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
                 #       Some day it could produce same key for diffrent requests.
                 key = (self.__class__, self.model) + tuple(sorted(kwargs.items()))
@@ -408,8 +281,9 @@ class QuerySetMixin(object):
                     _local_get_cache[key] = self._no_monkey.get(self, *args, **kwargs)
                     return _local_get_cache[key]
                 except TypeError:
-                    pass # If some arg is unhashable we can't save it to dict key,
-                         # we just skip local cache in that case
+                    # If some arg is unhashable we can't save it to dict key,
+                    # we just skip local cache in that case
+                    pass
 
             if 'fetch' in self._cacheconf['ops']:
                 qs = self
@@ -420,15 +294,18 @@ class QuerySetMixin(object):
 
         return qs._no_monkey.get(qs, *args, **kwargs)
 
+    if django.VERSION >= (1, 6):
+        def exists(self):
+            if self._cacheprofile and 'exists' in self._cacheconf['ops']:
+                if self._result_cache is not None:
+                    return bool(self._result_cache)
+                return cached_as(self)(lambda: self._no_monkey.exists(self))()
+            else:
+                return self._no_monkey.exists(self)
+
 
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
-
-# This will help with thread-safe _old_objs access
-import threading
-def get_thread_id():
-    return threading.current_thread().ident
-
 
 class ManagerMixin(object):
     @once_per('cls')
@@ -523,8 +400,13 @@ class ManagerMixin(object):
     def cache(self, *args, **kwargs):
         return self.get_queryset().cache(*args, **kwargs)
 
-    def nocache(self, *args, **kwargs):
-        return self.get_queryset().nocache(*args, **kwargs)
+    def nocache(self):
+        return self.get_queryset().nocache()
+
+    def bulk_create(self, objs):
+        self._no_monkey.bulk_create(self, objs)
+        for obj in objs:
+            invalidate_obj(obj)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
@@ -536,19 +418,22 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if not sender._meta.auto_created:
         return
 
+    m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
+                   if m2m.rel.through == sender)
+
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        attname = get_model_name(instance)
-        objects = sender.objects.filter(**{attname: instance.pk})
+        objects = sender.objects.filter(**{m2m.m2m_field_name(): instance.pk})
         for obj in objects:
             invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
         # NOTE: we don't need to query through objects here,
-        #       cause we already know all their meaningful attributes.
-        base_att = get_model_name(instance) + '_id'
-        item_att = get_model_name(model) + '_id'
+        #       cause we already know all their meaningfull attributes.
         for pk in pk_set:
-            invalidate_dict(sender, {base_att: instance.pk, item_att: pk})
+            invalidate_dict(sender, {
+                m2m.m2m_column_name(): instance.pk,
+                m2m.m2m_reverse_name(): pk
+            })
 
 
 @once
@@ -580,11 +465,21 @@ def install_cacheops():
         admin_used = 'django.contrib.admin' in settings.INSTALLED_APPS
     if admin_used:
         from django.contrib.admin.options import ModelAdmin
+
         # Renamed queryset to get_queryset in Django 1.6
         method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+
         @monkey(ModelAdmin, name=method_name)
         def get_queryset(self, request):
             return get_queryset.original(self, request).nocache()
 
-    # bind m2m changed handler
+    # Bind m2m changed handler
     m2m_changed.connect(invalidate_m2m)
+
+    # Make buffers/memoryviews pickleable to serialize binary field data
+    if six.PY2:
+        import copy_reg
+        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
+    if six.PY3:
+        import copyreg
+        copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))

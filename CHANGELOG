@@ -1,6 +1,34 @@
+2.2.1
+- fixed thread local error
+- fixed ops = 'all' both in config and .cache()
+
+2.2
+- switched to new CACHEOPS setting style
+- added CACHEOPS_DEFAULTS setting
+- work as LRU cache
+- cache .exists() calls in Django 1.6+
+- invalidate on .bulk_create()
+- added no_invalidation context manager/decorator
+- documented local_get and cache_on_save
+- fixed saving objects with F-expression fields (Fedor Nasyrov)
+- fixed queries with Django 1.7 transforms
+- fixed binary fields in python 3
+- stopped using simplejson
+- simpler queryset key calculation,
+  third party fields should be more compatible now
+- removed bogus clone param from .nocache() call
+
+2.1.1
+- fixed bug in m2m invalidation
+- fixed bug with null geometry fields
+- fixed unpickling objects with BinaryFields
+
+2.1
 - support Django 1.7
 - do not fetch from cache when doing .select_for_update() and similar,
   but do write to cache if it's enabled
+- fixed inherited models exception in admin,
+  multi-table models are still not really supported!
 - fixed fake cacheops
 - fixed deprecation warning in Django 1.6 admin
 

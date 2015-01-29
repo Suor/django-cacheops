@@ -23,7 +23,8 @@ class Command(LabelCommand):
             elif len(app_n_model) == 3:
                 self.handle_obj(*app_n_model)
             else:
-                raise CommandError('Wrong model/app name syntax: %s\nType <app_name> or <app_name>.<model_name>' % label)
+                raise CommandError('Wrong model/app name syntax: %s\n'
+                                   'Type <app_name> or <app_name>.<model_name>' % label)
 
     def handle_all(self):
         invalidate_all()

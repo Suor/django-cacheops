@@ -31,6 +31,24 @@ if os.environ.get('CACHEOPS_DB') == 'postgresql':
             'HOST': ''
         },
     }
+elif os.environ.get('CACHEOPS_DB') == 'postgis':
+    POSTGIS_VERSION = (2, 1, 1)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.contrib.gis.db.backends.postgis',
+            'NAME': 'cacheops',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+        'slave': {
+            'ENGINE': 'django.contrib.gis.db.backends.postgis',
+            'NAME': 'cacheops_slave',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+    }
 else:
     DATABASES = {
         'default': {
@@ -51,18 +69,29 @@ CACHEOPS_REDIS = {
     'db': 13,
     'socket_timeout': 3,
 }
-CACHEOPS = {
-    'tests.local': ('just_enable', 60*60, {'local_get': True}),
-    'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
-    'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
-    'tests.issue': ('all', 60*60),
-    'tests.genericcontainer': ('all', 60*60),
-    '*.*': ('just_enable', 60*60),
-}
+if os.environ.get('CACHEOPS_CONF') == 'old':
+    CACHEOPS = {
+        'tests.local': ('just_enable', 60*60, {'local_get': True}),
+        'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
+        'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
+        'tests.genericcontainer': ('all', 60*60),
+        'tests.all': ('all', 60*60),
+        '*.*': ('just_enable', 60*60),
+    }
+else:
+    CACHEOPS_DEFAULTS = {
+        'timeout': 60*60
+    }
+    CACHEOPS = {
+        'tests.local': {'local_get': True},
+        'tests.cacheonsavemodel': {'cache_on_save': True},
+        'tests.dbbinded': {'db_agnostic': False},
+        'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
+        'tests.all': {'ops': 'all'},
+        '*.*': {},
+    }
 
-# We need to catch any changes in django
-CACHEOPS_STRICT_STRINGIFY = True
-
+CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
 ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'

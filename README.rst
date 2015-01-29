@@ -37,6 +37,10 @@ Or you can get latest one from github::
 Setup
 -----
 
+**Note:** settings format has changed in cacheops 2.2,
+for old style settings see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
+Old format is supported in cacheops 2.2+, but considered deprecated.
+
 Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
 
 Setup redis connection and enable caching for desired models:
@@ -56,22 +60,50 @@ Setup redis connection and enable caching for desired models:
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This includes request.user or post.author access,
         # where Post.author is a foreign key to auth.User
-        'auth.user': ('get', 60*15),
+        'auth.user': {'ops': 'get', 'timeout': 60*15},
 
-        # Automatically cache all gets, queryset fetches and counts
+        # Automatically cache all gets and queryset fetches
         # to other django.contrib.auth models for an hour
-        'auth.*': ('all', 60*60),
+        'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
 
-        # Enable manual caching on all news models with default timeout of an hour
-        # Use News.objects.cache().get(...)
+        # Cache gets, fetches, counts and exists to Permission
+        # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
+        'auth.permission': {'ops': 'all', 'timeout': 60*60}
+
+        # Enable manual caching on all other models with default timeout of an hour
+        # Use Post.objects.cache().get(...)
         #  or Tags.objects.filter(...).order_by(...).cache()
         # to cache particular ORM request.
         # Invalidation is still automatic
-        'news.*': ('just_enable', 60*60),
+        '*.*': {'ops': (), 'timeout': 60*60},
 
-        # Automatically cache count requests for all other models for 15 min
-        '*.*': ('count', 60*15),
+        # And since ops is empty by default you can rewrite last line as:
+        '*.*': {'timeout': 60*60},
     }
+
+You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
+
+.. code:: python
+
+    CACHEOPS_DEFAULTS = {
+        'timeout': 60*60
+    }
+    CACHEOPS = {
+        'auth.user': {'ops': 'get', 'timeout': 60*15},
+        'auth.*': {'ops': ('fetch', 'get')},
+        'auth.permission': {'ops': 'all'}
+        '*.*': {},
+    }
+
+Besides ``ops`` and ``timeout`` options you can also use:
+
+``local_get: True`` to cache simple gets for this model in process local memory.
+This is very fast, but is not invalidated in any way until process is restarted.
+Still could be useful for extremely rarely changed things.
+
+``cache_on_save=True | 'field_name'`` will write an instance to cache upon save.
+Cached instance will be retrieved on ``.get(field_name=...)`` request.
+Setting to ``True`` causes caching by primary key.
 
 
 Additionally, you can tell cacheops to degrade gracefully on redis fail with:
@@ -113,7 +145,7 @@ Here you can specify which ops should be cached for queryset, for example, this 
 
 
 will cache count call in ``Paginator`` but not later articles fetch.
-There are three possible actions - ``get``, ``fetch`` and ``count``. You can
+There are four possible actions - ``get``, ``fetch``, ``count`` and ``exists``. You can
 pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
 There is, however, a shortcut for it:
 
@@ -235,6 +267,52 @@ And the one that FLUSHES cacheops redis database::
 
 Don't use that if you share redis database for both cache and something else.
 
+On the other hand, there is a way to turn off invalidation for a while:
+
+.. code:: python
+
+    from cacheops import no_invalidation
+
+    with no_invalidation:
+        # ... do some changes
+        obj.save()
+
+Also works as decorator:
+
+
+.. code:: python
+
+    @no_invalidation
+    def some_work(...):
+        # ... do some changes
+        obj.save()
+
+Combined with ``try ... finally`` it could be used to postpone invalidation:
+
+.. code:: python
+
+    try:
+        with no_invalidation:
+            # ...
+    finally:
+        invalidate_obj(...)
+        # ... or
+        invalidate_model(...)
+
+Postponing invalidation can considerably speed up batch jobs.
+
+
+Using memory limit
+------------------
+
+If your cache never grows too large you may not bother. But if you do you have few options.
+Cacheops stores cached data along with invalidation data,
+so you can't just set ``maxmemory`` and let redis evict at its will.
+
+First strategy that will work is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+
+Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``. However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database a lot.
+
 
 Multiple database support
 -------------------------
@@ -245,8 +323,7 @@ on database queried. That could be changed with ``db_agnostic`` cache profile op
 .. code:: python
 
     CACHEOPS = {
-        'some.model': ('get', TIMEOUT, {'db_agnostic': False}),
-        # ...
+        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
     }
 
 
@@ -462,14 +539,15 @@ Writing a test for an issue you are having can speed up its resolution a lot. He
 TODO
 ----
 
-- add local cache (cleared at the and of request?)
 - better support transactions
-- a way to turn off or postpone invalidation
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
-- fast mode: store cache in local memory, but check in with redis if it's valid
 - shard cache between multiple redises
-- lazy methods on querysets (calculate cache key from methods called)
+- add local cache (cleared at the and of request?)
+- respect subqueries?
+- a way to postpone invalidation?
+- fast mode: store cache in local memory, but check in with redis if it's valid
+- lazy methods on querysets (calculate cache key from methods called)?
 
 
 .. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master

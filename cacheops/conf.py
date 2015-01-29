@@ -2,11 +2,13 @@
 from copy import deepcopy
 import warnings
 import redis
-from funcy import memoize, decorator, identity
+from funcy import memoize, decorator, identity, is_tuple, merge
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+
+ALL_OPS = ('get', 'fetch', 'count', 'exists')
 
 
 profile_defaults = {
@@ -14,9 +16,11 @@ profile_defaults = {
     'local_get': False,
     'db_agnostic': True,
 }
+# NOTE: this is a compatibility for old style config,
+# TODO: remove in cacheops 3.0
 profiles = {
     'just_enable': {},
-    'all': {'ops': ('get', 'fetch', 'count')},
+    'all': {'ops': ALL_OPS},
     'get': {'ops': ('get',)},
     'count': {'ops': ('count',)},
 }
@@ -24,7 +28,7 @@ for key in profiles:
     profiles[key] = dict(profile_defaults, **profiles[key])
 
 
-STRICT_STRINGIFY = getattr(settings, 'CACHEOPS_STRICT_STRINGIFY', False)
+LRU = getattr(settings, 'CACHEOPS_LRU', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 
@@ -57,23 +61,36 @@ def prepare_profiles():
     """
     Prepares a dict 'app.model' -> profile, for use in model_profile()
     """
+    # NOTE: this is a compatibility for old style config,
+    # TODO: remove in cacheops 3.0
     if hasattr(settings, 'CACHEOPS_PROFILES'):
         profiles.update(settings.CACHEOPS_PROFILES)
+
+    if hasattr(settings, 'CACHEOPS_DEFAULTS'):
+        profile_defaults.update(settings.CACHEOPS_DEFAULTS)
 
     model_profiles = {}
     ops = getattr(settings, 'CACHEOPS', {})
     for app_model, profile in ops.items():
-        profile_name, timeout = profile[:2]
+        # NOTE: this is a compatibility for old style config,
+        # TODO: remove in cacheops 3.0
+        if is_tuple(profile):
+            profile_name, timeout = profile[:2]
 
-        try:
-            model_profiles[app_model] = mp = deepcopy(profiles[profile_name])
-        except KeyError:
-            raise ImproperlyConfigured('Unknown cacheops profile "%s"' % profile_name)
+            try:
+                model_profiles[app_model] = mp = deepcopy(profiles[profile_name])
+            except KeyError:
+                raise ImproperlyConfigured('Unknown cacheops profile "%s"' % profile_name)
 
-        if len(profile) > 2:
-            mp.update(profile[2])
-        mp['timeout'] = timeout
-        mp['ops'] = set(mp['ops'])
+            if len(profile) > 2:
+                mp.update(profile[2])
+            mp['timeout'] = timeout
+            mp['ops'] = set(mp['ops'])
+        else:
+            model_profiles[app_model] = mp = merge(profile_defaults, profile)
+            if mp['ops'] == 'all':
+                mp['ops'] = ALL_OPS
+            mp['ops'] = set(mp['ops'])
 
     return model_profiles
 

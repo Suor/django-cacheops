@@ -1,32 +1,15 @@
 # -*- coding: utf-8 -*-
-from operator import concat
-from itertools import product
-from functools import wraps, reduce
+import re
+from functools import wraps
+import json
 import inspect
+import threading
 import six
-# Use Python 2 map here for now
-from funcy.py2 import memoize, map, cat
-from .cross import json, md5hex
+from funcy import memoize
+from .cross import md5hex
 
 import django
 from django.db import models
-from django.db.models.query import QuerySet
-from django.db.models.sql import AND, OR
-from django.db.models.sql.query import Query, ExtraWhere
-from django.db.models.sql.where import EverythingNode, NothingNode
-from django.db.models.sql.expressions import SQLEvaluator
-# A new thing in Django 1.6
-try:
-    from django.db.models.sql.where import SubqueryConstraint
-except ImportError:
-    class SubqueryConstraint(object):
-        pass
-# A new things in Django 1.7
-try:
-    from django.db.models.lookups import Lookup, Exact, In, IsNull
-except ImportError:
-    class Lookup(object):
-        pass
 from django.http import HttpRequest
 
 from .conf import redis_client
@@ -35,7 +18,14 @@ try:
 except ImportError:
     Bit = None
 
-LONG_DISJUNCTION = 8
+# NOTE: we don't serialize this fields since their values could be very long
+#       and one should not filter by their equality anyway.
+NOT_SERIALIZED_FIELDS = (
+    models.FileField,
+    models.TextField, # One should not filter by long text equality
+)
+if hasattr(models, 'BinaryField'):
+    NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
 def non_proxy(model):
@@ -281,18 +271,21 @@ def cached_view_fab(_cached):
 
 import os.path
 
+STRIP_RE = re.compile(r'TOSTRIP.*/TOSTRIP', re.S)
+
 @memoize
-def load_script(name):
+def load_script(name, strip=False):
     # TODO: strip comments
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
+    if strip:
+        code = STRIP_RE.sub('', code)
     return redis_client.register_script(code)
 
 
 ### Whitespace handling for template tags
 
-import re
 from django.utils.safestring import mark_safe
 
 NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
@@ -302,3 +295,9 @@ def carefully_strip_whitespace(text):
     text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
     text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
     return text
+
+
+# This will help mimic thread globals via dicts
+
+def get_thread_id():
+    return threading.current_thread().ident

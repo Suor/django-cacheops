@@ -5,3 +5,4 @@ build
 sqlite.db
 .idea
 .tox
+.cache
