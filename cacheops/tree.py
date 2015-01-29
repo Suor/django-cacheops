@@ -21,6 +21,11 @@ except ImportError:
     class Lookup(object):
         pass
 
+try:
+    from bitfield.types import Bit
+except ImportError:
+    Bit = None
+
 from .utils import NOT_SERIALIZED_FIELDS
 
 
@@ -76,7 +81,10 @@ def dnfs(qs):
         elif isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             attname = attname_of(model, constraint.col)
-            if isinstance(value, (QuerySet, Query, SQLEvaluator)):
+            value_types_to_skip = (QuerySet, Query, SQLEvaluator)
+            if Bit:
+                value_types_to_skip += (Bit,)
+            if isinstance(value, value_types_to_skip):
                 return [[SOME_COND]]
             elif lookup == 'exact':
                 # TODO: check for non-serialized for both exact and in
