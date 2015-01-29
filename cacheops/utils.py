@@ -13,10 +13,6 @@ from django.db import models
 from django.http import HttpRequest
 
 from .conf import redis_client
-try:
-    from bitfield.types import Bit
-except ImportError:
-    Bit = None
 
 # NOTE: we don't serialize this fields since their values could be very long
 #       and one should not filter by their equality anyway.
