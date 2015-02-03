@@ -97,6 +97,9 @@ class Weird(models.Model):
     objects = models.Manager()
     customs = CustomManager()
 
+# TODO: check other new fields:
+#       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
+#       - Other: UUIDField, DurationField
 # contrib.postgres ArrayField
 with suppress(ImportError):
     from django.contrib.postgres.fields import ArrayField
