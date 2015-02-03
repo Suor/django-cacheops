@@ -7,7 +7,12 @@ from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import EverythingNode, NothingNode
-from django.db.models.sql.expressions import SQLEvaluator
+# This thing existed in Django 1.7 and earlier
+try:
+    from django.db.models.sql.expressions import SQLEvaluator
+except ImportError:
+    class SQLEvaluator(object):
+        pass
 # A new thing in Django 1.6
 try:
     from django.db.models.sql.where import SubqueryConstraint
