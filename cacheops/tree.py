@@ -20,6 +20,12 @@ try:
 except ImportError:
     class Lookup(object):
         pass
+# A new thing in Django 1.8
+try:
+    from django.db.models.sql.datastructures import Join
+except ImportError:
+    class Join(object):
+        pass
 
 from .utils import NOT_SERIALIZED_FIELDS
 
@@ -137,8 +143,9 @@ def dnfs(qs):
     def table_for(alias):
         if alias == main_alias:
             return model._meta.db_table
-        else:
-            return qs.query.alias_map[alias][0]
+        # Django 1.7 and earlier used tuples to encode joins
+        join = qs.query.alias_map[alias]
+        return join.table_name if isinstance(join, Join) else join[0]
 
     where = qs.query.where
     model = qs.model
