@@ -565,6 +565,7 @@ TODO
     - ArrayField.len => field__len=?
     - ArrayField[0] => field__0=?
     - JSONField['some_key'] => field__some_key=?
+- custom cache eviction strategy in lua
 - cache a string directly (no pickle) for direct serving (custom key function?)
 - try msgpack?
 - lazy methods on querysets (calculate cache key from methods called)?
