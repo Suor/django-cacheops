@@ -152,6 +152,25 @@ class BasicTests(BaseTestCase):
         self.assertEqual(list(qs.cache()), list(qs))
 
 
+class ValuesTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def test_it_works(self):
+        with self.assertNumQueries(1):
+            len(Category.objects.cache().values())
+            len(Category.objects.cache().values())
+
+    def test_it_varies_on_class(self):
+        with self.assertNumQueries(2):
+            len(Category.objects.cache())
+            len(Category.objects.cache().values())
+
+    def test_it_varies_on_flat(self):
+        with self.assertNumQueries(2):
+            len(Category.objects.cache().values_list())
+            len(Category.objects.cache().values_list(flat=True))
+
+
 class NoInvalidationTests(BaseTestCase):
     fixtures = ['basic']
 
