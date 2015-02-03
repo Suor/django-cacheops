@@ -11,7 +11,7 @@ import django
 from django.utils.encoding import smart_str
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model
-from django.db.models.query import QuerySet, ValuesQuerySet, ValuesListQuerySet
+from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 try:
@@ -144,7 +144,11 @@ class QuerySetMixin(object):
             md.update(self.db)
         if extra:
             md.update(str(extra))
-        # 'flat' attribute changes results formatting for ValuesQuerySet
+        # Need to test for attribute existence cause Django 1.8 and earlier
+        if hasattr(self, '_iterator_class'):
+            it_class = self._iterator_class
+            md.update('%s.%s' % (it_class.__module__, it_class.__name__))
+        # 'flat' attribute changes results formatting for values_list() in Django 1.8 and earlier
         if hasattr(self, 'flat'):
             md.update(str(self.flat))
 
@@ -197,30 +201,47 @@ class QuerySetMixin(object):
     def inplace(self):
         return self.cloning(0)
 
-    def _clone(self, klass=None, setup=False, **kwargs):
-        if self._cloning:
-            return self.clone(klass, setup, **kwargs)
-        elif klass is not None:
-            # HACK: monkey patch self.query.clone for single call
-            #       to return itself instead of cloning
-            original_query_clone = self.query.clone
-            def query_clone():
-                self.query.clone = original_query_clone
-                return self.query
-            self.query.clone = query_clone
-            return self.clone(klass, setup, **kwargs)
-        else:
-            self.__dict__.update(kwargs)
-            return self
+    if django.VERSION >= (1, 9):
+        def _clone(self, **kwargs):
+            if self._cloning:
+                return self.clone(**kwargs)
+            else:
+                self.__dict__.update(kwargs)
+                return self
 
-    def clone(self, klass=None, setup=False, **kwargs):
-        kwargs.setdefault('_cacheprofile', self._cacheprofile)
-        if hasattr(self, '_cacheconf'):
-            kwargs.setdefault('_cacheconf', self._cacheconf)
+        def clone(self, **kwargs):
+            kwargs.setdefault('_cacheprofile', self._cacheprofile)
+            if hasattr(self, '_cacheconf'):
+                kwargs.setdefault('_cacheconf', self._cacheconf)
 
-        clone = self._no_monkey._clone(self, klass, setup, **kwargs)
-        clone._cloning = self._cloning - 1 if self._cloning else 0
-        return clone
+            clone = self._no_monkey._clone(self, **kwargs)
+            clone._cloning = self._cloning - 1 if self._cloning else 0
+            return clone
+    else:
+        def _clone(self, klass=None, setup=False, **kwargs):
+            if self._cloning:
+                return self.clone(klass, setup, **kwargs)
+            elif klass is not None:
+                # HACK: monkey patch self.query.clone for single call
+                #       to return itself instead of cloning
+                original_query_clone = self.query.clone
+                def query_clone():
+                    self.query.clone = original_query_clone
+                    return self.query
+                self.query.clone = query_clone
+                return self.clone(klass, setup, **kwargs)
+            else:
+                self.__dict__.update(kwargs)
+                return self
+
+        def clone(self, klass=None, setup=False, **kwargs):
+            kwargs.setdefault('_cacheprofile', self._cacheprofile)
+            if hasattr(self, '_cacheconf'):
+                kwargs.setdefault('_cacheconf', self._cacheconf)
+
+            clone = self._no_monkey._clone(self, klass, setup, **kwargs)
+            clone._cloning = self._cloning - 1 if self._cloning else 0
+            return clone
 
     def iterator(self):
         # TODO: do not cache empty queries in Django 1.6
@@ -445,31 +466,31 @@ def install_cacheops():
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
     QuerySet._cloning = QuerySetMixin._cloning
-    monkey_mix(ValuesQuerySet, QuerySetMixin, ['iterator'])
-    monkey_mix(ValuesListQuerySet, QuerySetMixin, ['iterator'])
 
-    # Removed in Django 1.8+
-    try:
-        from django.db.models.query import DateQuerySet
-    except ImportError:
-        pass
-    else:
-        monkey_mix(DateQuerySet, QuerySetMixin, ['iterator'])
+    # DateQuerySet existed in Django 1.7 and earlier
+    # Values*QuerySet existed in Django 1.8 and earlier
+    from django.db.models import query
+    for cls_name in ('ValuesQuerySet', 'ValuesListQuerySet', 'DateQuerySet'):
+        if hasattr(query, cls_name):
+            cls = getattr(query, cls_name)
+            monkey_mix(cls, QuerySetMixin, ['iterator'])
 
-    # Install profile and signal handlers for any earlier created models
-    from django.db.models import get_models
-    for model in get_models(include_auto_created=True):
-        model._default_manager._install_cacheops(model)
-
-    # Turn off caching in admin
     try:
         # Use app registry in Django 1.7
         from django.apps import apps
         admin_used = apps.is_installed('django.contrib.admin')
+        get_models = apps.get_models
     except ImportError:
         # Introspect INSTALLED_APPS in older djangos
         from django.conf import settings
         admin_used = 'django.contrib.admin' in settings.INSTALLED_APPS
+        from django.db.models import get_models
+
+    # Install profile and signal handlers for any earlier created models
+    for model in get_models(include_auto_created=True):
+        model._default_manager._install_cacheops(model)
+
+    # Turn off caching in admin
     if admin_used:
         from django.contrib.admin.options import ModelAdmin
 

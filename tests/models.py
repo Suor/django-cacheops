@@ -8,7 +8,6 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
 
 
@@ -185,15 +184,20 @@ class ProductReview(models.Model):
 
 
 # 70
+try:
+    from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+except ImportError:
+    from django.contrib.contenttypes.generic import GenericForeignKey, GenericRelation
+
 class GenericContainer(models.Model):
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
-    content_object = generic.GenericForeignKey('content_type', 'object_id')
+    content_object = GenericForeignKey('content_type', 'object_id')
     name = models.CharField(max_length=30)
 
 class Contained(models.Model):
     name = models.CharField(max_length=30)
-    containers = generic.GenericRelation(GenericContainer)
+    containers = GenericRelation(GenericContainer)
 
 
 # 117

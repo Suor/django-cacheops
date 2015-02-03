@@ -96,3 +96,6 @@ CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE')
 ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'
+
+# Required in Django 1.9
+TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates'}]
