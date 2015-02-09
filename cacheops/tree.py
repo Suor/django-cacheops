@@ -67,7 +67,7 @@ def dnfs(qs):
             # If where.lhs don't refer to a field then don't bother
             if not hasattr(where.lhs, 'target'):
                 return [[SOME_COND]]
-            # TODO: check if all of this are possible
+            # Don't bother with complex right hand side either
             if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
             # Skip conditions on non-serialized fields
@@ -86,6 +86,7 @@ def dnfs(qs):
         # Django 1.6 and earlier used tuples to encode conditions
         elif isinstance(where, tuple):
             constraint, lookup, annotation, value = where
+            # Don't bother with complex right hand side
             if isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
             # Skip conditions on non-serialized fields
