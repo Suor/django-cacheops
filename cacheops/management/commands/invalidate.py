@@ -8,25 +8,27 @@ except ImportError:
     from django.core.exceptions import ImproperlyConfigured
 
     class AppConfig(object):
-        def __init__(self, app):
-            self.app = app
+        def __init__(self, label):
+            self.label = label
 
         def get_model(self, model_name):
-            model = get_model(self.app, model_name)
+            model = get_model(self.label, model_name)
             if not model:
                 raise LookupError(
                     "App '%s' doesn't have a '%s' model." % (self.app.label, model_name))
             return model
 
         def get_models(self, include_auto_created=False):
-            return get_models(self.app, include_auto_created=include_auto_created)
+            return get_models(self.label, include_auto_created=include_auto_created)
 
     class Apps(object):
-        def get_app_config(app_label):
+        def get_app_config(self, app_label):
             try:
-                return AppConfig(get_app(app_label))
+                get_app(app_label)
             except ImproperlyConfigured as e:
                 raise LookupError(*e.args)
+            else:
+                return AppConfig(app_label)
     apps = Apps()
 
 from cacheops.invalidation import *
