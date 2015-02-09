@@ -48,7 +48,7 @@ def dnfs(qs):
     __in is converted into = or = or = ...
     """
     SOME = object()
-    SOME_COND = (None, None, SOME, True)
+    SOME_TREE = [[(None, None, SOME, True)]]
 
     def negate(term):
         return (term[0], term[1], term[2], not term[3])
@@ -66,13 +66,13 @@ def dnfs(qs):
         if isinstance(where, Lookup):
             # If where.lhs don't refer to a field then don't bother
             if not hasattr(where.lhs, 'target'):
-                return [[SOME_COND]]
+                return SOME_TREE
             # Don't bother with complex right hand side either
             if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
-                return [[SOME_COND]]
+                return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
-                return [[SOME_COND]]
+                return SOME_TREE
 
             attname = where.lhs.target.attname
             if isinstance(where, Exact):
@@ -82,16 +82,16 @@ def dnfs(qs):
             elif isinstance(where, In) and len(where.rhs) < LONG_DISJUNCTION:
                 return [[(where.lhs.alias, attname, v, True)] for v in where.rhs]
             else:
-                return [[SOME_COND]]
+                return SOME_TREE
         # Django 1.6 and earlier used tuples to encode conditions
         elif isinstance(where, tuple):
             constraint, lookup, annotation, value = where
             # Don't bother with complex right hand side
             if isinstance(value, (QuerySet, Query, SQLEvaluator)):
-                return [[SOME_COND]]
+                return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
-                return [[SOME_COND]]
+                return SOME_TREE
 
             attname = attname_of(model, constraint.col)
             if lookup == 'isnull':
@@ -101,13 +101,13 @@ def dnfs(qs):
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
                 return [[(constraint.alias, attname, v, True)] for v in value]
             else:
-                return [[SOME_COND]]
+                return SOME_TREE
         elif isinstance(where, EverythingNode):
             return [[]]
         elif isinstance(where, NothingNode):
             return []
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
-            return [[SOME_COND]]
+            return SOME_TREE
         elif len(where) == 0:
             return [[]]
         else:
