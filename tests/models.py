@@ -89,7 +89,7 @@ class Weird(models.Model):
     date_field = models.DateField(default=date(2000, 1, 1))
     datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
     time_field = models.TimeField(default=time(10, 10))
-    list_field = IntegerArrayField(default=lambda: [])
+    list_field = IntegerArrayField(default=list)
     custom_field = CustomField(default=CustomValue('default'))
     if hasattr(models, 'BinaryField'):
         binary_field = models.BinaryField()
