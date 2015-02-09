@@ -1,7 +1,33 @@
 # -*- coding: utf-8 -*-
 from django.core.management.base import LabelCommand, CommandError
-from django.core.exceptions import ImproperlyConfigured
-from django.db.models import get_app, get_model, get_models
+try:
+    from django.apps import apps
+except ImportError:
+    # Django 1.7 like shim for older ones
+    from django.db.models import get_app, get_model, get_models
+    from django.core.exceptions import ImproperlyConfigured
+
+    class AppConfig(object):
+        def __init__(self, app):
+            self.app = app
+
+        def get_model(self, model_name):
+            model = get_model(self.app, model_name)
+            if not model:
+                raise LookupError(
+                    "App '%s' doesn't have a '%s' model." % (self.app.label, model_name))
+            return model
+
+        def get_models(self, include_auto_created=False):
+            return get_models(self.app, include_auto_created=include_auto_created)
+
+    class Apps(object):
+        def get_app_config(app_label):
+            try:
+                return AppConfig(get_app(app_label))
+            except ImproperlyConfigured as e:
+                raise LookupError(*e.args)
+    apps = Apps()
 
 from cacheops.invalidation import *
 
@@ -30,26 +56,28 @@ class Command(LabelCommand):
         invalidate_all()
 
     def handle_app(self, app_name):
-        try:
-            app = get_app(app_name)
-        except ImproperlyConfigured as e:
-            raise CommandError(e)
-
-        for model in get_models(app, include_auto_created=True):
+        for model in self.get_app(app_name).get_models(include_auto_created=True):
             invalidate_model(model)
 
     def handle_model(self, app_name, model_name):
-        model = get_model(app_name, model_name)
-        if model is None:
-            raise CommandError('Unknown model: %s.%s' % (app_name, model_name))
-        invalidate_model(model)
+        invalidate_model(self.get_model(app_name, model_name))
 
     def handle_obj(self, app_name, model_name, obj_pk):
-        model = get_model(app_name, model_name)
-        if model is None:
-            raise CommandError('Unknown model: %s.%s' % (app_name, model_name))
+        model = self.get_model(app_name, model_name)
         try:
             obj = model.objects.get(pk=obj_pk)
         except model.DoesNotExist:
             raise CommandError('No %s.%s with pk = %s' % (app_name, model_name, obj_pk))
         invalidate_obj(obj)
+
+    def get_app(self, app_name):
+        try:
+            return apps.get_app_config(app_name)
+        except LookupError as e:
+            raise CommandError(e)
+
+    def get_model(self, app_name, model_name):
+        try:
+            return apps.get_app_config(app_name).get_model(model_name)
+        except LookupError as e:
+            raise CommandError(e)
