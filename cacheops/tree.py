@@ -6,7 +6,13 @@ from funcy.py2 import map, cat
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
-from django.db.models.sql.where import EverythingNode, NothingNode
+from django.db.models.sql.where import NothingNode
+# This thing existed in Django 1.8 and earlier
+try:
+    from django.db.models.sql.where import EverythingNode
+except ImportError:
+    class EverythingNode(object):
+        pass
 # This thing existed in Django 1.7 and earlier
 try:
     from django.db.models.sql.expressions import SQLEvaluator
