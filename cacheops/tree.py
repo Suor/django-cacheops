@@ -70,13 +70,13 @@ def dnfs(qs):
             # TODO: check if all of this are possible
             if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
+            # Skip conditions on non-serialized fields
+            if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
+                return [[SOME_COND]]
 
             attname = where.lhs.target.attname
             if isinstance(where, Exact):
-                if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
-                    return [[SOME_COND]]
-                else:
-                    return [[(where.lhs.alias, attname, where.rhs, True)]]
+                return [[(where.lhs.alias, attname, where.rhs, True)]]
             elif isinstance(where, IsNull):
                 return [[(where.lhs.alias, attname, None, where.rhs)]]
             elif isinstance(where, In) and len(where.rhs) < LONG_DISJUNCTION:
@@ -86,17 +86,17 @@ def dnfs(qs):
         # Django 1.6 and earlier used tuples to encode conditions
         elif isinstance(where, tuple):
             constraint, lookup, annotation, value = where
-            attname = attname_of(model, constraint.col)
             if isinstance(value, (QuerySet, Query, SQLEvaluator)):
                 return [[SOME_COND]]
-            elif lookup == 'exact':
-                # TODO: check for non-serialized for both exact and in
-                if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
-                    return [[SOME_COND]]
-                else:
-                    return [[(constraint.alias, attname, value, True)]]
-            elif lookup == 'isnull':
+            # Skip conditions on non-serialized fields
+            if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
+                return [[SOME_COND]]
+
+            attname = attname_of(model, constraint.col)
+            if lookup == 'isnull':
                 return [[(constraint.alias, attname, None, value)]]
+            elif lookup == 'exact':
+                return [[(constraint.alias, attname, value, True)]]
             elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
                 return [[(constraint.alias, attname, v, True)] for v in value]
             else:
