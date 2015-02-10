@@ -4,7 +4,7 @@ import sys
 
 setup(
     name='django-cacheops',
-    version='2.2.1',
+    version='2.3',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 

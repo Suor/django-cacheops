@@ -1,3 +1,14 @@
+2.3
+- Django 1.8 support and preliminary Django 1.9 support
+- made 'ops' config option to accept single string
+- added invalidate_fragment()
+- added a way to get/set/delete function cache easily
+- added redis.TimeoutError to degradation handling (George Kappel)
+- fixed invalidation on QuerySet.bulk_create(),
+  worked only from Manager previously
+- fixed .bulk_create() API to comply with Django
+- minor optimizations
+
 2.2.1
 - fixed thread local error
 - fixed ops = 'all' both in config and .cache()
