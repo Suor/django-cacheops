@@ -11,7 +11,7 @@ from django.conf import settings
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contenttypes', '0002_remove_content_type_name'),
+        # ('contenttypes', '0002_remove_content_type_name'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -174,7 +174,7 @@ class Migration(migrations.Migration):
                 ('datetime_field', models.DateTimeField(default=datetime.datetime(2000, 1, 1, 10, 10))),
                 ('time_field', models.TimeField(default=datetime.time(10, 10))),
                 ('list_field', tests.models.IntegerArrayField(default=list)),
-                ('custom_field', tests.models.CustomField(default='default')),
+                ('custom_field', tests.models.CustomField(default=tests.models.custom_value_default)),
                 ('binary_field', models.BinaryField()),
             ],
         ),
