@@ -72,7 +72,7 @@ class Migration(migrations.Migration):
             name='Extra',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('tag', models.IntegerField(unique=True, db_column=b'custom_column_name')),
+                ('tag', models.IntegerField(unique=True, db_column='custom_column_name')),
             ],
         ),
         migrations.CreateModel(
@@ -88,7 +88,7 @@ class Migration(migrations.Migration):
             name='Label',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('text', models.CharField(default=b'', max_length=127, blank=True)),
+                ('text', models.CharField(default='', max_length=127, blank=True)),
             ],
         ),
         migrations.CreateModel(
@@ -103,7 +103,7 @@ class Migration(migrations.Migration):
             name='LabelT',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('text', models.CharField(default=b'', max_length=127, blank=True)),
+                ('text', models.CharField(default='', max_length=127, blank=True)),
             ],
         ),
         migrations.CreateModel(
@@ -190,7 +190,7 @@ class Migration(migrations.Migration):
             name='PremiumBrand',
             fields=[
                 ('brand_ptr', models.OneToOneField(parent_link=True, auto_created=True, primary_key=True, serialize=False, to='tests.Brand')),
-                ('extra', models.CharField(default=b'', max_length=127, blank=True)),
+                ('extra', models.CharField(default='', max_length=127, blank=True)),
             ],
             bases=('tests.brand',),
         ),
@@ -207,7 +207,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='extra',
             name='to_tag',
-            field=models.ForeignKey(to='tests.Extra', to_field=b'tag', null=True),
+            field=models.ForeignKey(to='tests.Extra', to_field='tag', null=True),
         ),
         migrations.AddField(
             model_name='brandt',
