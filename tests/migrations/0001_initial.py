@@ -246,6 +246,7 @@ class Migration(migrations.Migration):
         )
 
     if os.environ.get('CACHEOPS_DB') == 'postgis':
+        import django.contrib.gis.db.models.fields
         operations.append(
             migrations.CreateModel(
                 name='Geometry',
