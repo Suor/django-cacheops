@@ -325,9 +325,10 @@ class QuerySetMixin(object):
                 return self._no_monkey.exists(self)
 
     def bulk_create(self, objs, batch_size=None):
-        self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
         for obj in objs:
             invalidate_obj(obj)
+        return objs
 
 
 # We need to stash old object before Model.save() to invalidate on its properties
