@@ -302,6 +302,26 @@ Combined with ``try ... finally`` it could be used to postpone invalidation:
 Postponing invalidation can considerably speed up batch jobs.
 
 
+Dog-pile effect avoidance
+-------------------------
+
+This package can benefit from `python-redis-lock` to avoid cache dog-pile
+effect (also known as the thundering herd effect or cache stampede). This
+feature is available in QuerySet cache and `@cached_as()`/`@cached_view_as()`
+decorators.
+
+Just define `CACHEOPS_USE_LOCK=True` in settings to make the `@cached`
+decorator protected against this issue.
+
+As it will use another redis call and depends on the creation of a network
+wide lock (that will affect eventual celery workers, etc), it's disabled
+by default.
+
+But the lock is only used on cache misses; there is no consequence on the
+read operations. Overall, this features shouldn't affect performances
+negatively in most cases, and should obviously reduce load on cache expiration.
+
+
 Using memory limit
 ------------------
 

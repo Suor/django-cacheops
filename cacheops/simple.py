@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 import os, time
+import redis_lock
+
 from functools import wraps
 from .cross import pickle, md5hex
 
 from django.conf import settings
 
-from .conf import redis_client, handle_connection_failure
+from .conf import redis_client, handle_connection_failure, USE_LOCK
 from .utils import func_cache_key, cached_view_fab
 
 
@@ -34,8 +36,12 @@ class CacheKey(str):
 
 class BaseCache(object):
     """
-    Simple cache with time-based invalidation
+    Simple cache with time-based invalidation and dog-pile effect avoidance.
     """
+
+    # Override this variable in subclasses that implement redis.
+    can_lock = False
+
     def _cached(self, timeout=None, extra=None, _get_key=None):
         """
         A decorator for caching function calls
@@ -47,8 +53,18 @@ class BaseCache(object):
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
-                    result = func(*args, **kwargs)
-                    self.set(cache_key, result, timeout)
+                    if USE_LOCK and self.can_lock:
+                        # This will block in all calls but the
+                        # first to avoid dog-pile effect.
+                        with redis_lock.Lock(redis_client, cache_key):
+                            try:
+                                result = self.get(cache_key)
+                            except CacheMiss:
+                                result = func(*args, **kwargs)
+                                self.set(cache_key, result, timeout)
+                    else:
+                        result = func(*args, **kwargs)
+                        self.set(cache_key, result, timeout)
 
                 return result
 
@@ -73,6 +89,8 @@ class BaseCache(object):
 
 
 class RedisCache(BaseCache):
+    can_lock = True
+
     def __init__(self, conn):
         self.conn = conn
 
