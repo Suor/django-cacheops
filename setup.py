@@ -2,6 +2,11 @@ from setuptools import setup
 import sys
 
 
+README = open('README.rst').read()    \
+    .replace('|Build Status|', '', 1) \
+    .replace('|Gitter|', '', 1)
+
+
 setup(
     name='django-cacheops',
     version='2.3',
@@ -9,7 +14,7 @@ setup(
     author_email='suor.web@gmail.com',
 
     description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
-    long_description=open('README.rst').read().replace('|Build Status|', '', 1),
+    long_description=README,
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 

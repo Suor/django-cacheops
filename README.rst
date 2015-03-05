@@ -1,4 +1,4 @@
-Cacheops |Build Status|
+Cacheops |Build Status| |Gitter|
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
@@ -575,6 +575,6 @@ TODO
    :target: https://travis-ci.org/Suor/django-cacheops
 
 
-.. image:: https://badges.gitter.im/Join%20Chat.svg
+.. |Gitter| image:: https://badges.gitter.im/JoinChat.svg
    :alt: Join the chat at https://gitter.im/Suor/django-cacheops
    :target: https://gitter.im/Suor/django-cacheops?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
