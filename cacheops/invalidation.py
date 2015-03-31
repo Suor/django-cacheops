@@ -2,7 +2,12 @@
 import json
 from collections import defaultdict
 from funcy import memoize, post_processing, ContextDecorator
-from django.db.models.expressions import F, ExpressionNode
+from django.db.models.expressions import F
+# Since Django 1.8, `ExpressionNode` is `Expression`
+try:
+    from django.db.models.expressions import ExpressionNode as Expression
+except ImportError:
+    from django.db.models.expressions import Expression
 
 from .conf import redis_client, handle_connection_failure
 from .utils import non_proxy, load_script, get_thread_id, NOT_SERIALIZED_FIELDS
@@ -76,7 +81,7 @@ def get_obj_dict(model, obj):
         value = getattr(obj, field.attname)
         if value is None:
             yield field.attname, None
-        elif isinstance(value, (F, ExpressionNode)):
+        elif isinstance(value, (F, Expression)):
             continue
         else:
             yield field.attname, field.get_prep_value(value)
