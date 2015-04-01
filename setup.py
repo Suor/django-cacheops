@@ -1,5 +1,4 @@
 from setuptools import setup
-import sys
 
 
 # Remove build status and move Gitter link under title for PyPi
@@ -11,7 +10,7 @@ README = open('README.rst').read()    \
 
 setup(
     name='django-cacheops',
-    version='2.3',
+    version='2.3.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 

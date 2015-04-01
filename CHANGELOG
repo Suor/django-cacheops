@@ -1,3 +1,7 @@
+2.3.1
+- updated support for Django 1.8 (Andriy Sokolovskiy)
+- fixed bulk_create() to return objects instead of None (Ilya Baryshev)
+
 2.3
 - Django 1.8 support and preliminary Django 1.9 support
 - made 'ops' config option to accept single string
