@@ -480,6 +480,10 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(All.objects.cache(ops='all').all())
 
+    def test_141(self):
+        model = Model141.objects.create(is_updated=False)
+        Model141.objects.filter(id=model.id).update(is_updated=True)
+        self.assertEqual(model.is_updated, True)
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):

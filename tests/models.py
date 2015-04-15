@@ -216,3 +216,7 @@ if os.environ.get('CACHEOPS_DB') == 'postgis':
 
     class Geometry(gis_models.Model):
         point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
+
+# 141
+class Model141(models.Model):
+    is_updated = models.BooleanField()
