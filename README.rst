@@ -53,7 +53,10 @@ Setup redis connection and enable caching for desired models:
         'db': 1,             # SELECT non-default redis database
                              # using separate redis db or redis instance
                              # is highly recommended
-        'socket_timeout': 3,
+
+        'socket_timeout': 3,   # connection timeout in seconds, optional
+        'password': '...',     # optional
+        'unix_socket_path': '' # replaces host and port
     }
 
     CACHEOPS = {
