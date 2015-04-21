@@ -31,7 +31,7 @@ for key in profiles:
 
 LRU = getattr(settings, 'CACHEOPS_LRU', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
-
+USE_LOCK = getattr(settings, 'CACHEOPS_USE_LOCK', False)
 
 # Support DEGRADE_ON_FAILURE
 if DEGRADE_ON_FAILURE:

@@ -3,6 +3,7 @@ import sys
 from functools import wraps
 import json
 import six
+import redis_lock
 from funcy import cached_property, project, once, once_per, monkey
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
@@ -19,7 +20,8 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
+from .conf import model_profile, redis_client, handle_connection_failure, \
+                  LRU, ALL_OPS, USE_LOCK
 from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab, get_thread_id
 from .tree import dnfs
@@ -89,8 +91,17 @@ def _cached_as(*samples, **kwargs):
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
-            result = func(*args)
-            cache_thing(cache_key, result, cond_dnfs, timeout)
+            if USE_LOCK:
+                with redis_lock.Lock(redis_client, cache_key):
+                    cache_data = redis_client.get(cache_key)
+                    if cache_data is not None:
+                        return pickle.loads(cache_data)
+                    result = func(*args)
+                    cache_thing(cache_key, result, cond_dnfs, timeout)
+            else:
+                result = func(*args)
+                cache_thing(cache_key, result, cond_dnfs, timeout)
+
             return result
 
         return wrapper
@@ -247,10 +258,12 @@ class QuerySetMixin(object):
         # TODO: do not cache empty queries in Django 1.6
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
+        should_read_cache = not self._cacheconf['write_only'] \
+            and not self._for_write
 
         if cache_this:
             cache_key = self._cache_key()
-            if not self._cacheconf['write_only'] and not self._for_write:
+            if should_read_cache:
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
@@ -261,14 +274,38 @@ class QuerySetMixin(object):
 
         # Cache miss - fallback to overriden implementation
         results = []
-        for obj in superiter(self):
-            if cache_this:
-                results.append(obj)
-            yield obj
 
-        if cache_this:
-            self._cache_results(cache_key, results)
-        raise StopIteration
+        # We use the lock only if we need to cache. If not needing
+        # to cache, using the lock is superfluous anyway because we
+        # *will* dog-pile by computing the queryset multiple times.
+        if cache_this and should_read_cache and USE_LOCK:
+            with redis_lock.Lock(redis_client, cache_key):
+                # Retry fetching from cache in case previous locker filled it.
+                cache_data = redis_client.get(cache_key)
+                if cache_data is not None:
+                    results = pickle.loads(cache_data)
+                    for obj in results:
+                        yield obj
+                    raise StopIteration
+                # implicit else:
+                # We are the first thread / process to acquire the lock,
+                # it's our job to fetch the queryset and feed the cache.
+
+                for obj in superiter(self):
+                    results.append(obj)
+                    yield obj
+                self._cache_results(cache_key, results)
+                raise StopIteration
+        else:
+            # Either we are not caching, or we
+            # are simply not using the lock feature.
+            for obj in superiter(self):
+                if cache_this:
+                    results.append(obj)
+                yield obj
+            if cache_this:
+                self._cache_results(cache_key, results)
+            raise StopIteration
 
     def count(self):
         if self._cacheprofile and 'count' in self._cacheconf['ops']:

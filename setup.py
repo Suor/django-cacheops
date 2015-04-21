@@ -30,6 +30,7 @@ setup(
         'redis>=2.9.1',
         'funcy>=1.2,<2.0',
         'six>=1.4.0',
+        'python-redis-lock==2.0.0',
     ],
 
     classifiers=[
