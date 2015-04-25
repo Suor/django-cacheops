@@ -1,4 +1,4 @@
-Cacheops |Build Status|
+Cacheops |Build Status| |Code Health|
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
@@ -550,5 +550,7 @@ TODO
 - lazy methods on querysets (calculate cache key from methods called)?
 
 
-.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
-   :target: https://travis-ci.org/Suor/django-cacheops
+.. |Build Status| image:: https://travis-ci.org/whyflyru/django-cacheops.svg?branch=master
+   :target: https://travis-ci.org/whyflyru/django-cacheops
+.. |Code Health| image:: https://landscape.io/github/whyflyru/django-cacheops/master/landscape.svg?style=flat
+   :target: https://landscape.io/github/whyflyru/django-cacheops/master
