@@ -311,7 +311,7 @@ Using memory limit
 If your cache never grows too large you may not bother. But if you do you have some options.
 Cacheops stores cached data along with invalidation data,
 so you can't just set ``maxmemory`` and let redis evict at its will. For now cacheops offers 2 imperfect strategies, which are considered experimental.
-So be careful and consider `leaving feedback </Suor/django-cacheops/issues/143>`_.
+So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
 
 First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
 Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
