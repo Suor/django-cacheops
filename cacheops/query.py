@@ -3,7 +3,7 @@ import sys
 from functools import wraps
 import json
 import six
-from funcy import cached_property, project, once, once_per, monkey
+from funcy import select_keys, cached_property, once, once_per, monkey
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
@@ -383,11 +383,8 @@ class ManagerMixin(object):
             #
             #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
-            # Stripping up undesirable attributes
-            unwanted_attrs = [k for k in instance.__dict__
-                                if k.startswith('_') and k.endswith('_cache')]
-            unwanted_dict = project(instance.__dict__, unwanted_attrs)
-            for k in unwanted_attrs:
+            unwanted_dict = select_keys(r'^_.*_cache$', instance.__dict__)
+            for k in unwanted_dict:
                 del instance.__dict__[k]
 
             key = 'pk' if cache_on_save is True else cache_on_save
