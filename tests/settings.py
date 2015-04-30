@@ -49,6 +49,23 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'HOST': '',
         },
     }
+elif os.environ.get('CACHEOPS_DB') == 'mysql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'cacheops',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+        'slave': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'cacheops_slave',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+    }
 else:
     DATABASES = {
         'default': {
