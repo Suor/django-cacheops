@@ -230,17 +230,19 @@ class Migration(migrations.Migration):
         ),
     ]
 
-    from funcy import suppress
+    try:
+        from django.contrib.postgres.fields import ArrayField
+    except ImportError:
+        ArrayField = None
 
-    with suppress(ImportError):
-        import django.contrib.postgres.fields
+    if ArrayField and os.environ.get('CACHEOPS_DB') != 'mysql':
         operations.append(
             migrations.CreateModel(
                 name='TaggedPost',
                 fields=[
                     ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                     ('name', models.CharField(max_length=200)),
-                    ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.IntegerField(), size=None)),
+                    ('tags', ArrayField(base_field=models.IntegerField(), size=None)),
                 ],
             )
         )

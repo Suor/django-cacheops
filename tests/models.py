@@ -2,8 +2,6 @@ import os
 import six
 from datetime import date, datetime, time
 
-from funcy import suppress
-
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
@@ -103,9 +101,12 @@ class Weird(models.Model):
 #       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
 #       - Other: UUIDField, DurationField
 # contrib.postgres ArrayField
-with suppress(ImportError):
+try:
     from django.contrib.postgres.fields import ArrayField
+except ImportError:
+    ArrayField = None
 
+if ArrayField and os.environ.get('CACHEOPS_DB') != 'mysql':
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
         tags = ArrayField(models.IntegerField())
