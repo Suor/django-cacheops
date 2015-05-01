@@ -1,3 +1,4 @@
+from funcy import ContextDecorator
 from django.db.models import Manager
 from django.db.models.query import QuerySet
 
@@ -54,3 +55,13 @@ file_cache = DummyCache()
 # templates
 def invalidate_fragment(fragment_name, *extra):
     pass
+
+
+class _no_invalidation(ContextDecorator):
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+no_invalidation = _no_invalidation()
