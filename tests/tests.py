@@ -6,7 +6,7 @@ except ImportError:
     import unittest
 
 import django
-from django.db import models, connection
+from django.db import models, connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
@@ -764,6 +764,10 @@ class DbAgnosticTests(BaseTestCase):
 
     def test_db_agnostic_disabled(self):
         list(DbBinded.objects.cache())
+
+        # HACK: This prevents initialization queries to break .assertNumQueries() in MySQL.
+        #       Also there is no .ensure_connection() in older Djangos, thus it's even uglier.
+        connections['slave'].cursor().close()
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
