@@ -39,5 +39,10 @@ before_script:
   # postgis django backend requires these to exist
   - psql -U postgres -c "create database cacheops"
   - psql -U postgres -c "create database cacheops_slave"
+  # mysql databases
+  - mysql -e "create user cacheops"
+  - mysql -e "grant all on *.* to 'cacheops'@'localhost'"
+  - mysql -e "create database cacheops"
+  - mysql -e "create database cacheops_slave"
 script:
   - tox
