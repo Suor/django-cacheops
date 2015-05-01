@@ -1,5 +1,4 @@
 import os
-import six
 
 INSTALLED_APPS = [
     'cacheops',
@@ -53,14 +52,14 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
 elif os.environ.get('CACHEOPS_DB') == 'mysql':
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql' if six.PY2 else 'mysql.connector.django',
+            'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops',
             'USER': 'cacheops',
             'PASSWORD': '',
             'HOST': '',
         },
         'slave': {
-            'ENGINE': 'django.db.backends.mysql' if six.PY2 else 'mysql.connector.django',
+            'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
             'PASSWORD': '',
