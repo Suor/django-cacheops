@@ -135,12 +135,13 @@ class BasicTests(BaseTestCase):
 
     def test_expressions_save(self):
         # Check saving F
-        extra = Extra.objects.all()[0]
+        extra = Extra.objects.get(pk=1)
         extra.tag = F('tag')
         extra.save()
 
         # Check saving ExressionNode
-        extra = Extra.objects.all()[0]
+        Extra.objects.create(post_id=3, tag=7)
+        extra = Extra.objects.get(pk=3)
         extra.tag = F('tag') + 1
         extra.save()
 
