@@ -330,6 +330,11 @@ class QuerySetMixin(object):
             invalidate_obj(obj)
         return objs
 
+def connect_first(signal, receiver, sender):
+    old_receivers = signal.receivers
+    signal.receivers = []
+    signal.connect(receiver, sender=sender)
+    signal.receivers += old_receivers
 
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
@@ -344,9 +349,9 @@ class ManagerMixin(object):
         cls._cacheprofile = model_profile(cls)
         if cls._cacheprofile is not None:
             # Set up signals
-            pre_save.connect(self._pre_save, sender=cls)
-            post_save.connect(self._post_save, sender=cls)
-            post_delete.connect(self._post_delete, sender=cls)
+            connect_first(pre_save, self._pre_save, sender=cls)
+            connect_first(post_save, self._post_save, sender=cls)
+            connect_first(post_delete, self._post_delete, sender=cls)
 
             # Install auto-created models as their module attributes to make them picklable
             module = sys.modules[cls.__module__]
