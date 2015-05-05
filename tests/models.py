@@ -217,3 +217,17 @@ if os.environ.get('CACHEOPS_DB') == 'postgis':
 
     class Geometry(gis_models.Model):
         point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
+
+# 145
+class One(models.Model):
+    boolean = models.BooleanField(default=False)
+
+def set_boolean_true(sender, instance, created, **kwargs):
+    if created:
+        return
+
+    dialog = One.objects.cache(ops='all').get(id=instance.id)
+    assert dialog.boolean is True
+
+from django.db.models.signals import post_save
+post_save.connect(set_boolean_true, sender=One)

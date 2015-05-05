@@ -481,6 +481,14 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(All.objects.cache(ops='all').all())
 
+    def test_145(self):
+        # Create One with boolean False
+        one = One.objects.cache(ops='all').create(boolean=False)
+
+        # Update boolean to True
+        one = One.objects.cache(ops='all').get(id=one.id)
+        one.boolean = True
+        one.save()
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
