@@ -6,6 +6,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.admin',
     'tests',
+    'tests.nocached',
 ]
 
 MIDDLEWARE_CLASSES = []
@@ -93,7 +94,7 @@ if os.environ.get('CACHEOPS_CONF') == 'old':
         'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
         'tests.genericcontainer': ('all', 60*60),
         'tests.all': ('all', 60*60),
-        '*.*': ('just_enable', 60*60),
+        'tests.*': ('just_enable', 60*60),
     }
 else:
     CACHEOPS_DEFAULTS = {
@@ -105,7 +106,7 @@ else:
         'tests.dbbinded': {'db_agnostic': False},
         'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
         'tests.all': {'ops': 'all'},
-        '*.*': {},
+        'tests.*': {},
     }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
