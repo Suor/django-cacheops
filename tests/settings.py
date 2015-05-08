@@ -6,7 +6,6 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.admin',
     'tests',
-    'tests.nocached',
 ]
 
 MIDDLEWARE_CLASSES = []
@@ -95,6 +94,7 @@ if os.environ.get('CACHEOPS_CONF') == 'old':
         'tests.genericcontainer': ('all', 60*60),
         'tests.all': ('all', 60*60),
         'tests.*': ('just_enable', 60*60),
+        'tests.noncachedvideoproxy': None,
     }
 else:
     CACHEOPS_DEFAULTS = {
@@ -107,6 +107,7 @@ else:
         'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
         'tests.all': {'ops': 'all'},
         'tests.*': {},
+        'tests.noncachedvideoproxy': None,
     }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))

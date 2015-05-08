@@ -16,7 +16,6 @@ from django.db.models import F
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_as, cached_view_as
 from .models import *
-from nocached.models import *
 
 
 class BaseTestCase(TestCase):
@@ -722,8 +721,9 @@ class ProxyTests(BaseTestCase):
         video = Video.objects.create(title='Pulp Fiction')
         Video.objects.cache().get(title=video.title)
         NonCachedVideoProxy.objects.get(id=video.id).delete()
-        self.assertRaises(Video.DoesNotExist,
-                          Video.objects.cache().get, title=video.title)
+
+        with self.assertRaises(Video.DoesNotExist):
+            Video.objects.cache().get(title=video.title)
 
 
 class MultitableInheritanceTests(BaseTestCase):

@@ -75,6 +75,10 @@ def prepare_profiles():
     model_profiles = {}
     ops = getattr(settings, 'CACHEOPS', {})
     for app_model, profile in ops.items():
+        if profile is None:
+            model_profiles[app_model] = None
+            continue
+
         # NOTE: this is a compatibility for old style config,
         # TODO: remove in cacheops 3.0
         if is_tuple(profile):

@@ -126,6 +126,10 @@ class VideoProxy(Video):
     class Meta:
         proxy = True
 
+class NonCachedVideoProxy(Video):
+    class Meta:
+        proxy = True
+
 
 # Multi-table inheritance
 class Media(models.Model):
