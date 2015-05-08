@@ -330,6 +330,7 @@ class QuerySetMixin(object):
             invalidate_obj(obj)
         return objs
 
+
 def connect_first(signal, receiver, sender):
     old_receivers = signal.receivers
     signal.receivers = []

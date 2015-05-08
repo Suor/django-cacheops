@@ -484,12 +484,12 @@ class IssueTests(BaseTestCase):
 
     def test_145(self):
         # Create One with boolean False
-        one = One.objects.cache(ops='all').create(boolean=False)
+        one = One.objects.create(boolean=False)
 
         # Update boolean to True
-        one = One.objects.cache(ops='all').get(id=one.id)
+        one = One.objects.cache().get(id=one.id)
         one.boolean = True
-        one.save()
+        one.save() # An error was in post_save signal handler
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
