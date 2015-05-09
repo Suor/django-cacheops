@@ -3,7 +3,7 @@ import sys
 from functools import wraps
 import json
 import six
-from funcy import select_keys, cached_property, once, once_per, monkey
+from funcy import select_keys, cached_property, once, once_per, monkey, any
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
@@ -21,7 +21,7 @@ except ImportError:
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, get_thread_id
+                   func_cache_key, cached_view_fab, get_thread_id, model_family
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict
 
@@ -348,7 +348,8 @@ class ManagerMixin(object):
             return
 
         cls._cacheprofile = model_profile(cls)
-        if cls._cacheprofile is not None:
+
+        if any(model_profile, model_family(cls)):
             # Set up signals
             connect_first(pre_save, self._pre_save, sender=cls)
             connect_first(post_save, self._post_save, sender=cls)
@@ -376,6 +377,12 @@ class ManagerMixin(object):
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
+
+        # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
+        #       but its base having one. Or vice versa.
+        #       We still need to invalidate in this case, but cache on save better be skipped.
+        if not instance._cacheprofile:
+            return
 
         # Enabled cache_on_save makes us write saved object to cache.
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)

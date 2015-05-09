@@ -108,6 +108,7 @@ else:
         'tests.all': {'ops': 'all'},
         'tests.*': {},
         'tests.noncachedvideoproxy': None,
+        'tests.noncachedmedia': None,
     }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))

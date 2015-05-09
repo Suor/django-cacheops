@@ -5,7 +5,7 @@ import json
 import inspect
 import threading
 import six
-from funcy import memoize
+from funcy import memoize, tree_leaves
 from .cross import md5hex
 
 import django
@@ -25,12 +25,22 @@ if hasattr(models, 'BinaryField'):
     NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
+@memoize
 def non_proxy(model):
     while model._meta.proxy:
         # Every proxy model has exactly one non abstract parent model
         model = next(b for b in model.__bases__
                        if issubclass(b, models.Model) and not b._meta.abstract)
     return model
+
+def model_family(model):
+    """
+    Returns a list of all proxy models, including subclasess, superclassses and siblings.
+    """
+    base = non_proxy(model)
+    # NOTE: we also list multitable submodels here, we just don't care.
+    #       Cacheops doesn't support them anyway.
+    return tree_leaves(base, children=type.__subclasses__, follow=type.__subclasses__)
 
 
 if django.VERSION < (1, 6):

@@ -130,6 +130,13 @@ class NonCachedVideoProxy(Video):
     class Meta:
         proxy = True
 
+class NonCachedMedia(models.Model):
+    title = models.CharField(max_length=128)
+
+class MediaProxy(NonCachedMedia):
+    class Meta:
+        proxy = True
+
 
 # Multi-table inheritance
 class Media(models.Model):

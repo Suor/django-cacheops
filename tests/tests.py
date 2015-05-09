@@ -725,6 +725,14 @@ class ProxyTests(BaseTestCase):
         with self.assertRaises(Video.DoesNotExist):
             Video.objects.cache().get(title=video.title)
 
+    def test_148_reverse(self):
+        media = NonCachedMedia.objects.create(title='Pulp Fiction')
+        MediaProxy.objects.cache().get(title=media.title)
+        NonCachedMedia.objects.get(id=media.id).delete()
+
+        with self.assertRaises(NonCachedMedia.DoesNotExist):
+            MediaProxy.objects.cache().get(title=media.title)
+
 
 class MultitableInheritanceTests(BaseTestCase):
     @unittest.expectedFailure
