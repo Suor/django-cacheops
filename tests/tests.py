@@ -725,6 +725,7 @@ class ProxyTests(BaseTestCase):
         with self.assertRaises(Video.DoesNotExist):
             Video.objects.cache().get(title=video.title)
 
+    @unittest.skipUnless(django.VERSION >= (1, 7), "Really hard to make this work in older Djangos")
     def test_148_reverse(self):
         media = NonCachedMedia.objects.create(title='Pulp Fiction')
         MediaProxy.objects.cache().get(title=media.title)
