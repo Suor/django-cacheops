@@ -1,4 +1,4 @@
-VERSION = (2, 3, 1)
+VERSION = (2, 3, 2)
 __version__ = '.'.join(map(str, VERSION if VERSION[-1] else VERSION[:2]))
 
 
