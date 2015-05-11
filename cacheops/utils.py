@@ -5,7 +5,7 @@ import json
 import inspect
 import threading
 import six
-from funcy import memoize, tree_leaves
+from funcy import memoize, mapcat
 from .cross import md5hex
 
 import django
@@ -37,10 +37,12 @@ def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
     """
-    base = non_proxy(model)
+    def class_tree(cls):
+        return [cls] + mapcat(class_tree, cls.__subclasses__())
+
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
-    return tree_leaves(base, children=type.__subclasses__, follow=type.__subclasses__)
+    return class_tree(non_proxy(model))
 
 
 if django.VERSION < (1, 6):
