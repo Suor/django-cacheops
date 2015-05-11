@@ -5,7 +5,8 @@ import json
 import inspect
 import threading
 import six
-from funcy import memoize, mapcat
+from funcy import memoize
+from funcy.py2 import mapcat
 from .cross import md5hex
 
 import django
