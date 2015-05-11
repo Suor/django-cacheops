@@ -127,8 +127,7 @@ Usage
 
 | **Automatic caching.**
 
-It's automatic you just need to set it up. There are corner cases described in
-CAVEATS 3, 4, 7 and 8, which can .... See Invalidation section.
+It's automatic you just need to set it up.
 
 | **Manual caching.**
 
