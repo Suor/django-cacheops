@@ -1,5 +1,5 @@
-Cacheops |Build Status| |Code Health|
-========
+Cacheops |Build Status| |Code Health| |Gitter|
+==============================================
 
 A slick app that supports automatic or manual queryset caching and automatic
 granular event-driven invalidation.
@@ -68,7 +68,7 @@ Setup redis connection and enable caching for desired models:
 
         # Cache gets, fetches, counts and exists to Permission
         # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
-        'auth.permission': {'ops': 'all', 'timeout': 60*60}
+        'auth.permission': {'ops': 'all', 'timeout': 60*60},
 
         # Enable manual caching on all other models with default timeout of an hour
         # Use Post.objects.cache().get(...)
@@ -91,7 +91,7 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     CACHEOPS = {
         'auth.user': {'ops': 'get', 'timeout': 60*15},
         'auth.*': {'ops': ('fetch', 'get')},
-        'auth.permission': {'ops': 'all'}
+        'auth.permission': {'ops': 'all'},
         '*.*': {},
     }
 
@@ -362,11 +362,12 @@ functions:
         return _articles_json()
 
 
-You can manually invalidate cached function result this way:
+You can manually invalidate or update a result of cached function:
 
 .. code:: python
 
     top_articles.invalidate(some_category)
+    top_articles.key(some_category).set(new_value)
 
 
 Cacheops also provides get/set primitives for simple cache:
@@ -412,6 +413,8 @@ File based cache can be used the same way as simple time-invalidated one:
 
     # later, on appropriate event
     top_articles.invalidate(some_category)
+    # or
+    top_articles.key(some_category).set(some_value)
 
     # primitives
     file_cache.set(cache_key, data, timeout=None)
@@ -445,6 +448,14 @@ and ``@cached`` decorators, however, they require explicit naming of each fragme
     {% endcached %}
 
 You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
+
+To invalidate cached fragment use:
+
+.. code:: python
+
+    from cacheops import invalidate_fragment
+
+    invalidate_fragment(fragment_name, extra1, ...)
 
 
 Jinja2 extension
@@ -545,8 +556,18 @@ TODO
 - shard cache between multiple redises
 - add local cache (cleared at the and of request?)
 - respect subqueries?
+- respect headers in @cached_view*?
+- support CBV?
+- group invalidate_obj() calls?
 - a way to postpone invalidation?
 - fast mode: store cache in local memory, but check in with redis if it's valid
+- an interface for complex fields to extract exact on parts or transforms:
+    - ArrayField.len => field__len=?
+    - ArrayField[0] => field__0=?
+    - JSONField['some_key'] => field__some_key=?
+- custom cache eviction strategy in lua
+- cache a string directly (no pickle) for direct serving (custom key function?)
+- try msgpack?
 - lazy methods on querysets (calculate cache key from methods called)?
 
 
@@ -554,3 +575,10 @@ TODO
    :target: https://travis-ci.org/whyflyru/django-cacheops
 .. |Code Health| image:: https://landscape.io/github/whyflyru/django-cacheops/master/landscape.svg?style=flat
    :target: https://landscape.io/github/whyflyru/django-cacheops/master
+.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
+   :target: https://travis-ci.org/Suor/django-cacheops
+
+
+.. |Gitter| image:: https://badges.gitter.im/JoinChat.svg
+   :alt: Join the chat at https://gitter.im/Suor/django-cacheops
+   :target: https://gitter.im/Suor/django-cacheops?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge

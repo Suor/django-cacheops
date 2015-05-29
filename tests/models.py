@@ -8,7 +8,6 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
 
 
@@ -85,19 +84,24 @@ class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
     def get_prep_value(self, value):
         return ','.join(map(str, value))
 
+def custom_value_default():
+    return CustomValue('default')
 
 class Weird(models.Model):
     date_field = models.DateField(default=date(2000, 1, 1))
     datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
     time_field = models.TimeField(default=time(10, 10))
-    list_field = IntegerArrayField(default=lambda: [])
-    custom_field = CustomField(default=CustomValue('default'))
+    list_field = IntegerArrayField(default=list)
+    custom_field = CustomField(default=custom_value_default)
     if hasattr(models, 'BinaryField'):
         binary_field = models.BinaryField()
 
     objects = models.Manager()
     customs = CustomManager()
 
+# TODO: check other new fields:
+#       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
+#       - Other: UUIDField, DurationField
 # contrib.postgres ArrayField
 with suppress(ImportError):
     from django.contrib.postgres.fields import ArrayField
@@ -185,15 +189,20 @@ class ProductReview(models.Model):
 
 
 # 70
+try:
+    from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+except ImportError:
+    from django.contrib.contenttypes.generic import GenericForeignKey, GenericRelation
+
 class GenericContainer(models.Model):
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
-    content_object = generic.GenericForeignKey('content_type', 'object_id')
+    content_object = GenericForeignKey('content_type', 'object_id')
     name = models.CharField(max_length=30)
 
 class Contained(models.Model):
     name = models.CharField(max_length=30)
-    containers = generic.GenericRelation(GenericContainer)
+    containers = GenericRelation(GenericContainer)
 
 
 # 117

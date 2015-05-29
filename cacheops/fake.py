@@ -49,3 +49,8 @@ cache = DummyCache()
 cached = cache.cached
 cached_view = cache.cached_view
 file_cache = DummyCache()
+
+
+# templates
+def invalidate_fragment(fragment_name, *extra):
+    pass

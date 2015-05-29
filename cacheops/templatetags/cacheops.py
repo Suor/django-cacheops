@@ -5,6 +5,9 @@ from django.template.base import TagHelperNode, parse_bits
 from django.template import Library
 
 
+__all__ = ['invalidate_fragment']
+
+
 register = Library()
 
 
@@ -19,7 +22,7 @@ def tag_helper(func):
 
         def render(self, context):
             args, kwargs = self.get_resolved_arguments(context)
-            return func(context, self.nodelist, *args, **kwargs)
+            return func(context, self.nodelist, *args, **kwargs)()
 
     def _compile(parser, token):
         # content
@@ -46,7 +49,11 @@ def cached(context, nodelist, timeout, fragment_name, *extra):
         # TODO: make this cache preparation configurable
         return carefully_strip_whitespace(nodelist.render(context))
 
-    return _handle_tag()
+    return _handle_tag
+
+def invalidate_fragment(fragment_name, *extra):
+    cached(None, None, None, fragment_name, *extra).invalidate()
+
 
 @tag_helper
 def cached_as(context, nodelist, queryset, timeout, fragment_name, *extra):
@@ -55,4 +62,4 @@ def cached_as(context, nodelist, queryset, timeout, fragment_name, *extra):
         # TODO: make this cache preparation configurable
         return carefully_strip_whitespace(nodelist.render(context))
 
-    return _handle_tag()
+    return _handle_tag

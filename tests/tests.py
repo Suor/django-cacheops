@@ -152,6 +152,25 @@ class BasicTests(BaseTestCase):
         self.assertEqual(list(qs.cache()), list(qs))
 
 
+class ValuesTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def test_it_works(self):
+        with self.assertNumQueries(1):
+            len(Category.objects.cache().values())
+            len(Category.objects.cache().values())
+
+    def test_it_varies_on_class(self):
+        with self.assertNumQueries(2):
+            len(Category.objects.cache())
+            len(Category.objects.cache().values())
+
+    def test_it_varies_on_flat(self):
+        with self.assertNumQueries(2):
+            len(Category.objects.cache().values_list())
+            len(Category.objects.cache().values_list(flat=True))
+
+
 class NoInvalidationTests(BaseTestCase):
     fixtures = ['basic']
 
@@ -331,6 +350,26 @@ class TemplateTests(BaseTestCase):
         s = t.render(Context({'a': inc_a, 'b': inc_b}))
         self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
         self.assertEqual(counts, {'a': 2, 'b': 1})
+
+    def test_invalidate_fragment(self):
+        from cacheops import invalidate_fragment
+
+        counts = {'a': 0}
+        def inc_a():
+            counts['a'] += 1
+            return counts['a']
+
+        t = Template("""
+            {% load cacheops %}
+            {% cached 60 'a' %}.{{ a }}{% endcached %}
+        """)
+
+        render = lambda: re.sub(r'\s+', '', t.render(Context({'a': inc_a})))
+
+        self.assertEqual(render(), '.1')
+
+        invalidate_fragment('a')
+        self.assertEqual(render(), '.2')
 
     def test_cached_as(self):
         counts = {'a': 0}
@@ -706,6 +745,12 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 2)
         get_calls.invalidate(2)
         self.assertEqual(get_calls(2), 3)
+
+        get_calls.key(2).delete()
+        self.assertEqual(get_calls(2), 4)
+
+        get_calls.key(2).set(42)
+        self.assertEqual(get_calls(2), 42)
 
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")

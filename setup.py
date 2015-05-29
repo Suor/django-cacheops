@@ -1,15 +1,21 @@
 from setuptools import setup
-import sys
+
+
+# Remove build status and move Gitter link under title for PyPi
+README = open('README.rst').read()    \
+    .replace('|Build Status|', '', 1) \
+    .replace('|Gitter|', '', 1)       \
+    .replace('===\n', '===\n\n|Gitter|\n')
 
 
 setup(
     name='django-cacheops',
-    version='2.2.1',
+    version='2.3.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
     description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
-    long_description=open('README.rst').read().replace('|Build Status|', '', 1),
+    long_description=README,
     url='http://github.com/Suor/django-cacheops',
     license='BSD',
 

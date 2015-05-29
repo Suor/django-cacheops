@@ -1,4 +1,4 @@
-VERSION = (2, 1, 1)
+VERSION = (2, 3, 1)
 __version__ = '.'.join(map(str, VERSION if VERSION[-1] else VERSION[:2]))
 
 
@@ -11,6 +11,8 @@ if not FAKE:
     from .simple import *
     from .query import *
     from .invalidation import *
+    if django.VERSION >= (1, 4):
+        from .templatetags.cacheops import *
 else:
     from .fake import *
 
