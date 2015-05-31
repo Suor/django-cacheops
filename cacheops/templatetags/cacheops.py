@@ -4,6 +4,9 @@ import inspect
 from django.template.base import TagHelperNode, parse_bits
 from django.template import Library
 
+import cacheops
+from cacheops.utils import carefully_strip_whitespace
+
 
 __all__ = ['invalidate_fragment']
 
@@ -11,7 +14,7 @@ __all__ = ['invalidate_fragment']
 register = Library()
 
 
-def tag_helper(func):
+def decorator_tag(func):
     name = func.__name__
     params, varargs, varkw, defaults = inspect.getargspec(func)
 
@@ -22,7 +25,9 @@ def tag_helper(func):
 
         def render(self, context):
             args, kwargs = self.get_resolved_arguments(context)
-            return func(context, self.nodelist, *args, **kwargs)()
+            decorator = func(*args, **kwargs)
+            render = _make_render(context, self.nodelist)
+            return decorator(render)()
 
     def _compile(parser, token):
         # content
@@ -31,7 +36,7 @@ def tag_helper(func):
 
         # args
         bits = token.split_contents()[1:]
-        args, kwargs = parse_bits(parser, bits, params[2:], varargs, varkw, defaults,
+        args, kwargs = parse_bits(parser, bits, params, varargs, varkw, defaults,
                                   takes_context=None, name=name)
         return HelperNode(False, args, kwargs, nodelist)
 
@@ -39,27 +44,23 @@ def tag_helper(func):
     return func
 
 
-import cacheops
-from cacheops.utils import carefully_strip_whitespace
-
-@tag_helper
-def cached(context, nodelist, timeout, fragment_name, *extra):
-    @cacheops.cached(timeout=timeout, extra=(fragment_name,) + extra)
-    def _handle_tag():
+def _make_render(context, nodelist):
+    def render():
         # TODO: make this cache preparation configurable
         return carefully_strip_whitespace(nodelist.render(context))
+    return render
 
-    return _handle_tag
+
+@decorator_tag
+def cached(timeout, fragment_name, *extra):
+    return cacheops.cached(timeout=timeout, extra=(fragment_name,) + extra)
+
 
 def invalidate_fragment(fragment_name, *extra):
-    cached(None, None, None, fragment_name, *extra).invalidate()
+    render = _make_render(None, None)
+    cached(None, fragment_name, *extra)(render).invalidate()
 
 
-@tag_helper
-def cached_as(context, nodelist, queryset, timeout, fragment_name, *extra):
-    @cacheops.cached_as(queryset, timeout=timeout, extra=(fragment_name,) + extra)
-    def _handle_tag():
-        # TODO: make this cache preparation configurable
-        return carefully_strip_whitespace(nodelist.render(context))
-
-    return _handle_tag
+@decorator_tag
+def cached_as(queryset, timeout, fragment_name, *extra):
+    return cacheops.cached_as(queryset, timeout=timeout, extra=(fragment_name,) + extra)
