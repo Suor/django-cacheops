@@ -9,7 +9,7 @@ import cacheops
 from cacheops.utils import carefully_strip_whitespace
 
 
-__all__ = ['invalidate_fragment']
+__all__ = ['decorator_tag', 'invalidate_fragment']
 
 
 register = Library()

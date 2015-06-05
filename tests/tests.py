@@ -14,7 +14,7 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as
+                     cached, cached_as, cached_view_as, decorator_tag, invalidate_fragment
 from .models import *
 
 
@@ -331,15 +331,20 @@ class ArrayTests(BaseTestCase):
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class TemplateTests(BaseTestCase):
-    def test_cached(self):
-        counts = {'a': 0, 'b': 0}
-        def inc_a():
-            counts['a'] += 1
-            return ''
-        def inc_b():
-            counts['b'] += 1
-            return ''
+    def get_inc(self):
+        count = [0]
+        def inc():
+            count[0] += 1
+            return count[0]
+        return inc
 
+    def assertRendersTo(self, template, context, result):
+        s = template.render(Context(context))
+        self.assertEqual(re.sub(r'\s+', '', s), result)
+
+    def test_cached(self):
+        inc_a = self.get_inc()
+        inc_b = self.get_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.a{{ a }}{% endcached %}
@@ -348,55 +353,70 @@ class TemplateTests(BaseTestCase):
             {% cached timeout=60 fragment_name='b' %}.b{{ b }}{% endcached %}
         """)
 
-        s = t.render(Context({'a': inc_a, 'b': inc_b}))
-        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
-        self.assertEqual(counts, {'a': 2, 'b': 1})
+        self.assertRendersTo(t, {'a': inc_a, 'b': inc_b}, '.a1.a1.a2.b1')
 
     def test_invalidate_fragment(self):
-        from cacheops import invalidate_fragment
-
-        counts = {'a': 0}
-        def inc_a():
-            counts['a'] += 1
-            return counts['a']
-
+        inc = self.get_inc()
         t = Template("""
             {% load cacheops %}
-            {% cached 60 'a' %}.{{ a }}{% endcached %}
+            {% cached 60 'a' %}.{{ inc }}{% endcached %}
         """)
 
-        render = lambda: re.sub(r'\s+', '', t.render(Context({'a': inc_a})))
-
-        self.assertEqual(render(), '.1')
+        self.assertRendersTo(t, {'inc': inc}, '.1')
 
         invalidate_fragment('a')
-        self.assertEqual(render(), '.2')
+        self.assertRendersTo(t, {'inc': inc}, '.2')
 
     def test_cached_as(self):
-        counts = {'a': 0}
-        def inc_a():
-            counts['a'] += 1
-            return ''
-
+        inc = self.get_inc()
         qs = Post.objects.all()
-
         t = Template("""
             {% load cacheops %}
-            {% cached_as qs 0 'a' %}.a{{ a }}{% endcached_as %}
-            {% cached_as qs timeout=60 fragment_name='a' %}.a{{ a }}{% endcached_as %}
-            {% cached_as qs fragment_name='a' timeout=60 %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs 0 'a' %}.{{ inc }}{% endcached_as %}
+            {% cached_as qs timeout=60 fragment_name='a' %}.{{ inc }}{% endcached_as %}
+            {% cached_as qs fragment_name='a' timeout=60 %}.{{ inc }}{% endcached_as %}
         """)
 
-        s = t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a')
-        self.assertEqual(counts['a'], 1)
+        # All the forms are equivalent
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.1.1.1')
 
-        t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(counts['a'], 1)
+        # Cache works across calls
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.1.1.1')
 
+        # Post invalidation clears cache
         invalidate_model(Post)
-        t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(counts['a'], 2)
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.2.2.2')
+
+    def test_decorator_tag(self):
+        @decorator_tag
+        def my_cached(flag):
+            return cached(timeout=60) if flag else lambda x: x
+
+        inc = self.get_inc()
+        t = Template("""
+            {% load cacheops %}
+            {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 0 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 0 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
+        """)
+
+        self.assertRendersTo(t, {'inc': inc}, '.1.2.3.1')
+
+    def test_decorator_tag_context(self):
+        @decorator_tag(takes_context=True)
+        def my_cached(context):
+            return cached(timeout=60) if context['flag'] else lambda x: x
+
+        inc = self.get_inc()
+        t = Template("""
+            {% load cacheops %}
+            {% my_cached %}.{{ inc }}{% endmy_cached %}
+            {% my_cached %}.{{ inc }}{% endmy_cached %}
+        """)
+
+        self.assertRendersTo(t, {'inc': inc, 'flag': True}, '.1.1')
+        self.assertRendersTo(t, {'inc': inc, 'flag': False}, '.2.3')
 
 
 class IssueTests(BaseTestCase):
