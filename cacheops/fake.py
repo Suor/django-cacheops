@@ -65,7 +65,3 @@ class _no_invalidation(ContextDecorator):
         pass
 
 no_invalidation = _no_invalidation()
-
-
-def decorator_tag(func=None, takes_context=False):
-    raise NotImplementedError
