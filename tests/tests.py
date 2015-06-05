@@ -14,7 +14,9 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as, decorator_tag, invalidate_fragment
+                     cached, cached_as, cached_view_as
+if django.VERSION >= (1, 4):
+    from cacheops import decorator_tag, invalidate_fragment
 from .models import *
 
 
