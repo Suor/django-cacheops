@@ -2,7 +2,16 @@ from __future__ import absolute_import
 import inspect
 from functools import partial
 
-from django.template.base import TagHelperNode, parse_bits
+# NOTE: moved in Django 1.9
+try:
+    from django.template.library import TagHelperNode, parse_bits
+except ImportError:
+    from django.template.base import TagHelperNode as _TagHelperNode, parse_bits
+    class TagHelperNode(_TagHelperNode):
+        def __init__(self, func, takes_context, args, kwargs):
+            _TagHelperNode.__init__(self, takes_context, args, kwargs)
+            self.func = func
+
 from django.template import Library
 
 import cacheops
@@ -22,17 +31,6 @@ def decorator_tag(func=None, takes_context=False):
     name = func.__name__
     params, varargs, varkw, defaults = inspect.getargspec(func)
 
-    class HelperNode(TagHelperNode):
-        def __init__(self, takes_context, args, kwargs, nodelist=None):
-            super(HelperNode, self).__init__(takes_context=takes_context, args=args, kwargs=kwargs)
-            self.nodelist = nodelist
-
-        def render(self, context):
-            args, kwargs = self.get_resolved_arguments(context)
-            decorator = func(*args, **kwargs)
-            render = _make_render(context, self.nodelist)
-            return decorator(render)()
-
     def _compile(parser, token):
         # content
         nodelist = parser.parse(('end' + name,))
@@ -42,10 +40,22 @@ def decorator_tag(func=None, takes_context=False):
         bits = token.split_contents()[1:]
         args, kwargs = parse_bits(parser, bits, params, varargs, varkw, defaults,
                                   takes_context=takes_context, name=name)
-        return HelperNode(takes_context, args, kwargs, nodelist)
+        return CachedNode(func, takes_context, args, kwargs, nodelist)
 
     register.tag(name=name, compile_function=_compile)
     return func
+
+
+class CachedNode(TagHelperNode):
+    def __init__(self, func, takes_context, args, kwargs, nodelist):
+        super(CachedNode, self).__init__(func, takes_context, args, kwargs)
+        self.nodelist = nodelist
+
+    def render(self, context):
+        args, kwargs = self.get_resolved_arguments(context)
+        decorator = self.func(*args, **kwargs)
+        render = _make_render(context, self.nodelist)
+        return decorator(render)()
 
 
 def _make_render(context, nodelist):
