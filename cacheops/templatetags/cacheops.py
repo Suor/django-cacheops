@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import inspect
+from functools import partial
 
 from django.template.base import TagHelperNode, parse_bits
 from django.template import Library
@@ -14,13 +15,16 @@ __all__ = ['invalidate_fragment']
 register = Library()
 
 
-def decorator_tag(func):
+def decorator_tag(func=None, takes_context=False):
+    if func is None:
+        return partial(decorator_tag, takes_context=takes_context)
+
     name = func.__name__
     params, varargs, varkw, defaults = inspect.getargspec(func)
 
     class HelperNode(TagHelperNode):
         def __init__(self, takes_context, args, kwargs, nodelist=None):
-            super(HelperNode, self).__init__(takes_context, args, kwargs)
+            super(HelperNode, self).__init__(takes_context=takes_context, args=args, kwargs=kwargs)
             self.nodelist = nodelist
 
         def render(self, context):
@@ -37,8 +41,8 @@ def decorator_tag(func):
         # args
         bits = token.split_contents()[1:]
         args, kwargs = parse_bits(parser, bits, params, varargs, varkw, defaults,
-                                  takes_context=None, name=name)
-        return HelperNode(False, args, kwargs, nodelist)
+                                  takes_context=takes_context, name=name)
+        return HelperNode(takes_context, args, kwargs, nodelist)
 
     register.tag(name=name, compile_function=_compile)
     return func
