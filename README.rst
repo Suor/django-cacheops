@@ -465,60 +465,39 @@ To invalidate cached fragment use:
     invalidate_fragment(fragment_name, extra1, ...)
 
 If you have more complex fragment caching needs, cacheops provides a helper to
-make your own templatetags which decorate a template fragment in a way
-analagous to decorating a function using ``@cached`` or ``@cached_as``.
+make your own template tags which decorate a template fragment in a way
+analogous to decorating a function with ``@cached`` or ``@cached_as``.
+This is **experimental** feature for now.
 
-First ``cacheops.templatestags.CacheopsLibrary`` is used in place of
-``django.template.Library``. Then ``register.decorator_tag`` turns a function
-``foor`` returning a decorator into a ``{% foo %}`` ``{% endfoo %}`` pair.
-``register.decorator_tag`` passes through arguments to the templatetag to your
-function and optionally takes an argument, ``takes_context`` in the same way as
-Django's own ``inclusion_tag`` and ``simple_tag``.
-
-To motivate this functionality, here's example of how two navigation menus at
-the top and bottom of a page might be cached. In this example the cache
-fragment:
-
-1. is invalidated on multiple querysets/models: the menu items and a feature
-   flag
-2. varies on seleted item
-3. varies on and current language.
-
-In addition the cache is bypassed entirely for staff users.
-
-In `myapp/templatetagss/mycachetags.py`:
+To use it create ``myapp/templatetags/mycachetags.py`` and add something like this there:
 
 .. code:: python
 
-   from cacheops import cached_as
-   from cacheops.templatetags import CacheopsLibrary
+    from cacheops import cached_as, CacheopsLibrary
 
-   register = CacheopsLibrary()
+    register = CacheopsLibrary()
 
-   def dont_cache(func):
-       return func
+    @register.decorator_tag(takes_context=True)
+    def cache_menu(context, menu_name):
+        from django.utils import translation
+        from myapp.models import Flag, MenuItem
 
-   @register.decorator_tag(takes_context=True)
-   def cache_menu(context, menu_name):
-       from django.utils import translation
-       from featureflag.models import Flag
-       from myapp.models import MyMenuItem
+        request = context.get('request')
+        if request and request.user.is_staff():
+            # Use noop decorator to bypass caching for staff
+            return lambda func: func
 
-       request = context.get('request')
-       if request and request.user.is_staff():
-           return dont_cache
+        return cached_as(
+            # Invalidate cache if any menu item or a flag for menu changes
+            MenuItem,
+            Flag.objects.filter(name='menu'),
+            # Vary for menu name and language, also stamp it as "menu" to be safe
+            extra=("menu", menu_name, translation.get_language()),
+            timeout=24 * 60 * 60
+        )
 
-       return cached_as(
-           Flag.objects.filter(name='menu_feature'),
-           MyMenuItem,
-           timeout=24 * 60 * 60,
-           extra=(
-               "menu",
-               menu_name
-               translation.get_language(),
-               context.get('mymenuitem_selected')))
-
-It could then be used in templates as follows:
+``@decorator_tag`` here creates a template tag behaving the same as returned decorator
+upon wrapped template fragment. Resulting template tag could be used as follows:
 
 .. code:: django
 
@@ -527,7 +506,9 @@ It could then be used in templates as follows:
     {% cache_menu "top" %}
         ... the top menu template code ...
     {% endcache_menu %}
+
     ... some template code ..
+
     {% cache_menu "bottom" %}
         ... the bottom menu template code ...
     {% endcache_menu %}
