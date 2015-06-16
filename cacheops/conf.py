@@ -109,6 +109,9 @@ def model_profile(model):
     """
     Returns cacheops profile for a model
     """
+    if not model:
+        return None
+
     model_profiles = prepare_profiles()
 
     app = model._meta.app_label
