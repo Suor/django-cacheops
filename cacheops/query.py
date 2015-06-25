@@ -324,11 +324,18 @@ class QuerySetMixin(object):
             else:
                 return self._no_monkey.exists(self)
 
-    def bulk_create(self, objs, batch_size=None):
-        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
-        for obj in objs:
-            invalidate_obj(obj)
-        return objs
+    if django.VERSION >= (1, 5):
+        def bulk_create(self, objs, batch_size=None):
+            objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+            for obj in objs:
+                invalidate_obj(obj)
+            return objs
+    elif django.VERSION >= (1, 4):
+        def bulk_create(self, objs):
+            objs = self._no_monkey.bulk_create(self, objs)
+            for obj in objs:
+                invalidate_obj(obj)
+            return objs
 
 
 def connect_first(signal, receiver, sender):
