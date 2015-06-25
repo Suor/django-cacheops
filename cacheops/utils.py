@@ -5,7 +5,7 @@ import json
 import inspect
 import threading
 import six
-from funcy import memoize
+from funcy import memoize, compose
 from funcy.py2 import mapcat
 from .cross import md5hex
 
@@ -118,10 +118,15 @@ def view_cache_key(func, args, kwargs, extra=None):
     return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
 
 def cached_view_fab(_cached):
+    def force_render(response):
+        if hasattr(response, 'render') and callable(response.render):
+            response.render()
+        return response
+
     def cached_view(*dargs, **dkwargs):
         def decorator(func):
             dkwargs['_get_key'] = view_cache_key
-            cached_func = _cached(*dargs, **dkwargs)(func)
+            cached_func = _cached(*dargs, **dkwargs)(compose(force_render, func))
 
             @wraps(func)
             def wrapper(request, *args, **kwargs):

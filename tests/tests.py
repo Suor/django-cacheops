@@ -274,6 +274,16 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(r2), 1) # hit, since only url is considered
         self.assertEqual(get_calls(r3), 2) # miss
 
+    def test_cached_view_on_template_response(self):
+        from django.template.response import TemplateResponse
+
+        @cached_view_as(Category)
+        def view(request):
+            return TemplateResponse(request, Template('hi'))
+
+        factory = RequestFactory()
+        view(factory.get('/hi'))
+
 
 from datetime import date, datetime, time
 
