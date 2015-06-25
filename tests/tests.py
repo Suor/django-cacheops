@@ -812,6 +812,18 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.key(2).set(42)
         self.assertEqual(get_calls(2), 42)
 
+    def test_cached_call(self):
+        calls = [0]
+
+        def get_calls():
+            calls[0] += 1
+            return calls[0]
+
+        from cacheops import cache
+
+        self.assertEqual(cache.cached_call('calls', get_calls), 1)
+        self.assertEqual(cache.cached_call('calls', get_calls), 1)
+
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
