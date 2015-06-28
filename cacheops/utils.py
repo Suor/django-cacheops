@@ -114,7 +114,10 @@ def view_cache_key(func, args, kwargs, extra=None):
     Calculate cache key for view func.
     Use url instead of not properly serializable request argument.
     """
-    uri = args[0].build_absolute_uri()
+    if hasattr(args[0], 'build_absolute_uri'):
+        uri = args[0].build_absolute_uri()
+    else:
+        uri = args[0]
     return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
 
 def cached_view_fab(_cached):
@@ -136,6 +139,11 @@ def cached_view_fab(_cached):
                     return func(request, *args, **kwargs)
 
                 return cached_func(request, *args, **kwargs)
+
+            if hasattr(cached_func, 'invalidate'):
+                wrapper.invalidate = cached_func.invalidate
+                wrapper.key = cached_func.key
+
             return wrapper
         return decorator
     return cached_view

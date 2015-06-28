@@ -14,7 +14,7 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as
+                     cached, cached_view, cached_as, cached_view_as
 if django.VERSION >= (1, 4):
     from cacheops import invalidate_fragment
     from cacheops.templatetags.cacheops import register
@@ -823,6 +823,32 @@ class SimpleCacheTests(BaseTestCase):
 
         self.assertEqual(cache.cached_call('calls', get_calls), 1)
         self.assertEqual(cache.cached_call('calls', get_calls), 1)
+
+    def test_cached_view(self):
+        calls = [0]
+
+        @cached_view(timeout=100)
+        def get_calls(request):
+            calls[0] += 1
+            return calls[0]
+
+        factory = RequestFactory()
+        r1 = factory.get('/hi')
+        r2 = factory.get('/hi')
+        r2.META['REMOTE_ADDR'] = '10.10.10.10'
+        r3 = factory.get('/bye')
+
+        self.assertEqual(get_calls(r1), 1) # cache
+        self.assertEqual(get_calls(r1), 1) # hit
+        self.assertEqual(get_calls(r2), 1) # hit, since only url is considered
+        self.assertEqual(get_calls(r3), 2) # miss
+
+        get_calls.invalidate(r1)
+        self.assertEqual(get_calls(r1), 3) # miss
+
+        # Can pass uri to invalidate
+        get_calls.invalidate(r1.build_absolute_uri())
+        self.assertEqual(get_calls(r1), 4) # miss
 
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
