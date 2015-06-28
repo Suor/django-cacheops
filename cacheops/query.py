@@ -89,7 +89,7 @@ def _cached_as(*samples, **kwargs):
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
-            result = func(*args)
+            result = func(*args, **kwargs)
             cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
