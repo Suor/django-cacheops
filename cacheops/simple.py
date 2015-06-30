@@ -50,6 +50,10 @@ class BaseCache(object):
         """
         A decorator for caching function calls
         """
+        # Support @cached (without parentheses) form
+        if callable(timeout):
+            return self._cached(_get_key=_get_key)(timeout)
+
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -76,10 +80,10 @@ class BaseCache(object):
         return decorator
 
     def cached(self, timeout=None, extra=None):
-        return self._cached(timeout, extra, _get_key=func_cache_key)
+        return self._cached(timeout=timeout, extra=extra, _get_key=func_cache_key)
 
     def cached_view(self, timeout=None, extra=None):
-        return cached_view_fab(self._cached)(timeout, extra)
+        return cached_view_fab(self._cached)(timeout=timeout, extra=extra)
 
 
 class RedisCache(BaseCache):
