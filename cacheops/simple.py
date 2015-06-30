@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import os, time
-from functools import wraps
 from .cross import pickle, md5hex
 
 from django.conf import settings
+from funcy import wraps
 
 from .conf import redis_client, handle_connection_failure
 from .utils import func_cache_key, cached_view_fab

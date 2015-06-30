@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import re
-from functools import wraps
 import json
 import inspect
 import threading
 import six
-from funcy import memoize, compose
+from funcy import memoize, compose, wraps
 from funcy.py2 import mapcat
 from .cross import md5hex
 

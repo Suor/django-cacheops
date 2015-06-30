@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
-from functools import wraps
 import json
 import six
-from funcy import select_keys, cached_property, once, once_per, monkey, any
+from funcy import select_keys, cached_property, once, once_per, monkey, any, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
