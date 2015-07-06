@@ -45,14 +45,14 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     )
 
 
-def _cached_as(*samples, **kwargs):
+def cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
-    _get_key = kwargs.get('_get_key')
+    key_func = kwargs.get('key_func', func_cache_key)
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -82,7 +82,7 @@ def _cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
+            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -96,13 +96,8 @@ def _cached_as(*samples, **kwargs):
     return decorator
 
 
-def cached_as(*samples, **kwargs):
-    kwargs["_get_key"] = func_cache_key
-    return _cached_as(*samples, **kwargs)
-
-
 def cached_view_as(*samples, **kwargs):
-    return cached_view_fab(_cached_as)(*samples, **kwargs)
+    return cached_view_fab(cached_as)(*samples, **kwargs)
 
 
 class QuerySetMixin(object):

@@ -46,18 +46,18 @@ class BaseCache(object):
 
         return result
 
-    def _cached(self, timeout=None, extra=None, _get_key=None):
+    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
         """
         A decorator for caching function calls
         """
         # Support @cached (without parentheses) form
         if callable(timeout):
-            return self._cached(_get_key=_get_key)(timeout)
+            return self._cached(key_func=key_func)(timeout)
 
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -67,23 +67,20 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 return CacheKey.make(cache_key, cache=self, timeout=timeout)
             wrapper.key = key
 
             return wrapper
         return decorator
 
-    def cached(self, timeout=None, extra=None):
-        return self._cached(timeout=timeout, extra=extra, _get_key=func_cache_key)
-
     def cached_view(self, timeout=None, extra=None):
-        return cached_view_fab(self._cached)(timeout=timeout, extra=extra)
+        return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
 
 class RedisCache(BaseCache):

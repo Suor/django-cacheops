@@ -129,7 +129,7 @@ def cached_view_fab(_cached):
 
     def cached_view(*dargs, **dkwargs):
         def decorator(func):
-            dkwargs['_get_key'] = view_cache_key
+            dkwargs['key_func'] = view_cache_key
             cached_func = _cached(*dargs, **dkwargs)(compose(force_render, func))
 
             @wraps(func)
