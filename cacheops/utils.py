@@ -110,6 +110,14 @@ def func_cache_key(func, args, kwargs, extra=None):
         factors.append(func.__code__.co_firstlineno)
     return md5hex(json.dumps(factors, sort_keys=True, default=str))
 
+def debug_cache_key(func, args, kwargs, extra=None):
+    """
+    Same as func_cache_key(), but doesn't take into account function line.
+    Handy to use when editing code.
+    """
+    factors = [func.__module__, func.__name__, args, kwargs, extra]
+    return md5hex(json.dumps(factors, sort_keys=True, default=str))
+
 def view_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key for view func.
