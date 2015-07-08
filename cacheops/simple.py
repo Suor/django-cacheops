@@ -52,7 +52,7 @@ class BaseCache(object):
         """
         # Support @cached (without parentheses) form
         if callable(timeout):
-            return self._cached(key_func=key_func)(timeout)
+            return self.cached(key_func=key_func)(timeout)
 
         def decorator(func):
             @wraps(func)
