@@ -169,7 +169,7 @@ def invalidate_model(model):
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
-        for batch in batcher(conjs_keys, 200):
+        for batch in batcher(conjs_keys, 1000):
             redis_client.srem(set_key, *batch)
 
 def invalidate_all():
