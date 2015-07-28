@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import six
 from cacheops.conf import redis_client, handle_connection_failure
-from cacheops.utils import get_model_name, non_proxy
+from cacheops.utils import get_model_name, non_proxy, batcher
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all')
@@ -168,8 +168,9 @@ def invalidate_model(model):
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
-        for k in conjs_keys:
-            redis_client.srem(set_key, k)
+
+        for batch in batcher(conjs_keys, 1000):
+            redis_client.srem(set_key, *batch)
 
 def invalidate_all():
     redis_client.flushdb()

@@ -114,7 +114,7 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(mb.labels.cache().all())
 
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             label = Label.objects.cache().create(text="Gateway")
 
         with self.assertNumQueries(2):
@@ -124,7 +124,6 @@ class BasicTests(BaseTestCase):
             list(mb.labels.cache().all())
         with self.assertNumQueries(0):
             list(mb.labels.cache().all())
-
 
     def test_db_column(self):
         e = Extra.objects.cache().get(tag=5)

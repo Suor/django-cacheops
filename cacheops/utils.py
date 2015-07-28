@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from operator import concat, itemgetter
-from itertools import product
+from itertools import product, islice, chain
 import inspect
 
 try:
@@ -32,6 +32,13 @@ except ImportError:
 
 
 LONG_DISJUNCTION = 8
+
+
+def batcher(iterable, size):
+    sourceiter = iter(iterable)
+    while True:
+        batchiter = islice(sourceiter, size)
+        yield chain([batchiter.next()], batchiter)
 
 
 def non_proxy(model):
