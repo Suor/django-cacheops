@@ -102,6 +102,10 @@ def prepare_profiles():
                 mp['ops'] = [mp['ops']]
             mp['ops'] = set(mp['ops'])
 
+        if 'timeout' not in mp:
+            raise ImproperlyConfigured(
+                'You must specify "timeout" option in "%s" CACHEOPS profile' % app_model)
+
     return model_profiles
 
 @memoize
