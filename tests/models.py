@@ -240,5 +240,14 @@ def set_boolean_true(sender, instance, created, **kwargs):
     dialog = One.objects.cache(ops='all').get(id=instance.id)
     assert dialog.boolean is True
 
+# 159
+class M2MBase(models.Model):
+    char_many_to_many = models.ManyToManyField('M2MWithCharId')
+
+class M2MWithCharId(models.Model):
+    id = models.CharField(max_length=30, primary_key=True)
+    name = models.CharField(max_length=30)
+
+
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)

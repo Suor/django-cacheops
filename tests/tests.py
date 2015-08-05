@@ -522,7 +522,54 @@ class IssueTests(BaseTestCase):
         # Update boolean to True
         one = One.objects.cache().get(id=one.id)
         one.boolean = True
-        one.save() # An error was in post_save signal handler
+        one.save()  # An error was in post_save signal handler
+
+    def test_159(self):
+        brand_id = 1
+        label_id = brand_id + 1
+        brand = Brand.objects.create(pk=brand_id)
+        label = Label.objects.create(pk=label_id)
+        brand.labels.add(label)
+
+        # Create another_brand. It must have the same id as label to check
+        # condition when cache for brand invalidates by label.id
+        another_brand = Brand.objects.create(pk=label_id)
+        another_brand.labels.add(Label.objects.create())
+
+        list(brand.labels.cache().all())
+        list(another_brand.labels.cache().all())
+
+        # check that labels was cached for both brands
+        with self.assertNumQueries(0):
+            list(brand.labels.cache().all())
+            list(another_brand.labels.cache().all())
+
+        # clear brands for label, which related to brand and not related
+        # to another_brand
+        label.brands.clear()
+
+        # cache must not be invalidated for another brand
+        with self.assertNumQueries(0):
+            list(another_brand.labels.cache().all())
+        # and should be invalidated for brand
+        with self.assertNumQueries(1):
+            list(brand.labels.cache().all())
+
+    def test_159_case2(self):
+        base = M2MBase.objects.create()
+        target = M2MWithCharId.objects.create(id="stub_id")
+        base.char_many_to_many.add(target)
+
+        list(base.char_many_to_many.cache().all())
+
+        try:
+            target.m2mbase_set.clear()
+        except Exception as e:
+            self.fail(e)
+
+        with self.assertNumQueries(1):
+            list(base.char_many_to_many.cache().all())
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
