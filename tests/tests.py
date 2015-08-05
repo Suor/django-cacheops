@@ -276,10 +276,16 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_view_on_template_response(self):
         from django.template.response import TemplateResponse
+        # NOTE: get_template_from_string() removed in Django 1.8
+        try:
+            from django.template import engines
+            from_string = engines['django'].from_string
+        except ImportError:
+            from django.template.loader import get_template_from_string as from_string
 
         @cached_view_as(Category)
         def view(request):
-            return TemplateResponse(request, Template('hi'))
+            return TemplateResponse(request, from_string('hi'))
 
         factory = RequestFactory()
         view(factory.get('/hi'))
