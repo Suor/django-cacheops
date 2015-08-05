@@ -442,7 +442,8 @@ class ManagerMixin(object):
         return self.get_queryset().nocache()
 
 
-def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
+def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
+                   **kwargs):
     """
     Invoke invalidation on m2m changes.
     """
@@ -450,13 +451,19 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     # since post_save and post_delete events are triggered for them
     if not sender._meta.auto_created:
         return
+    if action not in ('pre_clear', 'post_add', 'pre_remove'):
+        return
 
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
                    if m2m.rel.through == sender)
 
+    instance_field, model_field = m2m.m2m_column_name(), m2m.m2m_reverse_name()
+    if reverse:
+        instance_field, model_field = model_field, instance_field
+
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        objects = sender.objects.filter(**{m2m.m2m_field_name(): instance.pk})
+        objects = sender.objects.filter(**{instance_field: instance.pk})
         for obj in objects:
             invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
@@ -464,8 +471,8 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         #       cause we already know all their meaningfull attributes.
         for pk in pk_set:
             invalidate_dict(sender, {
-                m2m.m2m_column_name(): instance.pk,
-                m2m.m2m_reverse_name(): pk
+                instance_field: instance.pk,
+                model_field: pk
             })
 
 
