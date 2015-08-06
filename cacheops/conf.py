@@ -50,13 +50,28 @@ class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
 
-# Connecting to redis
-try:
-    redis_conf = settings.CACHEOPS_REDIS
-except AttributeError:
-    raise ImproperlyConfigured('You must specify non-empty CACHEOPS_REDIS setting to use cacheops')
+class LazyRedis(object):
+    def _setup(self):
+        # Connecting to redis
+        try:
+            redis_conf = settings.CACHEOPS_REDIS
+        except AttributeError:
+            raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-redis_client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
+        client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
+
+        object.__setattr__(self, '__class__', client.__class__)
+        object.__setattr__(self, '__dict__', client.__dict__)
+
+    def __getattr__(self, name):
+        self._setup()
+        return getattr(self, name)
+
+    def __setattr__(self, name, value):
+        self._setup()
+        return setattr(self, name, value)
+
+redis_client = LazyRedis()
 
 
 @memoize
