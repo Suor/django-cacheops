@@ -4,7 +4,7 @@ import json
 import inspect
 import threading
 import six
-from funcy import memoize, compose, wraps
+from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
 from .cross import md5hex
 
@@ -12,7 +12,7 @@ import django
 from django.db import models
 from django.http import HttpRequest
 
-from .conf import redis_client
+from .conf import redis_client, model_profile
 
 
 # NOTE: we don't serialize this fields since their values could be very long
@@ -43,6 +43,11 @@ def model_family(model):
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
     return class_tree(non_proxy(model))
+
+
+@memoize
+def family_has_profile(cls):
+    return any(model_profile, model_family(cls))
 
 
 if django.VERSION < (1, 6):
