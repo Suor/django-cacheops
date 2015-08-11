@@ -377,6 +377,13 @@ You can manually invalidate or update a result of a cached function:
     top_articles.key(some_category).set(new_value)
 
 
+To invalidate cached view you can pass absolute uri instead of request:
+
+.. code:: python
+
+    top_articles.invalidate('http://example.com/page', some_category)
+
+
 Cacheops also provides get/set primitives for simple cache:
 
 .. code:: python
