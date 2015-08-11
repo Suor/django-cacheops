@@ -21,7 +21,6 @@ env:
   - TOXENV=py33-dj16
   - TOXENV=py33-dj17
   - TOXENV=py33-dj18
-  - TOXENV=py33-djmaster
   - TOXENV=py34-dj15
   - TOXENV=py34-dj16
   - TOXENV=py34-dj17
@@ -30,7 +29,6 @@ env:
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
-    - env: "TOXENV=py33-djmaster"
     - env: "TOXENV=py34-djmaster"
 install:
   - pip install tox
