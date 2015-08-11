@@ -1,3 +1,19 @@
+2.4
+- added @decorator_tag to easily create cached template tags
+- create redis client lazily
+- let invalidate @cached_view()
+- support template responses used by generic CBV
+- support argumentless no parentheses form for @cached and @cached_view
+- removed unneeded invalidation calls in .bulk_create()
+- allow decorating built-in and external functions
+- added .cached_call() to simple and file cache
+- added key_func argument to @cached_as()
+- check that timeout is specified in CACHEOPS setting
+- fixed m2m invalidation on reverse changes
+- fixed passing kwargs in @cached_as()
+- fixed @cached with no parentheses
+- fixed .bulk_create() API in Django 1.4
+
 2.3.2
 - made cacheops invalidate before other post_* signals (Emil Stenström)
 - fixed invalidation on proxy/base model changes
