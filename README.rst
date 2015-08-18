@@ -615,7 +615,6 @@ TODO
 ----
 
 - better support transactions
-- get rid of migrations?
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - shard cache between multiple redises
@@ -623,7 +622,7 @@ TODO
 - respect subqueries?
 - respect headers in @cached_view*?
 - group invalidate_obj() calls?
-- a way to postpone invalidation?
+- a postpone invalidation context manager/decorator?
 - fast mode: store cache in local memory, but check in with redis if it's valid
 - an interface for complex fields to extract exact on parts or transforms: ArrayField.len => field__len=?, ArrayField[0] => field__0=?, JSONField['some_key'] => field__some_key=?
 - custom cache eviction strategy in lua
