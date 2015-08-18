@@ -563,6 +563,10 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(base.char_many_to_many.cache())
 
+    def test_161(self):
+        categories = Category.objects.using('slave').filter(title='Python')
+        list(Post.objects.using('slave').filter(category__in=categories).cache())
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
