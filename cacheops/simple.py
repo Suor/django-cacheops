@@ -9,7 +9,7 @@ from .conf import redis_client, handle_connection_failure
 from .utils import func_cache_key, cached_view_fab
 
 
-__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss')
+__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
 
 
 class CacheMiss(Exception):
