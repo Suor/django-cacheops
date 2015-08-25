@@ -132,7 +132,11 @@ class QuerySetMixin(object):
         # Use query SQL as part of a key
         try:
             sql, params = self.query.get_compiler(self._db or DEFAULT_DB_ALIAS).as_sql()
-            md.update(smart_str(sql % params))
+            try:
+                sql_str = sql % params
+            except UnicodeDecodeError:
+                sql_str = sql % map(smart_str, params)
+            md.update(smart_str(sql_str))
         except EmptyResultSet:
             pass
         # If query results differ depending on database

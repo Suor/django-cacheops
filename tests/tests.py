@@ -567,6 +567,10 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.using('slave').filter(title='Python')
         list(Post.objects.using('slave').filter(category__in=categories).cache())
 
+    def test_161_non_ascii(self):
+        # Non ascii text in non-unicode str literal
+        list(Category.objects.filter(title='фыва').cache())
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
