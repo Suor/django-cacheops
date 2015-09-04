@@ -1,3 +1,8 @@
+2.4.1
+- export FileCache and RedisCache from cacheops
+- allow non-ascii in str params
+- fixed subqueries with diffrent db
+
 2.4
 - added @decorator_tag to easily create cached template tags
 - create redis client lazily
