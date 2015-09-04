@@ -209,7 +209,7 @@ class DecoratorTests(BaseTestCase):
         calls = [0]
 
         @deco
-        def get_calls(r=None):
+        def get_calls(_=None):
             calls[0] += 1
             return calls[0]
 
@@ -844,7 +844,7 @@ class SimpleCacheTests(BaseTestCase):
         calls = [0]
 
         @cached(timeout=100)
-        def get_calls(x):
+        def get_calls(_):
             calls[0] += 1
             return calls[0]
 
