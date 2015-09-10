@@ -816,6 +816,20 @@ class ProxyTests(BaseTestCase):
         with self.assertRaises(NonCachedMedia.DoesNotExist):
             MediaProxy.objects.cache().get(title=media.title)
 
+    def test_proxy_caching(self):
+        video = Video.objects.create(title='Pulp Fiction')
+        self.assertEqual(type(Video.objects.cache().get(pk=video.pk)),
+                         Video)
+        self.assertEqual(type(VideoProxy.objects.cache().get(pk=video.pk)),
+                         VideoProxy)
+
+    def test_proxy_caching_reversed(self):
+        video = Video.objects.create(title='Pulp Fiction')
+        self.assertEqual(type(VideoProxy.objects.cache().get(pk=video.pk)),
+                         VideoProxy)
+        self.assertEqual(type(Video.objects.cache().get(pk=video.pk)),
+                         Video)
+
 
 class MultitableInheritanceTests(BaseTestCase):
     @unittest.expectedFailure
