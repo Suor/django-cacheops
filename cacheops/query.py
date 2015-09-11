@@ -128,7 +128,10 @@ class QuerySetMixin(object):
         """
         md = md5()
         md.update('%s.%s' % (self.__class__.__module__, self.__class__.__name__))
-        md.update(stamp_fields(self.model)) # Protect from field list changes in model
+        # Vary cache key for proxy models
+        md.update('%s.%s' % (self.model.__module__, self.model.__name__))
+        # Protect from field list changes in model
+        md.update(stamp_fields(self.model))
         # Use query SQL as part of a key
         try:
             sql, params = self.query.get_compiler(self._db or DEFAULT_DB_ALIAS).as_sql()
