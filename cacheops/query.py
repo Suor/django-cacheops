@@ -412,13 +412,19 @@ class ManagerMixin(object):
             for k in unwanted_dict:
                 del instance.__dict__[k]
 
-            key = 'pk' if cache_on_save is True else cache_on_save
+            if cache_on_save is True:
+                keys = ['pk']
+            elif isinstance(cache_on_save, six.string_types):
+                keys = [cache_on_save]
+            else:
+                keys = cache_on_save
             # Django doesn't allow filters like related_id = 1337.
             # So we just hacky strip _id from end of a key
             # TODO: make it right, _meta.get_field() should help
-            filter_key = key[:-3] if key.endswith('_id') else key
-
-            cond = {filter_key: getattr(instance, key)}
+            filter_keys = [(key[:-3], key) if key.endswith('_id') else (key, key)
+                           for key in keys]
+            cond = dict([(filter_key, getattr(instance, key))
+                        for filter_key, key in filter_keys])
             qs = sender.objects.inplace().filter(**cond).order_by()
             if MAX_GET_RESULTS:
                 qs = qs[:MAX_GET_RESULTS + 1]
