@@ -182,6 +182,14 @@ class Local(models.Model):
 class CacheOnSaveModel(models.Model):
     title = models.CharField(max_length=32)
 
+# uh.
+class CacheOnSaveModelField(models.Model):
+    title = models.CharField(max_length=32)
+    name = models.CharField(max_length=32)
+
+class CacheOnSaveModelFields(models.Model):
+    title = models.CharField(max_length=32)
+    name = models.CharField(max_length=32)
 
 # 47
 class DbAgnostic(models.Model):

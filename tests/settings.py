@@ -90,6 +90,9 @@ if os.environ.get('CACHEOPS_CONF') == 'old':
     CACHEOPS = {
         'tests.local': ('just_enable', 60*60, {'local_get': True}),
         'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
+        'tests.cacheonsavemodelfield': ('just_enable', 60*60, {'cache_on_save': 'name'}),
+        'tests.cacheonsavemodelfields': ('just_enable', 60*60,
+                                         {'cache_on_save': ['name', 'title']}),
         'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
         'tests.genericcontainer': ('all', 60*60),
         'tests.all': ('all', 60*60),
@@ -103,6 +106,8 @@ else:
     CACHEOPS = {
         'tests.local': {'local_get': True},
         'tests.cacheonsavemodel': {'cache_on_save': True},
+        'tests.cacheonsavemodelfield': {'cache_on_save': 'name'},
+        'tests.cacheonsavemodelfields': {'cache_on_save': ['name', 'title']},
         'tests.dbbinded': {'db_agnostic': False},
         'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
         'tests.all': {'ops': 'all'},

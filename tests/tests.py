@@ -467,6 +467,20 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(0):
             CacheOnSaveModel.objects.cache().get(pk=m.pk)
 
+    def test_cache_on_save_single_field_lookup(self):
+        m = CacheOnSaveModelField(title="test", name="trial")
+        m.save()
+
+        with self.assertNumQueries(0):
+            CacheOnSaveModelField.objects.cache().get(name="trial")
+
+    def test_cache_on_save_multiple_field_lookup(self):
+        m = CacheOnSaveModelFields(title="test", name="trial")
+        m.save()
+
+        with self.assertNumQueries(0):
+            CacheOnSaveModelFields.objects.cache().get(title="test", name="trial")
+
     def test_54(self):
         qs = Category.objects.all()
         list(qs) # force load objects to quesryset cache
