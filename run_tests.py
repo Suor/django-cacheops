@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, re
+import os, sys, re, shutil
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 import django
@@ -17,4 +17,14 @@ else:
 
 if hasattr(django, 'setup'):
     django.setup()
-call_command('test', names, failfast='-x' in sys.argv, verbosity=2 if '-v' in sys.argv else 1)
+
+# NOTE: we create migrations each time  since they depend on type of database,
+#       python and django versions
+try:
+    if django.VERSION >= (1, 7):
+        shutil.rmtree('tests/migrations', True)
+        call_command('makemigrations', 'tests', verbosity=2 if '-v' in sys.argv else 0)
+    call_command('test', names, failfast='-x' in sys.argv, verbosity=2 if '-v' in sys.argv else 1)
+finally:
+    if django.VERSION >= (1, 7):
+        shutil.rmtree('tests/migrations')

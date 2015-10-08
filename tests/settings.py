@@ -49,6 +49,23 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'HOST': '',
         },
     }
+elif os.environ.get('CACHEOPS_DB') == 'mysql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'cacheops',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+        'slave': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'cacheops_slave',
+            'USER': 'cacheops',
+            'PASSWORD': '',
+            'HOST': '',
+        },
+    }
 else:
     DATABASES = {
         'default': {
@@ -76,7 +93,8 @@ if os.environ.get('CACHEOPS_CONF') == 'old':
         'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
         'tests.genericcontainer': ('all', 60*60),
         'tests.all': ('all', 60*60),
-        '*.*': ('just_enable', 60*60),
+        'tests.*': ('just_enable', 60*60),
+        'tests.noncachedvideoproxy': None,
     }
 else:
     CACHEOPS_DEFAULTS = {
@@ -88,7 +106,9 @@ else:
         'tests.dbbinded': {'db_agnostic': False},
         'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
         'tests.all': {'ops': 'all'},
-        '*.*': {},
+        'tests.*': {},
+        'tests.noncachedvideoproxy': None,
+        'tests.noncachedmedia': None,
     }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))

@@ -2,8 +2,6 @@ import os
 import six
 from datetime import date, datetime, time
 
-from funcy import suppress
-
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
@@ -103,9 +101,12 @@ class Weird(models.Model):
 #       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
 #       - Other: UUIDField, DurationField
 # contrib.postgres ArrayField
-with suppress(ImportError):
+try:
     from django.contrib.postgres.fields import ArrayField
+except ImportError:
+    ArrayField = None
 
+if ArrayField and os.environ.get('CACHEOPS_DB') != 'mysql':
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
         tags = ArrayField(models.IntegerField())
@@ -122,6 +123,17 @@ class Video(models.Model):
     title = models.CharField(max_length=128)
 
 class VideoProxy(Video):
+    class Meta:
+        proxy = True
+
+class NonCachedVideoProxy(Video):
+    class Meta:
+        proxy = True
+
+class NonCachedMedia(models.Model):
+    title = models.CharField(max_length=128)
+
+class MediaProxy(NonCachedMedia):
     class Meta:
         proxy = True
 
@@ -216,3 +228,26 @@ if os.environ.get('CACHEOPS_DB') == 'postgis':
 
     class Geometry(gis_models.Model):
         point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
+
+# 145
+class One(models.Model):
+    boolean = models.BooleanField(default=False)
+
+def set_boolean_true(sender, instance, created, **kwargs):
+    if created:
+        return
+
+    dialog = One.objects.cache(ops='all').get(id=instance.id)
+    assert dialog.boolean is True
+
+# 159
+class M2MBase(models.Model):
+    char_many_to_many = models.ManyToManyField('M2MWithCharId')
+
+class M2MWithCharId(models.Model):
+    id = models.CharField(max_length=30, primary_key=True)
+    name = models.CharField(max_length=30)
+
+
+from django.db.models.signals import post_save
+post_save.connect(set_boolean_true, sender=One)

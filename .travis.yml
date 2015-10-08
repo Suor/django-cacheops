@@ -1,5 +1,7 @@
 language: python
 python: 2.7
+sudo: false
+cache: pip
 services:
   - redis-server
 addons:
@@ -15,19 +17,20 @@ env:
   - TOXENV=py27-dj15
   - TOXENV=py27-dj16
   - TOXENV=py27-dj17
+  - TOXENV=py27-dj18
   - TOXENV=py27-djmaster
   - TOXENV=py33-dj15
   - TOXENV=py33-dj16
   - TOXENV=py33-dj17
-  - TOXENV=py33-djmaster
+  - TOXENV=py33-dj18
   - TOXENV=py34-dj15
   - TOXENV=py34-dj16
   - TOXENV=py34-dj17
+  - TOXENV=py34-dj18
   - TOXENV=py34-djmaster
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
-    - env: "TOXENV=py33-djmaster"
     - env: "TOXENV=py34-djmaster"
 install:
   - pip install tox
@@ -36,5 +39,10 @@ before_script:
   # postgis django backend requires these to exist
   - psql -U postgres -c "create database cacheops"
   - psql -U postgres -c "create database cacheops_slave"
+  # mysql databases
+  - mysql -e "create user cacheops"
+  - mysql -u root -e "grant all on *.* to 'cacheops'@'localhost'"
+  - mysql -e "create database cacheops"
+  - mysql -e "create database cacheops_slave"
 script:
   - tox

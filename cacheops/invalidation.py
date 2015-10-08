@@ -21,7 +21,7 @@ _no_invalidation_depth = defaultdict(int)
 
 @handle_connection_failure
 def invalidate_dict(model, obj_dict):
-    if _no_invalidation_depth.get(get_thread_id()):
+    if no_invalidation.active:
         return
     model = non_proxy(model)
     load_script('invalidate')(args=[
@@ -43,7 +43,7 @@ def invalidate_model(model):
     NOTE: This is a heavy artilery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    if _no_invalidation_depth.get(get_thread_id()):
+    if no_invalidation.active:
         return
     model = non_proxy(model)
     conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
@@ -53,7 +53,7 @@ def invalidate_model(model):
 
 @handle_connection_failure
 def invalidate_all():
-    if _no_invalidation_depth.get(get_thread_id()):
+    if no_invalidation.active:
         return
     redis_client.flushdb()
 
@@ -64,6 +64,10 @@ class _no_invalidation(ContextDecorator):
 
     def __exit__(self, type, value, traceback):
         _no_invalidation_depth[get_thread_id()] -= 1
+
+    @property
+    def active(self):
+        return _no_invalidation_depth.get(get_thread_id())
 
 no_invalidation = _no_invalidation()
 

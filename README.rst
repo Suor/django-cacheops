@@ -39,9 +39,9 @@ Setup
 
 **Note:** settings format has changed in cacheops 2.2,
 for old style settings see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
-Old format is supported in cacheops 2.2+, but considered deprecated.
+Old format is still supported in cacheops 2.2+, but considered deprecated.
 
-Add ``cacheops`` to your ``INSTALLED_APPS`` before any apps that use it.
+Add ``cacheops`` to your ``INSTALLED_APPS``.
 
 Setup redis connection and enable caching for desired models:
 
@@ -53,7 +53,10 @@ Setup redis connection and enable caching for desired models:
         'db': 1,             # SELECT non-default redis database
                              # using separate redis db or redis instance
                              # is highly recommended
-        'socket_timeout': 3,
+
+        'socket_timeout': 3,   # connection timeout in seconds, optional
+        'password': '...',     # optional
+        'unix_socket_path': '' # replaces host and port
     }
 
     CACHEOPS = {
@@ -279,7 +282,6 @@ On the other hand, there is a way to turn off invalidation for a while:
 
 Also works as decorator:
 
-
 .. code:: python
 
     @no_invalidation
@@ -305,13 +307,18 @@ Postponing invalidation can considerably speed up batch jobs.
 Using memory limit
 ------------------
 
-If your cache never grows too large you may not bother. But if you do you have few options.
+If your cache never grows too large you may not bother. But if you do you have some options.
 Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will.
+so you can't just set ``maxmemory`` and let redis evict at its will. For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
+So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
 
-First strategy that will work is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
+one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
+You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
 
-Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``. However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database a lot.
+Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
+However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
 
 
 Multiple database support
@@ -354,7 +361,7 @@ functions:
 
     @property
     def articles_json(self):
-        @cached(timeout=10*60, extra=self.category)
+        @cached(timeout=10*60, extra=self.category_id)
         def _articles_json():
             ...
             return json.dumps(...)
@@ -362,12 +369,19 @@ functions:
         return _articles_json()
 
 
-You can manually invalidate or update a result of cached function:
+You can manually invalidate or update a result of a cached function:
 
 .. code:: python
 
     top_articles.invalidate(some_category)
     top_articles.key(some_category).set(new_value)
+
+
+To invalidate cached view you can pass absolute uri instead of request:
+
+.. code:: python
+
+    top_articles.invalidate('http://example.com/page', some_category)
 
 
 Cacheops also provides get/set primitives for simple cache:
@@ -422,8 +436,8 @@ File based cache can be used the same way as simple time-invalidated one:
     file_cache.delete(cache_key)
 
 
-It have several improvements upon django built-in file cache, both about high load.
-First, it is safe against concurrent writes. Second, it's invalidation is done as separate task,
+It has several improvements upon django built-in file cache, both about high load.
+First, it's safe against concurrent writes. Second, it's invalidation is done as separate task,
 you'll need to call this from crontab for that to work::
 
     /path/manage.py cleanfilecache
@@ -456,6 +470,55 @@ To invalidate cached fragment use:
     from cacheops import invalidate_fragment
 
     invalidate_fragment(fragment_name, extra1, ...)
+
+If you have more complex fragment caching needs, cacheops provides a helper to
+make your own template tags which decorate a template fragment in a way
+analogous to decorating a function with ``@cached`` or ``@cached_as``.
+This is **experimental** feature for now.
+
+To use it create ``myapp/templatetags/mycachetags.py`` and add something like this there:
+
+.. code:: python
+
+    from cacheops import cached_as, CacheopsLibrary
+
+    register = CacheopsLibrary()
+
+    @register.decorator_tag(takes_context=True)
+    def cache_menu(context, menu_name):
+        from django.utils import translation
+        from myapp.models import Flag, MenuItem
+
+        request = context.get('request')
+        if request and request.user.is_staff():
+            # Use noop decorator to bypass caching for staff
+            return lambda func: func
+
+        return cached_as(
+            # Invalidate cache if any menu item or a flag for menu changes
+            MenuItem,
+            Flag.objects.filter(name='menu'),
+            # Vary for menu name and language, also stamp it as "menu" to be safe
+            extra=("menu", menu_name, translation.get_language()),
+            timeout=24 * 60 * 60
+        )
+
+``@decorator_tag`` here creates a template tag behaving the same as returned decorator
+upon wrapped template fragment. Resulting template tag could be used as follows:
+
+.. code:: django
+
+    {% load mycachetags %}
+
+    {% cache_menu "top" %}
+        ... the top menu template code ...
+    {% endcache_menu %}
+
+    ... some template code ..
+
+    {% cache_menu "bottom" %}
+        ... the bottom menu template code ...
+    {% endcache_menu %}
 
 
 Jinja2 extension
@@ -501,8 +564,8 @@ probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions.
 6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
-and is more flexible. 8 is postponed until it will gain more interest or a champion willing to
-implement it emerge.
+and is more flexible. 8 and 9 are postponed until they will gain more interest
+or a champion willing to implement any one of them emerge.
 
 
 Performance tips
@@ -512,20 +575,20 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
-2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return a clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return the clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
 
     items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
 
    You can revert queryset to cloning state using ``.cloning()`` call.
 
-   Note that this is a micro-optimization technique. Using it is desirable in most hot places, but not everywhere.
+   Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
 
 3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
    which sometimes makes queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than list of model instances.
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
 
-5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/topics/persistence>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
+5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/commands/save>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
 
 6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
@@ -535,14 +598,15 @@ Here come some performance tips to make cacheops and Django ORM faster.
 Writing a test
 --------------
 
-Writing a test for an issue you are having can speed up its resolution a lot. Here is how you do that. I am supposing you have some application code causing it.
+Writing a test for an issue you are experiencing can speed up its resolution a lot.
+Here is how you do that. I suppose you have some application code causing it.
 
 1. Make a fork.
-2. Install all from `test_requirements.txt`.
-3. Ensure you can run tests with `./run_tests.py`.
-4. Copy relevant models code to https://github.com/Suor/django-cacheops/blob/master/tests/models.py
-5. Go to https://github.com/Suor/django-cacheops/blob/master/tests/tests.py and paste code causing exception to `IssueTests.test_{issue_number}`.
-6. Execute `./run_tests.py IssueTests.test_{issue_number}` and see it failing.
+2. Install all from ``test_requirements.txt``.
+3. Ensure you can run tests with ``./run_tests.py``.
+4. Copy relevant models code to ``tests/models.py``.
+5. Go to ``tests/tests.py`` and paste code causing exception to ``IssueTests.test_{issue_number}``.
+6. Execute ``./run_tests.py IssueTests.test_{issue_number}`` and see it failing.
 7. Cut down model and test code until error disappears and make a step back.
 8. Commit changes and make a pull request.
 
@@ -557,18 +621,12 @@ TODO
 - add local cache (cleared at the and of request?)
 - respect subqueries?
 - respect headers in @cached_view*?
-- support CBV?
 - group invalidate_obj() calls?
-- a way to postpone invalidation?
+- a postpone invalidation context manager/decorator?
 - fast mode: store cache in local memory, but check in with redis if it's valid
-- an interface for complex fields to extract exact on parts or transforms:
-    - ArrayField.len => field__len=?
-    - ArrayField[0] => field__0=?
-    - JSONField['some_key'] => field__some_key=?
+- an interface for complex fields to extract exact on parts or transforms: ArrayField.len => field__len=?, ArrayField[0] => field__0=?, JSONField['some_key'] => field__some_key=?
 - custom cache eviction strategy in lua
 - cache a string directly (no pickle) for direct serving (custom key function?)
-- try msgpack?
-- lazy methods on querysets (calculate cache key from methods called)?
 
 
 .. |Build Status| image:: https://travis-ci.org/whyflyru/django-cacheops.svg?branch=master

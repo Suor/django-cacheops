@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 import re
-from functools import wraps
 import json
 import inspect
 import threading
 import six
-from funcy import memoize
+from funcy import memoize, compose, wraps, any
+from funcy.py2 import mapcat
 from .cross import md5hex
 
 import django
 from django.db import models
 from django.http import HttpRequest
 
-from .conf import redis_client
+from .conf import redis_client, model_profile
 
 # NOTE: we don't serialize this fields since their values could be very long
 #       and one should not filter by their equality anyway.
@@ -24,12 +24,29 @@ if hasattr(models, 'BinaryField'):
     NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
+@memoize
 def non_proxy(model):
     while model._meta.proxy:
         # Every proxy model has exactly one non abstract parent model
         model = next(b for b in model.__bases__
                        if issubclass(b, models.Model) and not b._meta.abstract)
     return model
+
+def model_family(model):
+    """
+    Returns a list of all proxy models, including subclasess, superclassses and siblings.
+    """
+    def class_tree(cls):
+        return [cls] + mapcat(class_tree, cls.__subclasses__())
+
+    # NOTE: we also list multitable submodels here, we just don't care.
+    #       Cacheops doesn't support them anyway.
+    return class_tree(non_proxy(model))
+
+
+@memoize
+def family_has_profile(cls):
+    return any(model_profile, model_family(cls))
 
 
 if django.VERSION < (1, 6):
@@ -92,7 +109,17 @@ def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
     """
-    factors = [func.__module__, func.__name__, func.__code__.co_firstlineno, args, kwargs, extra]
+    factors = [func.__module__, func.__name__, args, kwargs, extra]
+    if hasattr(func, '__code__'):
+        factors.append(func.__code__.co_firstlineno)
+    return md5hex(json.dumps(factors, sort_keys=True, default=str))
+
+def debug_cache_key(func, args, kwargs, extra=None):
+    """
+    Same as func_cache_key(), but doesn't take into account function line.
+    Handy to use when editing code.
+    """
+    factors = [func.__module__, func.__name__, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=str))
 
 def view_cache_key(func, args, kwargs, extra=None):
@@ -100,14 +127,22 @@ def view_cache_key(func, args, kwargs, extra=None):
     Calculate cache key for view func.
     Use url instead of not properly serializable request argument.
     """
-    uri = args[0].build_absolute_uri()
+    if hasattr(args[0], 'build_absolute_uri'):
+        uri = args[0].build_absolute_uri()
+    else:
+        uri = args[0]
     return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
 
 def cached_view_fab(_cached):
+    def force_render(response):
+        if hasattr(response, 'render') and callable(response.render):
+            response.render()
+        return response
+
     def cached_view(*dargs, **dkwargs):
         def decorator(func):
-            dkwargs['_get_key'] = view_cache_key
-            cached_func = _cached(*dargs, **dkwargs)(func)
+            dkwargs['key_func'] = view_cache_key
+            cached_func = _cached(*dargs, **dkwargs)(compose(force_render, func))
 
             @wraps(func)
             def wrapper(request, *args, **kwargs):
@@ -117,6 +152,11 @@ def cached_view_fab(_cached):
                     return func(request, *args, **kwargs)
 
                 return cached_func(request, *args, **kwargs)
+
+            if hasattr(cached_func, 'invalidate'):
+                wrapper.invalidate = cached_func.invalidate
+                wrapper.key = cached_func.key
+
             return wrapper
         return decorator
     return cached_view

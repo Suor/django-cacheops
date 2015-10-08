@@ -6,7 +6,7 @@ except ImportError:
     import unittest
 
 import django
-from django.db import models, connection
+from django.db import models, connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
@@ -14,7 +14,11 @@ from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
-                     cached, cached_as, cached_view_as
+                     cached, cached_view, cached_as, cached_view_as
+if django.VERSION >= (1, 4):
+    from cacheops import invalidate_fragment
+    from cacheops.templatetags.cacheops import register
+    decorator_tag = register.decorator_tag
 from .models import *
 
 
@@ -135,12 +139,13 @@ class BasicTests(BaseTestCase):
 
     def test_expressions_save(self):
         # Check saving F
-        extra = Extra.objects.all()[0]
+        extra = Extra.objects.get(pk=1)
         extra.tag = F('tag')
         extra.save()
 
         # Check saving ExressionNode
-        extra = Extra.objects.all()[0]
+        Extra.objects.create(post_id=3, tag=7)
+        extra = Extra.objects.get(pk=3)
         extra.tag = F('tag') + 1
         extra.save()
 
@@ -204,7 +209,7 @@ class DecoratorTests(BaseTestCase):
         calls = [0]
 
         @deco
-        def get_calls(r=None):
+        def get_calls(_=None):
             calls[0] += 1
             return calls[0]
 
@@ -269,6 +274,22 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(r2), 1) # hit, since only url is considered
         self.assertEqual(get_calls(r3), 2) # miss
 
+    def test_cached_view_on_template_response(self):
+        from django.template.response import TemplateResponse
+        # NOTE: get_template_from_string() removed in Django 1.8
+        try:
+            from django.template import engines
+            from_string = engines['django'].from_string
+        except ImportError:
+            from django.template.loader import get_template_from_string as from_string
+
+        @cached_view_as(Category)
+        def view(request):
+            return TemplateResponse(request, from_string('hi'))
+
+        factory = RequestFactory()
+        view(factory.get('/hi'))
+
 
 from datetime import date, datetime, time
 
@@ -330,15 +351,20 @@ class ArrayTests(BaseTestCase):
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class TemplateTests(BaseTestCase):
-    def test_cached(self):
-        counts = {'a': 0, 'b': 0}
-        def inc_a():
-            counts['a'] += 1
-            return ''
-        def inc_b():
-            counts['b'] += 1
-            return ''
+    def get_inc(self):
+        count = [0]
+        def inc():
+            count[0] += 1
+            return count[0]
+        return inc
 
+    def assertRendersTo(self, template, context, result):
+        s = template.render(Context(context))
+        self.assertEqual(re.sub(r'\s+', '', s), result)
+
+    def test_cached(self):
+        inc_a = self.get_inc()
+        inc_b = self.get_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.a{{ a }}{% endcached %}
@@ -347,55 +373,70 @@ class TemplateTests(BaseTestCase):
             {% cached timeout=60 fragment_name='b' %}.b{{ b }}{% endcached %}
         """)
 
-        s = t.render(Context({'a': inc_a, 'b': inc_b}))
-        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a.b')
-        self.assertEqual(counts, {'a': 2, 'b': 1})
+        self.assertRendersTo(t, {'a': inc_a, 'b': inc_b}, '.a1.a1.a2.b1')
 
     def test_invalidate_fragment(self):
-        from cacheops import invalidate_fragment
-
-        counts = {'a': 0}
-        def inc_a():
-            counts['a'] += 1
-            return counts['a']
-
+        inc = self.get_inc()
         t = Template("""
             {% load cacheops %}
-            {% cached 60 'a' %}.{{ a }}{% endcached %}
+            {% cached 60 'a' %}.{{ inc }}{% endcached %}
         """)
 
-        render = lambda: re.sub(r'\s+', '', t.render(Context({'a': inc_a})))
-
-        self.assertEqual(render(), '.1')
+        self.assertRendersTo(t, {'inc': inc}, '.1')
 
         invalidate_fragment('a')
-        self.assertEqual(render(), '.2')
+        self.assertRendersTo(t, {'inc': inc}, '.2')
 
     def test_cached_as(self):
-        counts = {'a': 0}
-        def inc_a():
-            counts['a'] += 1
-            return ''
-
+        inc = self.get_inc()
         qs = Post.objects.all()
-
         t = Template("""
             {% load cacheops %}
-            {% cached_as qs 0 'a' %}.a{{ a }}{% endcached_as %}
-            {% cached_as qs timeout=60 fragment_name='a' %}.a{{ a }}{% endcached_as %}
-            {% cached_as qs fragment_name='a' timeout=60 %}.a{{ a }}{% endcached_as %}
+            {% cached_as qs 0 'a' %}.{{ inc }}{% endcached_as %}
+            {% cached_as qs timeout=60 fragment_name='a' %}.{{ inc }}{% endcached_as %}
+            {% cached_as qs fragment_name='a' timeout=60 %}.{{ inc }}{% endcached_as %}
         """)
 
-        s = t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(re.sub(r'\s+', '', s), '.a.a.a')
-        self.assertEqual(counts['a'], 1)
+        # All the forms are equivalent
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.1.1.1')
 
-        t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(counts['a'], 1)
+        # Cache works across calls
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.1.1.1')
 
+        # Post invalidation clears cache
         invalidate_model(Post)
-        t.render(Context({'a': inc_a, 'qs': qs}))
-        self.assertEqual(counts['a'], 2)
+        self.assertRendersTo(t, {'inc': inc, 'qs': qs}, '.2.2.2')
+
+    def test_decorator_tag(self):
+        @decorator_tag
+        def my_cached(flag):
+            return cached(timeout=60) if flag else lambda x: x
+
+        inc = self.get_inc()
+        t = Template("""
+            {% load cacheops %}
+            {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 0 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 0 %}.{{ inc }}{% endmy_cached %}
+            {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
+        """)
+
+        self.assertRendersTo(t, {'inc': inc}, '.1.2.3.1')
+
+    def test_decorator_tag_context(self):
+        @decorator_tag(takes_context=True)
+        def my_cached(context):
+            return cached(timeout=60) if context['flag'] else lambda x: x
+
+        inc = self.get_inc()
+        t = Template("""
+            {% load cacheops %}
+            {% my_cached %}.{{ inc }}{% endmy_cached %}
+            {% my_cached %}.{{ inc }}{% endmy_cached %}
+        """)
+
+        self.assertRendersTo(t, {'inc': inc, 'flag': True}, '.1.1')
+        self.assertRendersTo(t, {'inc': inc, 'flag': False}, '.2.3')
 
 
 class IssueTests(BaseTestCase):
@@ -479,6 +520,56 @@ class IssueTests(BaseTestCase):
 
         with self.assertNumQueries(0):
             list(All.objects.cache(ops='all').all())
+
+    def test_145(self):
+        # Create One with boolean False
+        one = One.objects.create(boolean=False)
+
+        # Update boolean to True
+        one = One.objects.cache().get(id=one.id)
+        one.boolean = True
+        one.save()  # An error was in post_save signal handler
+
+    def test_159(self):
+        brand = Brand.objects.create(pk=1)
+        label = Label.objects.create(pk=2)
+        brand.labels.add(label)
+
+        # Create another brand with the same pk as label.
+        # This will trigger a bug invalidating brands quering them by label id.
+        another_brand = Brand.objects.create(pk=2)
+
+        list(brand.labels.cache())
+        list(another_brand.labels.cache())
+
+        # Clear brands for label linked to brand, but not another_brand.
+        label.brands.clear()
+
+        # Cache must stay for another_brand
+        with self.assertNumQueries(0):
+            list(another_brand.labels.cache())
+        # ... and should be invalidated for brand
+        with self.assertNumQueries(1):
+            list(brand.labels.cache())
+
+    def test_159_case2(self):
+        base = M2MBase.objects.create()
+        target = M2MWithCharId.objects.create(id="stub_id")
+        base.char_many_to_many.add(target)
+
+        list(base.char_many_to_many.cache())
+        target.m2mbase_set.clear()
+
+        with self.assertNumQueries(1):
+            list(base.char_many_to_many.cache())
+
+    def test_161(self):
+        categories = Category.objects.using('slave').filter(title='Python')
+        list(Post.objects.using('slave').filter(category__in=categories).cache())
+
+    def test_161_non_ascii(self):
+        # Non ascii text in non-unicode str literal
+        list(Category.objects.filter(title='фыва').cache())
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
@@ -708,6 +799,23 @@ class ProxyTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(VideoProxy.objects.cache())
 
+    def test_148_invalidate_from_non_cached_proxy(self):
+        video = Video.objects.create(title='Pulp Fiction')
+        Video.objects.cache().get(title=video.title)
+        NonCachedVideoProxy.objects.get(id=video.id).delete()
+
+        with self.assertRaises(Video.DoesNotExist):
+            Video.objects.cache().get(title=video.title)
+
+    @unittest.skipUnless(django.VERSION >= (1, 7), "Really hard to make this work in older Djangos")
+    def test_148_reverse(self):
+        media = NonCachedMedia.objects.create(title='Pulp Fiction')
+        MediaProxy.objects.cache().get(title=media.title)
+        NonCachedMedia.objects.get(id=media.id).delete()
+
+        with self.assertRaises(NonCachedMedia.DoesNotExist):
+            MediaProxy.objects.cache().get(title=media.title)
+
 
 class MultitableInheritanceTests(BaseTestCase):
     @unittest.expectedFailure
@@ -736,7 +844,7 @@ class SimpleCacheTests(BaseTestCase):
         calls = [0]
 
         @cached(timeout=100)
-        def get_calls(x):
+        def get_calls(_):
             calls[0] += 1
             return calls[0]
 
@@ -752,6 +860,44 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.key(2).set(42)
         self.assertEqual(get_calls(2), 42)
 
+    def test_cached_call(self):
+        calls = [0]
+
+        def get_calls():
+            calls[0] += 1
+            return calls[0]
+
+        from cacheops import cache
+
+        self.assertEqual(cache.cached_call('calls', get_calls), 1)
+        self.assertEqual(cache.cached_call('calls', get_calls), 1)
+
+    def test_cached_view(self):
+        calls = [0]
+
+        @cached_view(timeout=100)
+        def get_calls(request):
+            calls[0] += 1
+            return calls[0]
+
+        factory = RequestFactory()
+        r1 = factory.get('/hi')
+        r2 = factory.get('/hi')
+        r2.META['REMOTE_ADDR'] = '10.10.10.10'
+        r3 = factory.get('/bye')
+
+        self.assertEqual(get_calls(r1), 1) # cache
+        self.assertEqual(get_calls(r1), 1) # hit
+        self.assertEqual(get_calls(r2), 1) # hit, since only url is considered
+        self.assertEqual(get_calls(r3), 2) # miss
+
+        get_calls.invalidate(r1)
+        self.assertEqual(get_calls(r1), 3) # miss
+
+        # Can pass uri to invalidate
+        get_calls.invalidate(r1.build_absolute_uri())
+        self.assertEqual(get_calls(r1), 4) # miss
+
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
@@ -763,6 +909,10 @@ class DbAgnosticTests(BaseTestCase):
 
     def test_db_agnostic_disabled(self):
         list(DbBinded.objects.cache())
+
+        # HACK: This prevents initialization queries to break .assertNumQueries() in MySQL.
+        #       Also there is no .ensure_connection() in older Djangos, thus it's even uglier.
+        connections['slave'].cursor().close()
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))

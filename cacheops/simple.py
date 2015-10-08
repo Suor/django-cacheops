@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import os, time
-from functools import wraps
 from .cross import pickle, md5hex
 
 from django.conf import settings
+from funcy import wraps
 
 from .conf import redis_client, handle_connection_failure
 from .utils import func_cache_key, cached_view_fab
 
 
-__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss')
+__all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
 
 
 class CacheMiss(Exception):
@@ -36,14 +36,28 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def _cached(self, timeout=None, extra=None, _get_key=None):
+    def cached_call(self, key, func, timeout=None, args=(), kwargs={}):
+        cache_key = 'cc:%s' % key
+        try:
+            result = self.get(cache_key)
+        except CacheMiss:
+            result = func(*args, **kwargs)
+            self.set(cache_key, result, timeout)
+
+        return result
+
+    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
         """
         A decorator for caching function calls
         """
+        # Support @cached (without parentheses) form
+        if callable(timeout):
+            return self.cached(key_func=key_func)(timeout)
+
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -53,23 +67,20 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
-                cache_key = 'c:' + _get_key(func, args, kwargs, extra)
+                cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 return CacheKey.make(cache_key, cache=self, timeout=timeout)
             wrapper.key = key
 
             return wrapper
         return decorator
 
-    def cached(self, timeout=None, extra=None):
-        return self._cached(timeout, extra, _get_key=func_cache_key)
-
     def cached_view(self, timeout=None, extra=None):
-        return cached_view_fab(self._cached)(timeout, extra)
+        return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
 
 class RedisCache(BaseCache):

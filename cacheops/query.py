@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import sys
-from functools import wraps
 import json
 import six
-from funcy import cached_property, project, once, once_per, monkey
+from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
 import django
 from django.utils.encoding import smart_str
 from django.core.exceptions import ImproperlyConfigured
+from django.db import DEFAULT_DB_ALIAS
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
@@ -21,7 +21,7 @@ except ImportError:
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, get_model_name, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, get_thread_id
+                   func_cache_key, cached_view_fab, get_thread_id, family_has_profile
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict
 
@@ -46,14 +46,14 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     )
 
 
-def _cached_as(*samples, **kwargs):
+def cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
-    _get_key = kwargs.get('_get_key')
+    key_func = kwargs.get('key_func', func_cache_key)
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -83,13 +83,13 @@ def _cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = 'as:' + _get_key(func, args, kwargs, key_extra)
+            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
-            result = func(*args)
+            result = func(*args, **kwargs)
             cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
@@ -97,13 +97,8 @@ def _cached_as(*samples, **kwargs):
     return decorator
 
 
-def cached_as(*samples, **kwargs):
-    kwargs["_get_key"] = func_cache_key
-    return _cached_as(*samples, **kwargs)
-
-
 def cached_view_as(*samples, **kwargs):
-    return cached_view_fab(_cached_as)(*samples, **kwargs)
+    return cached_view_fab(cached_as)(*samples, **kwargs)
 
 
 class QuerySetMixin(object):
@@ -136,7 +131,12 @@ class QuerySetMixin(object):
         md.update(stamp_fields(self.model)) # Protect from field list changes in model
         # Use query SQL as part of a key
         try:
-            md.update(smart_str(self.query))
+            sql, params = self.query.get_compiler(self._db or DEFAULT_DB_ALIAS).as_sql()
+            try:
+                sql_str = sql % params
+            except UnicodeDecodeError:
+                sql_str = sql % map(smart_str, params)
+            md.update(smart_str(sql_str))
         except EmptyResultSet:
             pass
         # If query results differ depending on database
@@ -324,12 +324,27 @@ class QuerySetMixin(object):
             else:
                 return self._no_monkey.exists(self)
 
-    def bulk_create(self, objs, batch_size=None):
-        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
-        for obj in objs:
-            invalidate_obj(obj)
-        return objs
+    if django.VERSION >= (1, 5):
+        def bulk_create(self, objs, batch_size=None):
+            objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+            if family_has_profile(self.model):
+                for obj in objs:
+                    invalidate_obj(obj)
+            return objs
+    elif django.VERSION >= (1, 4):
+        def bulk_create(self, objs):
+            objs = self._no_monkey.bulk_create(self, objs)
+            if family_has_profile(self.model):
+                for obj in objs:
+                    invalidate_obj(obj)
+            return objs
 
+
+def connect_first(signal, receiver, sender):
+    old_receivers = signal.receivers
+    signal.receivers = []
+    signal.connect(receiver, sender=sender)
+    signal.receivers += old_receivers
 
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = {}
@@ -342,11 +357,12 @@ class ManagerMixin(object):
             return
 
         cls._cacheprofile = model_profile(cls)
-        if cls._cacheprofile is not None:
+
+        if family_has_profile(cls):
             # Set up signals
-            pre_save.connect(self._pre_save, sender=cls)
-            post_save.connect(self._post_save, sender=cls)
-            post_delete.connect(self._post_delete, sender=cls)
+            connect_first(pre_save, self._pre_save, sender=cls)
+            connect_first(post_save, self._post_save, sender=cls)
+            connect_first(post_delete, self._post_delete, sender=cls)
 
             # Install auto-created models as their module attributes to make them picklable
             module = sys.modules[cls.__module__]
@@ -371,6 +387,12 @@ class ManagerMixin(object):
             invalidate_obj(old)
         invalidate_obj(instance)
 
+        # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
+        #       but its base having one. Or vice versa.
+        #       We still need to invalidate in this case, but cache on save better be skipped.
+        if not instance._cacheprofile:
+            return
+
         # Enabled cache_on_save makes us write saved object to cache.
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
         # <cache_on_save_field> is pk unless specified.
@@ -383,11 +405,8 @@ class ManagerMixin(object):
             #
             #       So we strip down any _*_cache attrs before saving
             #       and later reassign them
-            # Stripping up undesirable attributes
-            unwanted_attrs = [k for k in instance.__dict__
-                                if k.startswith('_') and k.endswith('_cache')]
-            unwanted_dict = project(instance.__dict__, unwanted_attrs)
-            for k in unwanted_attrs:
+            unwanted_dict = select_keys(r'^_.*_cache$', instance.__dict__)
+            for k in unwanted_dict:
                 del instance.__dict__[k]
 
             key = 'pk' if cache_on_save is True else cache_on_save
@@ -431,7 +450,8 @@ class ManagerMixin(object):
         return self.get_queryset().nocache()
 
 
-def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, **kwargs):
+def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
+                   **kwargs):
     """
     Invoke invalidation on m2m changes.
     """
@@ -439,22 +459,29 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     # since post_save and post_delete events are triggered for them
     if not sender._meta.auto_created:
         return
+    if action not in ('pre_clear', 'post_add', 'pre_remove'):
+        return
 
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
                    if m2m.rel.through == sender)
 
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        objects = sender.objects.filter(**{m2m.m2m_field_name(): instance.pk})
+        # TODO: always use column names here once Django 1.3 is dropped
+        instance_field = m2m.m2m_reverse_field_name() if reverse else m2m.m2m_field_name()
+        objects = sender.objects.filter(**{instance_field: instance.pk})
         for obj in objects:
             invalidate_obj(obj)
     elif action in ('post_add', 'pre_remove'):
+        instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
+        if reverse:
+            instance_column, model_column = model_column, instance_column
         # NOTE: we don't need to query through objects here,
         #       cause we already know all their meaningfull attributes.
         for pk in pk_set:
             invalidate_dict(sender, {
-                m2m.m2m_column_name(): instance.pk,
-                m2m.m2m_reverse_name(): pk
+                instance_column: instance.pk,
+                model_column: pk
             })
 
 
