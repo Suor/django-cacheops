@@ -89,7 +89,7 @@ class IntegerArrayField(six.with_metaclass(SubfieldBase, models.Field)):
             return None
         if isinstance(value, list):
             return value
-        return map(int, value.split(','))
+        return [int(v) for v in value.split(',')]
 
     def from_db_value(self, value, expession, conn, context):
         return self.to_python(value)
