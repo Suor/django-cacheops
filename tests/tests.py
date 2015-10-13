@@ -294,15 +294,16 @@ class DecoratorTests(BaseTestCase):
 from datetime import date, datetime, time
 
 class WeirdTests(BaseTestCase):
-    def _template(self, field, value, invalidation=True):
+    def _template(self, field, value):
         qs = Weird.objects.cache().filter(**{field: value})
         count = qs.count()
 
-        Weird.objects.create(**{field: value})
+        obj = Weird.objects.create(**{field: value})
 
-        if invalidation:
-            with self.assertNumQueries(1):
-                self.assertEqual(qs.count(), count + 1)
+        with self.assertNumQueries(2):
+            self.assertEqual(qs.count(), count + 1)
+            new_obj = qs.get(pk=obj.pk)
+            self.assertEqual(getattr(new_obj, field), value)
 
     def test_date(self):
         self._template('date_field', date.today())

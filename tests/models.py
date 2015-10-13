@@ -7,6 +7,12 @@ from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
+# Deprecated this thing in Django 1.8 and removed in 1.10
+try:
+    from django.db.models import SubfieldBase
+except ImportError:
+    class SubfieldBase(type):
+        pass
 
 
 ### For basic tests and bench
@@ -43,7 +49,10 @@ class CustomValue(object):
     def __str__(self):
         return str(self.value)
 
-class CustomField(six.with_metaclass(models.SubfieldBase, models.Field)):
+    def __eq__(self, other):
+        return self.value == other.value
+
+class CustomField(six.with_metaclass(SubfieldBase, models.Field)):
     def db_type(self, connection):
         return 'text'
 
@@ -51,6 +60,9 @@ class CustomField(six.with_metaclass(models.SubfieldBase, models.Field)):
         if isinstance(value, CustomValue):
             return value
         return CustomValue(value)
+
+    def from_db_value(self, value, expession, conn, context):
+        return self.to_python(value)
 
     def get_prep_value(self, value):
         return value.value
@@ -68,7 +80,7 @@ class CustomManager(models.Manager):
     get_queryset = get_query_set
 
 
-class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
+class IntegerArrayField(six.with_metaclass(SubfieldBase, models.Field)):
     def db_type(self, connection):
         return 'text'
 
@@ -78,6 +90,9 @@ class IntegerArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
         if isinstance(value, list):
             return value
         return map(int, value.split(','))
+
+    def from_db_value(self, value, expession, conn, context):
+        return self.to_python(value)
 
     def get_prep_value(self, value):
         return ','.join(map(str, value))
