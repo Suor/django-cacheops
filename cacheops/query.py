@@ -147,9 +147,9 @@ class QuerySetMixin(object):
             md.update(self.db)
         if extra:
             md.update(str(extra))
-        # Need to test for attribute existence cause Django 1.8 and earlier
-        if hasattr(self, '_iterator_class'):
-            it_class = self._iterator_class
+        # Thing only appeared in Django 1.8 and was renamed in Django 1.9
+        it_class = getattr(self, '_iterator_class', None) or getattr(self, '_iterable_class', None)
+        if it_class:
             md.update('%s.%s' % (it_class.__module__, it_class.__name__))
         # 'flat' attribute changes results formatting for values_list() in Django 1.8 and earlier
         if hasattr(self, 'flat'):
