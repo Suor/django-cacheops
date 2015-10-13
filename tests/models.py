@@ -50,7 +50,7 @@ class CustomValue(object):
         return str(self.value)
 
     def __eq__(self, other):
-        return self.value == other.value
+        return isinstance(other, CustomValue) and self.value == other.value
 
 class CustomField(six.with_metaclass(SubfieldBase, models.Field)):
     def db_type(self, connection):
@@ -104,7 +104,7 @@ class Weird(models.Model):
     date_field = models.DateField(default=date(2000, 1, 1))
     datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
     time_field = models.TimeField(default=time(10, 10))
-    list_field = IntegerArrayField(default=list)
+    list_field = IntegerArrayField(default=list, blank=True)
     custom_field = CustomField(default=custom_value_default)
     if hasattr(models, 'BinaryField'):
         binary_field = models.BinaryField()

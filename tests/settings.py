@@ -8,6 +8,8 @@ INSTALLED_APPS = [
     'tests',
 ]
 
+ROOT_URLCONF = 'tests.urls'
+
 MIDDLEWARE_CLASSES = []
 
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
