@@ -309,7 +309,8 @@ class WeirdTests(BaseTestCase):
         self._template('date_field', date.today())
 
     def test_datetime(self):
-        self._template('datetime_field', datetime.now())
+        # NOTE: some databases (mysql) don't store microseconds
+        self._template('datetime_field', datetime.now().replace(microsecond=0))
 
     def test_time(self):
         self._template('time_field', time(10, 30))
