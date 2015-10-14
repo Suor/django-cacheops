@@ -41,9 +41,10 @@ def invalidate_dict(model, obj_dict):
                     if table == db_table:
                         match = False
                         for obj_key in set(obj_dict.keys()) & set(cond_dict.keys()):
-                            if obj_dict[obj_key] == cond_dict[obj_key]:
-                                match = True
+                            if obj_dict[obj_key] != cond_dict[obj_key]:
                                 break
+                        else:
+                            match = True
                         if match or not cond_dict:
                             # deep delete, to deal with savepoints in the cache
                             for mapping in local_cache.maps:
