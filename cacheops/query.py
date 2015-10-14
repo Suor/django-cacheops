@@ -6,6 +6,7 @@ import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
+from .transaction import Atomic
 
 import django
 from django.utils.encoding import smart_str
@@ -38,14 +39,23 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    load_script('cache_thing', LRU)(
-        keys=[cache_key],
-        args=[
-            pickle.dumps(data, -1),
-            json.dumps(cond_dnfs, default=str),
-            timeout
-        ]
-    )
+    try:
+        # are we in a transaction?
+        Atomic.thread_local.cache[cache_key] = {
+            'data': data,
+            'cond_dnfs': cond_dnfs,
+            'timeout': timeout
+        }
+    except AttributeError:
+        # we are not in a transaction.
+        load_script('cache_thing', LRU)(
+            keys=[cache_key],
+            args=[
+                pickle.dumps(data, -1),
+                json.dumps(cond_dnfs, default=str),
+                timeout
+            ]
+        )
 
 
 def cached_as(*samples, **kwargs):
@@ -86,6 +96,16 @@ def cached_as(*samples, **kwargs):
         @wraps(func)
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+
+            # try transaction local cache first
+            try:
+                cache_data = Atomic.thread_local.cache.get(cache_key, None)
+            except AttributeError:
+                # not in transaction
+                pass
+            else:
+                if cache_data is not None and cache_data.get('data', None) is not None:
+                    return cache_data['data']
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -261,9 +281,23 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
+                results = None
+
+                # try transaction local cache first
+                try:
+                    cache_data = Atomic.thread_local.cache.get(cache_key, None)
+                except AttributeError:
+                    # not in transaction
+                    pass
+                else:
+                    if cache_data is not None and cache_data.get('data', None) is not None:
+                        results = cache_data['data']
+
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
+
+                if results is not None:
                     for obj in results:
                         yield obj
                     raise StopIteration
