@@ -10,6 +10,7 @@ from .utils import load_script
 from .cross import pickle
 from threading import local
 
+
 class Atomic(transaction.Atomic):
     thread_local = local()
 
@@ -17,12 +18,10 @@ class Atomic(transaction.Atomic):
         connection = transaction.get_connection(self.using)
         if not connection.in_atomic_block:
             # outer most atomic block.
-            print 'enter outer most atomic block.'
             # setup our local cache
             Atomic.thread_local.cache = ChainMap()
         else:
             # new inner atomic block
-            print 'enter inner atomic block.'
             # add a 'context' to our local cache.
             Atomic.thread_local.cache.maps.append({})
         super(Atomic, self).__enter__()
@@ -35,10 +34,7 @@ class Atomic(transaction.Atomic):
                       not connection.needs_rollback
         if not connection.in_atomic_block:
             # exit outer most atomic block.
-            print 'exit outer most atomic block.'
             if commit:
-                print 'commit transaction'
-                print 'commit context\n\t%r' % dict(Atomic.thread_local.cache)
                 for key, value in Atomic.thread_local.cache.items():
                     load_script('cache_thing', LRU)(
                         keys=[key],
@@ -48,14 +44,11 @@ class Atomic(transaction.Atomic):
                             value['timeout']
                         ]
                     )
-            connection.local_cache = ChainMap()
+            Atomic.thread_local.cache.maps = [{}]
         else:
             # exit inner atomic block
-            print 'exit inner atomic block.'
             if commit:
-                print 'commit save point'
                 context = Atomic.thread_local.cache.maps.pop(0)
-                print 'save point context\n\t%r' % context
                 Atomic.thread_local.cache.maps[0].update(context)
             else:
                 Atomic.thread_local.cache.maps.pop(0)
