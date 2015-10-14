@@ -44,7 +44,9 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
         Atomic.thread_local.cache[cache_key] = {
             'data': data,
             'cond_dnfs': cond_dnfs,
-            'timeout': timeout
+            'timeout': timeout,
+            'db_tables': [x for x, y in cond_dnfs],  # help us out later for possible invalidation
+            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]  # help us out later for possible invalidation
         }
     except AttributeError:
         # we are not in a transaction.
