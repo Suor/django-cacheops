@@ -1,14 +1,15 @@
 import json
-from django.db import transaction, DEFAULT_DB_ALIAS
+from threading import local
 try:
     from collections import ChainMap
 except ImportError:
     from chainmap import ChainMap
 
+from django.db import transaction, DEFAULT_DB_ALIAS
+
 from .conf import LRU
 from .utils import load_script
 from .cross import pickle
-from threading import local
 
 
 class Atomic(transaction.Atomic):
@@ -35,6 +36,7 @@ class Atomic(transaction.Atomic):
         if not connection.in_atomic_block:
             # exit outer most atomic block.
             if commit:
+                # push the transaction's keys to redis
                 for key, value in Atomic.thread_local.cache.items():
                     load_script('cache_thing', LRU)(
                         keys=[key],
@@ -44,14 +46,13 @@ class Atomic(transaction.Atomic):
                             value['timeout']
                         ]
                     )
-            Atomic.thread_local.cache.maps = [{}]
+            del Atomic.thread_local.cache
         else:
             # exit inner atomic block
+            context = Atomic.thread_local.cache.maps.pop(0)
             if commit:
-                context = Atomic.thread_local.cache.maps.pop(0)
+                # mash the save points context into the outer context.
                 Atomic.thread_local.cache.maps[0].update(context)
-            else:
-                Atomic.thread_local.cache.maps.pop(0)
 
 
 def atomic(using=None, savepoint=True):
