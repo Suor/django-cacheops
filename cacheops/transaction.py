@@ -6,6 +6,7 @@ try:
 except ImportError:
     from chainmap import ChainMap
 
+import django
 from django.conf import settings
 from django.db import transaction, DEFAULT_DB_ALIAS
 
@@ -68,7 +69,8 @@ def atomic(using=None, savepoint=True):
     else:
         return Atomic(using, savepoint)
 
-transaction.original_atomic = transaction.atomic
-transaction.OriginalAtomic = transaction.Atomic
-transaction.atomic = atomic
-transaction.Atomic = Atomic
+if django.VERSION >= (1, 6):
+    transaction.original_atomic = transaction.atomic
+    transaction.OriginalAtomic = transaction.Atomic
+    transaction.atomic = atomic
+    transaction.Atomic = Atomic

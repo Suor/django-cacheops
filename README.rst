@@ -125,8 +125,10 @@ request will be wrapped in ``transaction.atomic``. Cacheops will not use a local
 to say, not Simple time-invalidated cache or File Cache.
 
 The local cache is thread specific and cleared on commit. Cached items cannot contribute to possible race conditions
-between threads/requests. Data is not cached on rolled back transactions. To maintain current expected behavior, this
+between threads. Data is not cached on rolled back transactions. To maintain current expected behavior, this
 setting is ``False`` by default.
+
+Because of the dependency on ``transaction.Atomic``, cacheops ignores this setting unless running django 1.6+.
 
 .. code:: python
 
