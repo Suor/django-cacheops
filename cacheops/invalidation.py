@@ -98,7 +98,9 @@ def invalidate_all():
     # wipe out our local cache, if we are in a transaction
     try:
         # leave the same amount of dicts as we found, but empty them
-        Atomic.thread_local.cacheops_transaction_cache.maps = [{} for x in Atomic.thread_local.cacheops_transaction_cache.maps]
+        Atomic.thread_local.cacheops_transaction_cache.maps = [
+            {} for x in Atomic.thread_local.cacheops_transaction_cache.maps
+        ]
     except AttributeError:
         pass
 

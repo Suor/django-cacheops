@@ -45,8 +45,9 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
             'data': data,
             'cond_dnfs': cond_dnfs,
             'timeout': timeout,
-            'db_tables': [x for x, y in cond_dnfs],  # help us out later for possible invalidation
-            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]  # help us out later for possible invalidation
+            # these two help us out later for possible invalidation
+            'db_tables': [x for x, y in cond_dnfs],
+            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
         }
     except AttributeError:
         # we are not in a transaction.
