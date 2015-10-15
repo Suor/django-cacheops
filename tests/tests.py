@@ -1188,7 +1188,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                         uncommitted_local_cache_results, msg='Local cache was not populated.'
                     )
                     self.assertEqual(
-                        uncommitted_local_cache_results,
+                        uncommitted_local_cache_results['data'],
                         orig_object
                     )
 
