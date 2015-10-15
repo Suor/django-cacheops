@@ -9,6 +9,7 @@ from .cross import pickle, md5
 try:
     from .transaction import Atomic
 except ImportError:
+    # django is too old for this
     Atomic = None
 
 import django
@@ -42,9 +43,9 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    try:
-        # are we in a transaction?
-        if Atomic:
+    if Atomic:
+        try:
+            # are we in a transaction?
             Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
                 'data': data,
                 'cond_dnfs': cond_dnfs,
@@ -53,16 +54,18 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
                 'db_tables': [x for x, y in cond_dnfs],
                 'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
             }
-    except AttributeError:
-        # we are not in a transaction.
-        load_script('cache_thing', LRU)(
-            keys=[cache_key],
-            args=[
-                pickle.dumps(data, -1),
-                json.dumps(cond_dnfs, default=str),
-                timeout
-            ]
-        )
+            return
+        except AttributeError:
+            # we are not in a transaction.
+            pass
+    load_script('cache_thing', LRU)(
+        keys=[cache_key],
+        args=[
+            pickle.dumps(data, -1),
+            json.dumps(cond_dnfs, default=str),
+            timeout
+        ]
+    )
 
 
 def cached_as(*samples, **kwargs):
@@ -105,14 +108,13 @@ def cached_as(*samples, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             # try transaction local cache first
-            try:
-                if Atomic:
+            if Atomic:
+                try:
                     cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
-            except AttributeError:
-                # not in transaction
-                pass
-            else:
-                if Atomic:
+                except AttributeError:
+                    # not in transaction
+                    pass
+                else:
                     if cache_data is not None and cache_data.get('data', None) is not None:
                         return cache_data['data']
 
@@ -293,22 +295,22 @@ class QuerySetMixin(object):
                 results = None
 
                 # try transaction local cache first
-                try:
-                    if Atomic:
+                if Atomic:
+                    try:
                         cache_data = Atomic.thread_local.cacheops_transaction_cache.get(
                             cache_key, None
                         )
-                except AttributeError:
-                    # not in transaction
-                    pass
-                else:
-                    if Atomic:
+                    except AttributeError:
+                        # not in transaction
+                        pass
+                    else:
                         if cache_data is not None and cache_data.get('data', None) is not None:
                             results = cache_data['data']
 
-                cache_data = redis_client.get(cache_key)
-                if cache_data is not None:
-                    results = pickle.loads(cache_data)
+                if results is None:
+                    cache_data = redis_client.get(cache_key)
+                    if cache_data is not None:
+                        results = pickle.loads(cache_data)
 
                 if results is not None:
                     for obj in results:

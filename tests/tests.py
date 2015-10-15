@@ -10,10 +10,6 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-try:
-    from django.db import transaction
-except ImportError:
-    pass
 
 try:
     from django.test import override_settings
@@ -33,7 +29,11 @@ from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 decorator_tag = register.decorator_tag
 from .models import *
-
+try:
+    from cacheops.transaction import Atomic, atomic
+except ImportError:
+    # django version is too old for this.
+    pass
 
 class BaseTestCase(TestCase):
     def setUp(self):
@@ -972,7 +972,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         invalidate_all()
 
     def test_transaction_with_commit(self):
-        with transaction.atomic():
+        with atomic():
             qs = Category.objects.filter(pk=1).cache()
             orig_object = list(qs)
             cache_key = qs._cache_key()
@@ -980,7 +980,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             uncommitted_local_cache_results = None
             try:
                 uncommitted_local_cache_results =\
-                    transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                    Atomic.thread_local.cacheops_transaction_cache.get(
                         cache_key, None
                     )
             except AttributeError:
@@ -1005,7 +1005,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         committed_local_cache_results = None
         try:
             committed_local_cache_results = \
-                transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                Atomic.thread_local.cacheops_transaction_cache.get(
                     cache_key, None
                 )
         except AttributeError:
@@ -1032,7 +1032,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
     def test_transaction_with_rollback(self):
         try:
-            with transaction.atomic():
+            with atomic():
                 qs = Category.objects.filter(pk=1).cache()
                 orig_object = list(qs)
                 cache_key = qs._cache_key()
@@ -1040,7 +1040,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 uncommitted_local_cache_results = None
                 try:
                     uncommitted_local_cache_results = \
-                        transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                        Atomic.thread_local.cacheops_transaction_cache.get(
                             cache_key, None
                         )
                 except AttributeError:
@@ -1071,7 +1071,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         committed_local_cache_results = None
         try:
             committed_local_cache_results = \
-                transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                Atomic.thread_local.cacheops_transaction_cache.get(
                     cache_key, None
                 )
         except AttributeError:
@@ -1092,8 +1092,8 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         )
 
     def test_savepoint_with_commit(self):
-        with transaction.atomic():
-            with transaction.atomic():
+        with atomic():
+            with atomic():
                 qs = Category.objects.filter(pk=1).cache()
                 orig_object = list(qs)
                 cache_key = qs._cache_key()
@@ -1101,7 +1101,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 uncommitted_savepoint_local_cache_results = None
                 try:
                     uncommitted_savepoint_local_cache_results = \
-                        transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                        Atomic.thread_local.cacheops_transaction_cache.get(
                             cache_key, None
                         )
                 except AttributeError:
@@ -1128,7 +1128,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             uncommitted_local_cache_results = None
             try:
                 uncommitted_local_cache_results = \
-                    transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                    Atomic.thread_local.cacheops_transaction_cache.get(
                         cache_key, None
                     )
             except AttributeError:
@@ -1153,7 +1153,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         committed_local_cache_results = None
         try:
             committed_local_cache_results = \
-                transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
         except AttributeError:
             pass
         self.assertIsNone(
@@ -1172,9 +1172,9 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
 
     def test_savepoint_with_rollback(self):
-        with transaction.atomic():
+        with atomic():
             try:
-                with transaction.atomic():
+                with atomic():
                     qs = Category.objects.filter(pk=1).cache()
                     orig_object = list(qs)
                     cache_key = qs._cache_key()
@@ -1182,7 +1182,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                     uncommitted_local_cache_results = None
                     try:
                         uncommitted_local_cache_results = \
-                            transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                            Atomic.thread_local.cacheops_transaction_cache.get(
                                 cache_key, None
                             )
                     except AttributeError:
@@ -1212,7 +1212,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             committed_local_cache_results = None
             try:
                 committed_local_cache_results = \
-                    transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                    Atomic.thread_local.cacheops_transaction_cache.get(
                         cache_key, None
                     )
             except AttributeError:
@@ -1233,7 +1233,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         committed_local_cache_results = None
         try:
             committed_local_cache_results = \
-                transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                Atomic.thread_local.cacheops_transaction_cache.get(
                     cache_key, None
                 )
         except AttributeError:
