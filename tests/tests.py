@@ -970,71 +970,235 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
     def test_transaction_with_commit(self):
         with transaction.atomic():
-            list(Category.objects.filter(pk=1).cache())
-            with self.assertNumQueries(0):
-                qs = Category.objects.filter(pk__exact=1).cache()
-                list(qs)
+            qs = Category.objects.filter(pk=1).cache()
+            orig_object = list(qs)
             cache_key = qs._cache_key()
+
             uncommitted_local_cache_results = None
             try:
-                uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                    cache_key, None
+                )
             except AttributeError:
                 pass
-            self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
+            self.assertIsNotNone(
+                uncommitted_local_cache_results, msg='Local cache was not populated.'
+            )
+            self.assertEqual(
+                uncommitted_local_cache_results['data'], orig_object
+            )
+
             uncommitted_remote_cache_results = redis_client.get(cache_key)
             if uncommitted_remote_cache_results is not None:
                 results = pickle.loads(uncommitted_remote_cache_results)
-            self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache populated early.')
+            self.assertIsNone(
+                uncommitted_remote_cache_results, msg='Remote cache populated early, during transaction.'
+            )
+
         committed_local_cache_results = None
         try:
-            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                cache_key, None
+            )
         except AttributeError:
             pass
-        self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on committed transaction.')
-        uncommitted_remote_cache_results = redis_client.get(cache_key)
-        if uncommitted_remote_cache_results is not None:
-            uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
-        self.assertIsNotNone(uncommitted_remote_cache_results, msg='Remote cache was not populated on committed transaction.')
+        self.assertIsNone(
+            committed_local_cache_results, msg='Local cache was not cleared on committed transaction.'
+        )
+
+        committed_remote_cache_results = redis_client.get(cache_key)
+        if committed_remote_cache_results is not None:
+            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
+        self.assertIsNotNone(
+            committed_remote_cache_results, msg='Remote cache was not populated on committed transaction.'
+        )
+        self.assertEqual(
+            committed_remote_cache_results, orig_object
+        )
 
 
     def test_transaction_with_rollback(self):
         try:
             with transaction.atomic():
-                list(Category.objects.filter(pk=1).cache())
-                with self.assertNumQueries(0):
-                    qs = Category.objects.filter(pk__exact=1).cache()
-                    list(qs)
+                qs = Category.objects.filter(pk=1).cache()
+                orig_object = list(qs)
                 cache_key = qs._cache_key()
+
                 uncommitted_local_cache_results = None
                 try:
-                    uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                    uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                        cache_key, None
+                    )
                 except AttributeError:
                     pass
-                self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
+                self.assertIsNotNone(
+                    uncommitted_local_cache_results, msg='Local cache was not populated.'
+                )
+                self.assertEqual(
+                    uncommitted_local_cache_results['data'], orig_object
+                )
+
                 uncommitted_remote_cache_results = redis_client.get(cache_key)
                 if uncommitted_remote_cache_results is not None:
                     results = pickle.loads(uncommitted_remote_cache_results)
-                self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache populated early.')
+                self.assertIsNone(
+                    uncommitted_remote_cache_results, msg='Remote cache populated early, during transaction.'
+                )
+
                 raise IntentionalRollback('test out caches after rolled back transaction.')
+
         except IntentionalRollback:
             pass
 
         committed_local_cache_results = None
         try:
-            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                cache_key, None
+            )
         except AttributeError:
             pass
-        self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on rolled back transaction.')
-        uncommitted_remote_cache_results = redis_client.get(cache_key)
-        if uncommitted_remote_cache_results is not None:
-            uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
-        self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache was populated on rolled back transaction.')
+        self.assertIsNone(
+            committed_local_cache_results, msg='Local cache was not cleared on rolled back transaction.'
+        )
+
+        committed_remote_cache_results = redis_client.get(cache_key)
+        if committed_remote_cache_results is not None:
+            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
+        self.assertIsNone(
+            committed_remote_cache_results, msg='Remote cache was populated on rolled back transaction.'
+        )
 
     def test_savepoint_with_commit(self):
-        pass
+        with transaction.atomic():
+            with transaction.atomic():
+                qs = Category.objects.filter(pk=1).cache()
+                orig_object = list(qs)
+                cache_key = qs._cache_key()
+
+                uncommitted_savepoint_local_cache_results = None
+                try:
+                    uncommitted_savepoint_local_cache_results = \
+                        transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                except AttributeError:
+                    pass
+                self.assertIsNotNone(
+                    uncommitted_savepoint_local_cache_results, msg='Local cache was not populated.'
+                )
+                self.assertEqual(
+                    uncommitted_savepoint_local_cache_results['data'], orig_object
+                )
+
+                uncommitted_savepoint_remote_cache_results = redis_client.get(cache_key)
+                if uncommitted_savepoint_remote_cache_results is not None:
+                    results = pickle.loads(uncommitted_savepoint_remote_cache_results)
+                self.assertIsNone(
+                    uncommitted_savepoint_remote_cache_results, msg='Remote cache populated early, during savepoint.'
+                )
+
+            uncommitted_local_cache_results = None
+            try:
+                uncommitted_local_cache_results = \
+                    transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+            except AttributeError:
+                pass
+            self.assertIsNotNone(
+                uncommitted_local_cache_results, msg='Local cache was cleared on commit savepoint.'
+            )
+            self.assertEqual(
+                uncommitted_local_cache_results['data'], orig_object
+            )
+
+            uncommitted_remote_cache_results = redis_client.get(cache_key)
+            if uncommitted_remote_cache_results is not None:
+                uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
+            self.assertIsNone(
+                uncommitted_remote_cache_results, msg='Remote cache was populated early, after savepoint commit.'
+            )
+
+        committed_local_cache_results = None
+        try:
+            committed_local_cache_results = \
+                transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+        except AttributeError:
+            pass
+        self.assertIsNone(
+            committed_local_cache_results, msg='Local cache was not cleared on committed transaction.'
+        )
+
+        committed_remote_cache_results = redis_client.get(cache_key)
+        if committed_remote_cache_results is not None:
+            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
+        self.assertIsNotNone(
+            committed_remote_cache_results, msg='Remote cache was not populated on committed transaction.'
+        )
+        self.assertEqual(committed_remote_cache_results, orig_object)
+
 
     def test_savepoint_with_rollback(self):
-        pass
+        with transaction.atomic():
+            try:
+                with transaction.atomic():
+                    qs = Category.objects.filter(pk=1).cache()
+                    orig_object = list(qs)
+                    cache_key = qs._cache_key()
+
+                    uncommitted_local_cache_results = None
+                    try:
+                        uncommitted_local_cache_results = \
+                            transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                    except AttributeError:
+                        pass
+                    self.assertIsNotNone(
+                        uncommitted_local_cache_results, msg='Local cache was not populated.'
+                    )
+
+                    uncommitted_remote_cache_results = redis_client.get(cache_key)
+                    if uncommitted_remote_cache_results is not None:
+                        results = pickle.loads(uncommitted_remote_cache_results)
+                    self.assertIsNone(
+                        uncommitted_remote_cache_results, msg='Remote cache populated early.'
+                    )
+
+                    raise IntentionalRollback('test out caches after rolled back savepoint.')
+
+            except IntentionalRollback:
+                pass
+
+            committed_local_cache_results = None
+            try:
+                committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                    cache_key, None
+                )
+            except AttributeError:
+                pass
+            self.assertIsNone(
+                committed_local_cache_results, msg='Local cache was not cleared on rolled back savepoint.'
+            )
+
+            uncommitted_remote_cache_results = redis_client.get(cache_key)
+            if uncommitted_remote_cache_results is not None:
+                uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
+            self.assertIsNone(
+                uncommitted_remote_cache_results, msg='Remote cache was populated on rolled back savepoint.'
+            )
+
+        committed_local_cache_results = None
+        try:
+            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(
+                cache_key, None
+            )
+        except AttributeError:
+            pass
+        self.assertIsNone(
+            committed_local_cache_results, msg='Local cache was not cleared on committed transaction.'
+        )
+
+        committed_remote_cache_results = redis_client.get(cache_key)
+        if committed_remote_cache_results is not None:
+            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
+        self.assertIsNone(
+            committed_remote_cache_results, msg='Remote cache was populated on empty committed transaction.'
+        )
 
 
 @unittest.skipUnless(django.VERSION >= (1, 6), "Only for Django 1.6+")
