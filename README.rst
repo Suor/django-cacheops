@@ -617,11 +617,10 @@ Here is how you do that. I suppose you have some application code causing it.
 TODO
 ----
 
-- better support transactions
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - shard cache between multiple redises
-- add local cache (cleared at the and of request?)
+- add local cache (cleared at the end of request?) (partially implemented by CACHEOPS_RESPECT_ATOMIC)
 - respect subqueries?
 - respect headers in @cached_view*?
 - group invalidate_obj() calls?
