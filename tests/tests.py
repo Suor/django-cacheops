@@ -1030,6 +1030,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
         self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache was populated on rolled back transaction.')
 
+
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 @override_settings(CACHEOPS_ATOMIC_REQUESTS=True)
 class TransactionalBasicTests(BasicTests):
