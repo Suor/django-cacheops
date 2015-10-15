@@ -8,7 +8,6 @@ if django.VERSION >= (1, 6):
     except ImportError:
         from chainmap import ChainMap
 
-
     from django.conf import settings
     from django.db import transaction, DEFAULT_DB_ALIAS
 
@@ -61,7 +60,6 @@ if django.VERSION >= (1, 6):
                         # mash the save points context into the outer context.
                         Atomic.thread_local.cacheops_transaction_cache.maps[0].update(context)
 
-
     def atomic(using=None, savepoint=True):
         # Bare decorator: @atomic -- although the first argument is called
         # `using`, it's actually the function being decorated.
@@ -70,7 +68,6 @@ if django.VERSION >= (1, 6):
         # Decorator: @atomic(...) or context manager: with atomic(...): ...
         else:
             return Atomic(using, savepoint)
-
 
     transaction.original_atomic = transaction.atomic
     transaction.OriginalAtomic = transaction.Atomic
