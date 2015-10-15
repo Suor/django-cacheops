@@ -12,7 +12,7 @@ from django.template import Context, Template
 from django.db.models import F
 
 try:
-    from django.test import override_settings
+    from django.test.utils import override_settings
 except ImportError:
     # django < 1.4 doesn't have this
     class override_settings(object):
