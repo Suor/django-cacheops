@@ -1,16 +1,31 @@
 # -*- coding: utf-8 -*-
+import pickle
 import os, re, copy
 import unittest
 
+import django
 from django.db import connection, connections
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
+from django.db import transaction
+
+try:
+    from django.test import override_settings
+except ImportError:
+    # django < 1.4 doesn't have this
+    class override_settings(object):
+        def __init__(*args, **kwargs):
+            pass
+
+        def __call__(self, fn):
+            return fn
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
+from cacheops.conf import redis_client
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 decorator_tag = register.decorator_tag
@@ -938,3 +953,84 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class IntentionalRollback(RuntimeError):
+    pass
+
+
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
+@override_settings(CACHEOPS_ATOMIC_REQUESTS=True)  # todo: make the transaction code respect the settings.
+class TransactionalLocalCacheTests(TransactionTestCase):
+    fixtures = ['basic']
+
+    def setUp(self):
+        super(TransactionTestCase, self).setUp()
+        invalidate_all()
+
+    def test_transaction_with_commit(self):
+        with transaction.atomic():
+            list(Category.objects.filter(pk=1).cache())
+            with self.assertNumQueries(0):
+                qs = Category.objects.filter(pk__exact=1).cache()
+                list(qs)
+            cache_key = qs._cache_key()
+            uncommitted_local_cache_results = None
+            try:
+                uncommitted_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+            except AttributeError:
+                pass
+            self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
+            uncommitted_remote_cache_results = redis_client.get(cache_key)
+            if uncommitted_remote_cache_results is not None:
+                results = pickle.loads(uncommitted_remote_cache_results)
+            self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache populated early.')
+        committed_local_cache_results = None
+        try:
+            committed_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+        except AttributeError:
+            pass
+        self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on committed transaction.')
+        uncommitted_remote_cache_results = redis_client.get(cache_key)
+        if uncommitted_remote_cache_results is not None:
+            uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
+        self.assertIsNotNone(uncommitted_remote_cache_results, msg='Remote cache was not populated on committed transaction.')
+
+
+    def test_transaction_with_rollback(self):
+        try:
+            with transaction.atomic():
+                list(Category.objects.filter(pk=1).cache())
+                with self.assertNumQueries(0):
+                    qs = Category.objects.filter(pk__exact=1).cache()
+                    list(qs)
+                cache_key = qs._cache_key()
+                uncommitted_local_cache_results = None
+                try:
+                    uncommitted_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+                except AttributeError:
+                    pass
+                self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
+                uncommitted_remote_cache_results = redis_client.get(cache_key)
+                if uncommitted_remote_cache_results is not None:
+                    results = pickle.loads(uncommitted_remote_cache_results)
+                self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache populated early.')
+                raise IntentionalRollback('test out caches after rolled back transaction.')
+        except IntentionalRollback:
+            pass
+
+        committed_local_cache_results = None
+        try:
+            committed_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+        except AttributeError:
+            pass
+        self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on rolled back transaction.')
+        uncommitted_remote_cache_results = redis_client.get(cache_key)
+        if uncommitted_remote_cache_results is not None:
+            uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
+        self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache was populated on rolled back transaction.')
+
+@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
+@override_settings(CACHEOPS_ATOMIC_REQUESTS=True)  # todo: make the transaction code respect the settings.
+class TransactionalBasicTests(BasicTests):
+    pass
