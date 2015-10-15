@@ -15,7 +15,6 @@ if django.VERSION >= (1, 6):
     from .utils import load_script
     from .cross import pickle
 
-
     class Atomic(transaction.Atomic):
         thread_local = local()
 
