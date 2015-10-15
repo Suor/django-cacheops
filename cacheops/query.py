@@ -41,7 +41,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     try:
         # are we in a transaction?
-        Atomic.thread_local.cache[cache_key] = {
+        Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
             'data': data,
             'cond_dnfs': cond_dnfs,
             'timeout': timeout,
@@ -101,7 +101,7 @@ def cached_as(*samples, **kwargs):
 
             # try transaction local cache first
             try:
-                cache_data = Atomic.thread_local.cache.get(cache_key, None)
+                cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
             except AttributeError:
                 # not in transaction
                 pass
@@ -287,7 +287,7 @@ class QuerySetMixin(object):
 
                 # try transaction local cache first
                 try:
-                    cache_data = Atomic.thread_local.cache.get(cache_key, None)
+                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
                 except AttributeError:
                     # not in transaction
                     pass

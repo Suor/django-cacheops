@@ -30,7 +30,7 @@ def invalidate_dict(model, obj_dict):
 
     # is this thing in our local cache?
     try:
-        local_cache = Atomic.thread_local.cache
+        local_cache = Atomic.thread_local.cacheops_transaction_cache
     except AttributeError:
         pass
     else:
@@ -78,7 +78,7 @@ def invalidate_model(model):
 
     # remove the same keys from our local cache, if we are in a transaction
     try:
-        local_cache = Atomic.thread_local.cache
+        local_cache = Atomic.thread_local.cacheops_transaction_cache
     except AttributeError:
         pass
     else:
@@ -98,7 +98,7 @@ def invalidate_all():
     # wipe out our local cache, if we are in a transaction
     try:
         # leave the same amount of dicts as we found, but empty them
-        Atomic.thread_local.cache.maps = [{} for x in Atomic.thread_local.cache.maps]
+        Atomic.thread_local.cacheops_transaction_cache.maps = [{} for x in Atomic.thread_local.cacheops_transaction_cache.maps]
     except AttributeError:
         pass
 

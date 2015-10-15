@@ -23,11 +23,11 @@ class Atomic(transaction.Atomic):
             if not connection.in_atomic_block:
                 # outer most atomic block.
                 # setup our local cache
-                Atomic.thread_local.cache = ChainMap()
+                Atomic.thread_local.cacheops_transaction_cache = ChainMap()
             else:
                 # new inner atomic block
                 # add a 'context' to our local cache.
-                Atomic.thread_local.cache.maps.append({})
+                Atomic.thread_local.cacheops_transaction_cache.maps.append({})
         super(Atomic, self).__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -41,7 +41,7 @@ class Atomic(transaction.Atomic):
                 # exit outer most atomic block.
                 if commit:
                     # push the transaction's keys to redis
-                    for key, value in Atomic.thread_local.cache.items():
+                    for key, value in Atomic.thread_local.cacheops_transaction_cache.items():
                         load_script('cache_thing', LRU)(
                             keys=[key],
                             args=[
@@ -50,13 +50,13 @@ class Atomic(transaction.Atomic):
                                 value['timeout']
                             ]
                         )
-                del Atomic.thread_local.cache
+                del Atomic.thread_local.cacheops_transaction_cache
             else:
                 # exit inner atomic block
-                context = Atomic.thread_local.cache.maps.pop(0)
+                context = Atomic.thread_local.cacheops_transaction_cache.maps.pop(0)
                 if commit:
                     # mash the save points context into the outer context.
-                    Atomic.thread_local.cache.maps[0].update(context)
+                    Atomic.thread_local.cacheops_transaction_cache.maps[0].update(context)
 
 
 def atomic(using=None, savepoint=True):

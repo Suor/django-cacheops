@@ -977,7 +977,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             cache_key = qs._cache_key()
             uncommitted_local_cache_results = None
             try:
-                uncommitted_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+                uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
             except AttributeError:
                 pass
             self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
@@ -987,7 +987,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             self.assertIsNone(uncommitted_remote_cache_results, msg='Remote cache populated early.')
         committed_local_cache_results = None
         try:
-            committed_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
         except AttributeError:
             pass
         self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on committed transaction.')
@@ -1007,7 +1007,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 cache_key = qs._cache_key()
                 uncommitted_local_cache_results = None
                 try:
-                    uncommitted_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+                    uncommitted_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
                 except AttributeError:
                     pass
                 self.assertIsNotNone(uncommitted_local_cache_results, msg='Local cache was not populated.')
@@ -1021,7 +1021,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
         committed_local_cache_results = None
         try:
-            committed_local_cache_results = transaction.Atomic.thread_local.cache.get(cache_key, None)
+            committed_local_cache_results = transaction.Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
         except AttributeError:
             pass
         self.assertIsNone(committed_local_cache_results, msg='Local cache was not cleared on rolled back transaction.')
