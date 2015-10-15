@@ -960,7 +960,7 @@ class IntentionalRollback(RuntimeError):
 
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
-@override_settings(CACHEOPS_ATOMIC_REQUESTS=True)
+@override_settings(CACHEOPS_RESPECT_ATOMIC=True)
 class TransactionalLocalCacheTests(TransactionTestCase):
     fixtures = ['basic']
 
@@ -1032,6 +1032,6 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
 
 @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
-@override_settings(CACHEOPS_ATOMIC_REQUESTS=True)
+@override_settings(CACHEOPS_RESPECT_ATOMIC=True)
 class TransactionalBasicTests(BasicTests):
     pass

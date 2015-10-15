@@ -118,6 +118,18 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 
     CACHEOPS_FAKE = True
 
+You can have cacheops use a local memory cache, writing to redis only on commit. This functionality works by patching
+``transaction.atomic`` and ``transaction.Atomic``. When ``ATOMIC_REQUESTS`` is set to ``True`` in ``DATABASES``, every
+request will be wrapped in ``transaction.atomic``. Cacheops will not use a local cache when not in a
+``transaction.atomic`` block, regardless of this setting. This local caching only affects querysets and views, which is
+to say, not Simple time-invalidated cache or File Cache.
+
+The local cache is thread specific and cleared on commit. Cached items cannot contribute to possible race conditions
+between threads/requests. Data is not cached on rolled back transactions.
+
+.. code:: python
+
+    CACHEOPS_RESPECT_ATOMIC = True
 
 Usage
 -----

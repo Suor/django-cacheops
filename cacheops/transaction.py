@@ -18,7 +18,7 @@ class Atomic(transaction.Atomic):
     thread_local = local()
 
     def __enter__(self):
-        if getattr(settings, 'CACHEOPS_ATOMIC_REQUESTS', False):
+        if getattr(settings, 'CACHEOPS_RESPECT_ATOMIC', False):
             connection = transaction.get_connection(self.using)
             if not connection.in_atomic_block:
                 # outer most atomic block.
@@ -32,7 +32,7 @@ class Atomic(transaction.Atomic):
 
     def __exit__(self, exc_type, exc_value, traceback):
         super(Atomic, self).__exit__(exc_type, exc_value, traceback)
-        if getattr(settings, 'CACHEOPS_ATOMIC_REQUESTS', False):
+        if getattr(settings, 'CACHEOPS_RESPECT_ATOMIC', False):
             connection = transaction.get_connection(self.using)
             commit = not connection.closed_in_transaction and\
                           exc_type is None and\
