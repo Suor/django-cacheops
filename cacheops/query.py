@@ -6,7 +6,10 @@ import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
-from .transaction import Atomic
+try:
+    from .transaction import Atomic
+except ImportError:
+    Atomic = None
 
 import django
 from django.utils.encoding import smart_str
@@ -41,14 +44,15 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     try:
         # are we in a transaction?
-        Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
-            'data': data,
-            'cond_dnfs': cond_dnfs,
-            'timeout': timeout,
-            # these two help us out later for possible invalidation
-            'db_tables': [x for x, y in cond_dnfs],
-            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
-        }
+        if Atomic:
+            Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
+                'data': data,
+                'cond_dnfs': cond_dnfs,
+                'timeout': timeout,
+                # these two help us out later for possible invalidation
+                'db_tables': [x for x, y in cond_dnfs],
+                'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
+            }
     except AttributeError:
         # we are not in a transaction.
         load_script('cache_thing', LRU)(
@@ -102,13 +106,15 @@ def cached_as(*samples, **kwargs):
 
             # try transaction local cache first
             try:
-                cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                if Atomic:
+                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
             except AttributeError:
                 # not in transaction
                 pass
             else:
-                if cache_data is not None and cache_data.get('data', None) is not None:
-                    return cache_data['data']
+                if Atomic:
+                    if cache_data is not None and cache_data.get('data', None) is not None:
+                        return cache_data['data']
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -288,13 +294,17 @@ class QuerySetMixin(object):
 
                 # try transaction local cache first
                 try:
-                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+                    if Atomic:
+                        cache_data = Atomic.thread_local.cacheops_transaction_cache.get(
+                            cache_key, None
+                        )
                 except AttributeError:
                     # not in transaction
                     pass
                 else:
-                    if cache_data is not None and cache_data.get('data', None) is not None:
-                        results = cache_data['data']
+                    if Atomic:
+                        if cache_data is not None and cache_data.get('data', None) is not None:
+                            results = cache_data['data']
 
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:

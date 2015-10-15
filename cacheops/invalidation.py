@@ -11,8 +11,10 @@ except ImportError:
 
 from .conf import redis_client, handle_connection_failure
 from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
-from .transaction import Atomic
-
+try:
+    from .transaction import Atomic
+except ImportError:
+    Atomic = None
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
@@ -30,27 +32,29 @@ def invalidate_dict(model, obj_dict):
 
     # is this thing in our local cache?
     try:
-        local_cache = Atomic.thread_local.cacheops_transaction_cache
+        if Atomic:
+            local_cache = Atomic.thread_local.cacheops_transaction_cache
     except AttributeError:
         pass
     else:
-        for key, value in local_cache.items():
-            if 'db_tables' in value and 'cond_dicts' in value:
-                for table, cond_dict in zip(value['db_tables'], value['cond_dicts']):
-                    # is this key for the table we are invalidating?
-                    if table == db_table:
-                        match = False
-                        for obj_key in set(obj_dict.keys()) & set(cond_dict.keys()):
-                            if obj_dict[obj_key] != cond_dict[obj_key]:
-                                break
-                        else:
-                            match = True
-                        if match or not cond_dict:
-                            # deep delete, to deal with savepoints in the cache
-                            for mapping in local_cache.maps:
-                                if key in mapping:
-                                    del mapping[key]
-                        break
+        if Atomic:
+            for key, value in local_cache.items():
+                if 'db_tables' in value and 'cond_dicts' in value:
+                    for table, cond_dict in zip(value['db_tables'], value['cond_dicts']):
+                        # is this key for the table we are invalidating?
+                        if table == db_table:
+                            match = False
+                            for obj_key in set(obj_dict.keys()) & set(cond_dict.keys()):
+                                if obj_dict[obj_key] != cond_dict[obj_key]:
+                                    break
+                            else:
+                                match = True
+                            if match or not cond_dict:
+                                # deep delete, to deal with savepoints in the cache
+                                for mapping in local_cache.maps:
+                                    if key in mapping:
+                                        del mapping[key]
+                            break
 
 
 def invalidate_obj(obj):
@@ -78,16 +82,18 @@ def invalidate_model(model):
 
     # remove the same keys from our local cache, if we are in a transaction
     try:
-        local_cache = Atomic.thread_local.cacheops_transaction_cache
+        if Atomic:
+            local_cache = Atomic.thread_local.cacheops_transaction_cache
     except AttributeError:
         pass
     else:
-        for key, value in local_cache.items():
-            if db_table in value.get('db_tables', []):
-                # deep delete, to deal with savepoints in the cache
-                for mapping in local_cache.maps:
-                    if key in mapping:
-                        del mapping[key]
+        if Atomic:
+            for key, value in local_cache.items():
+                if db_table in value.get('db_tables', []):
+                    # deep delete, to deal with savepoints in the cache
+                    for mapping in local_cache.maps:
+                        if key in mapping:
+                            del mapping[key]
 
 @handle_connection_failure
 def invalidate_all():
@@ -98,9 +104,10 @@ def invalidate_all():
     # wipe out our local cache, if we are in a transaction
     try:
         # leave the same amount of dicts as we found, but empty them
-        Atomic.thread_local.cacheops_transaction_cache.maps = [
-            {} for x in Atomic.thread_local.cacheops_transaction_cache.maps
-        ]
+        if Atomic:
+            Atomic.thread_local.cacheops_transaction_cache.maps = [
+                {} for x in Atomic.thread_local.cacheops_transaction_cache.maps
+            ]
     except AttributeError:
         pass
 

@@ -10,7 +10,10 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-from django.db import transaction
+try:
+    from django.db import transaction
+except ImportError:
+    pass
 
 try:
     from django.test import override_settings
