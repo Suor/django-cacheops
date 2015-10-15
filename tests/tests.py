@@ -1029,7 +1029,6 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             orig_object
         )
 
-
     def test_transaction_with_rollback(self):
         try:
             with atomic():
@@ -1169,7 +1168,6 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             msg='Remote cache was not populated on committed transaction.'
         )
         self.assertEqual(committed_remote_cache_results, orig_object)
-
 
     def test_savepoint_with_rollback(self):
         with atomic():
