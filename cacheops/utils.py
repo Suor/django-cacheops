@@ -20,9 +20,8 @@ from .conf import redis_client, model_profile
 NOT_SERIALIZED_FIELDS = (
     models.FileField,
     models.TextField, # One should not filter by long text equality
+    models.BinaryField,
 )
-if hasattr(models, 'BinaryField'):
-    NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
 @memoize
@@ -48,14 +47,6 @@ def model_family(model):
 @memoize
 def family_has_profile(cls):
     return any(model_profile, model_family(cls))
-
-
-if django.VERSION < (1, 6):
-    def get_model_name(model):
-        return model._meta.module_name
-else:
-    def get_model_name(model):
-        return model._meta.model_name
 
 
 class MonkeyProxy(object):

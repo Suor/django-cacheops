@@ -61,8 +61,7 @@ import django
 from django.db import connection
 from django.core.management import call_command
 
-if hasattr(django, 'setup'):
-    django.setup()
+django.setup()
 
 # Create a test database.
 db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)

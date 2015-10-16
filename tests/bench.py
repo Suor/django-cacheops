@@ -26,6 +26,7 @@ def do_get_no_cache():
     Category.objects.nocache().get(pk=1)
 
 
+# FIXME: This is wrong
 count_key = Category.objects.all()._cache_key(extra='count')
 def invalidate_count():
     redis_client.delete(count_key)
