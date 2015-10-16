@@ -1,6 +1,5 @@
 from redis.client import StrictRedis
 from django.db.transaction import Atomic
-import pickle
 
 _marker = object()
 

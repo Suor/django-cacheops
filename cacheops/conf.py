@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import warnings
-from cacheops.redis import LocalCachedTransactionRedis
+from cacheops.redis_client import LocalCachedTransactionRedis
 import six
 import redis
 from funcy import memoize, decorator, identity, merge
