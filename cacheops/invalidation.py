@@ -11,11 +11,7 @@ except ImportError:
 
 from .conf import redis_client, handle_connection_failure
 from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
-try:
-    from .transaction import Atomic
-except ImportError:
-    # django is too old for this
-    Atomic = None
+from .transaction import Atomic
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
@@ -31,31 +27,30 @@ def invalidate_dict(model, obj_dict):
         json.dumps(obj_dict, default=str)
     ])
 
-    if Atomic:
-        try:
-            local_cache = Atomic.thread_local.cacheops_transaction_cache
-        except AttributeError:
-            # not in a transaction
-            pass
-        else:
-            # is this thing in our local cache?
-            for key, value in local_cache.items():
-                if 'db_tables' in value and 'cond_dicts' in value:
-                    for table, cond_dict in zip(value['db_tables'], value['cond_dicts']):
-                        # is this key for the table we are invalidating?
-                        if table == db_table:
-                            match = False
-                            for obj_key in set(obj_dict.keys()) & set(cond_dict.keys()):
-                                if obj_dict[obj_key] != cond_dict[obj_key]:
-                                    break
-                            else:
-                                match = True
-                            if match or not cond_dict:
-                                # deep delete, to deal with savepoints in the cache
-                                for mapping in local_cache.maps:
-                                    if key in mapping:
-                                        del mapping[key]
-                            break
+    try:
+        local_cache = Atomic.thread_local.cacheops_transaction_cache
+    except AttributeError:
+        # not in a transaction
+        pass
+    else:
+        # is this thing in our local cache?
+        for key, value in local_cache.items():
+            if 'db_tables' in value and 'cond_dicts' in value:
+                for table, cond_dict in zip(value['db_tables'], value['cond_dicts']):
+                    # is this key for the table we are invalidating?
+                    if table == db_table:
+                        match = False
+                        for obj_key in set(obj_dict.keys()) & set(cond_dict.keys()):
+                            if obj_dict[obj_key] != cond_dict[obj_key]:
+                                break
+                        else:
+                            match = True
+                        if match or not cond_dict:
+                            # deep delete, to deal with savepoints in the cache
+                            for mapping in local_cache.maps:
+                                if key in mapping:
+                                    del mapping[key]
+                        break
 
 
 def invalidate_obj(obj):
@@ -81,20 +76,19 @@ def invalidate_model(model):
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
-    if Atomic:
-        try:
-            local_cache = Atomic.thread_local.cacheops_transaction_cache
-        except AttributeError:
-            # we are not in a transaction
-            pass
-        else:
-            # remove the same keys from our local cache
-            for key, value in local_cache.items():
-                if db_table in value.get('db_tables', []):
-                    # deep delete, to deal with savepoints in the cache
-                    for mapping in local_cache.maps:
-                        if key in mapping:
-                            del mapping[key]
+    try:
+        local_cache = Atomic.thread_local.cacheops_transaction_cache
+    except AttributeError:
+        # we are not in a transaction
+        pass
+    else:
+        # remove the same keys from our local cache
+        for key, value in local_cache.items():
+            if db_table in value.get('db_tables', []):
+                # deep delete, to deal with savepoints in the cache
+                for mapping in local_cache.maps:
+                    if key in mapping:
+                        del mapping[key]
 
 @handle_connection_failure
 def invalidate_all():
@@ -102,15 +96,14 @@ def invalidate_all():
         return
     redis_client.flushdb()
 
-    if Atomic:
-        try:
-            # wipe out our local cache, leaving the same amount of dicts as we found
-            Atomic.thread_local.cacheops_transaction_cache.maps = [
-                {} for x in Atomic.thread_local.cacheops_transaction_cache.maps
-            ]
-        except AttributeError:
-            # we are not in a transaction
-            pass
+    try:
+        # wipe out our local cache, leaving the same amount of dicts as we found
+        Atomic.thread_local.cacheops_transaction_cache.maps = [
+            {} for x in Atomic.thread_local.cacheops_transaction_cache.maps
+        ]
+    except AttributeError:
+        # we are not in a transaction
+        pass
 
 
 class InvalidationState(threading.local):
