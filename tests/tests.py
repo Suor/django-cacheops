@@ -2,8 +2,7 @@
 import os, re, copy
 import unittest
 
-import django
-from django.db import models, connection, connections
+from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
@@ -233,7 +232,8 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
         self.assertEqual(get_calls(), 1)      # hit
-        c.title = 'new'; c.save()             # invalidate
+        c.title = 'new'
+        c.save()                              # invalidate
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_depends_on_args(self):
@@ -249,9 +249,11 @@ class DecoratorTests(BaseTestCase):
         p = Post.objects.create(title='New Post', category=c)
 
         self.assertEqual(get_calls(1), 1)      # cache
-        c.title = 'new title'; c.save()        # invalidate by Category
+        c.title = 'new title'
+        c.save()                               # invalidate by Category
         self.assertEqual(get_calls(1), 2)      # miss and cache
-        p.title = 'new title'; p.save()        # invalidate by Post
+        p.title = 'new title'
+        p.save()                               # invalidate by Post
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
     def test_cached_view_as(self):
@@ -349,6 +351,7 @@ class ArrayTests(BaseTestCase):
 class TemplateTests(BaseTestCase):
     def get_inc(self):
         count = [0]
+
         def inc():
             count[0] += 1
             return count[0]

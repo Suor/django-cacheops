@@ -229,6 +229,7 @@ class QuerySetMixin(object):
                 # HACK: monkey patch self.query.clone for single call
                 #       to return itself instead of cloning
                 original_query_clone = self.query.clone
+
                 def query_clone():
                     self.query.clone = original_query_clone
                     return self.query

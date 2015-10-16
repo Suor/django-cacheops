@@ -7,7 +7,7 @@ services:
 addons:
   postgresql: "9.3"
 env:
-  - TOXENV=flakes
+  - TOXENV=lint
   - TOXENV=py27-dj17
   - TOXENV=py27-dj18
   - TOXENV=py27-djmaster
