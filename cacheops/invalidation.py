@@ -50,7 +50,6 @@ def invalidate_dict(model, obj_dict):
                             for mapping in local_cache.maps:
                                 if key in mapping:
                                     del mapping[key]
-                        break
 
 
 def invalidate_obj(obj):
