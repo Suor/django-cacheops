@@ -962,7 +962,6 @@ class IntentionalRollback(RuntimeError):
 
 
 @unittest.skipUnless(django.VERSION >= (1, 6), "Only for Django 1.6+")
-@override_settings(CACHEOPS_RESPECT_ATOMIC=True)
 class TransactionalLocalCacheTests(TransactionTestCase):
     fixtures = ['basic']
 
@@ -1247,9 +1246,3 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             committed_remote_cache_results,
             msg='Remote cache was populated on empty committed transaction.'
         )
-
-
-@unittest.skipUnless(django.VERSION >= (1, 6), "Only for Django 1.6+")
-@override_settings(CACHEOPS_RESPECT_ATOMIC=True)
-class TransactionalBasicTests(BasicTests):
-    pass

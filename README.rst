@@ -118,22 +118,6 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 
     CACHEOPS_FAKE = True
 
-You can have cacheops use a local memory cache, writing to redis only on commit. This functionality works by patching
-``transaction.atomic`` and ``transaction.Atomic``. When ``ATOMIC_REQUESTS`` is set to ``True`` in ``DATABASES``, every
-request will be wrapped in ``transaction.atomic``. Cacheops will not use a local cache when not in a
-``transaction.atomic`` block, regardless of this setting. This local caching only affects querysets and views, which is
-to say, not Simple time-invalidated cache or File Cache.
-
-The local cache is thread specific and cleared on commit. Cached items cannot contribute to possible race conditions
-between threads. Data is not cached on rolled back transactions. To maintain current expected behavior, this
-setting is ``False`` by default.
-
-Because of the dependency on ``transaction.Atomic``, cacheops ignores this setting unless running django 1.6+.
-
-.. code:: python
-
-    CACHEOPS_RESPECT_ATOMIC = True
-
 Usage
 -----
 
@@ -623,7 +607,7 @@ TODO
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate with prefetch_related()
 - shard cache between multiple redises
-- add local cache (cleared at the end of request?) (partially implemented by CACHEOPS_RESPECT_ATOMIC)
+- add local cache (cleared at the end of request?) (partially implemented, local cache clearing is currently `django.db.transaction.atomic` based)
 - respect subqueries?
 - respect headers in @cached_view*?
 - group invalidate_obj() calls?
