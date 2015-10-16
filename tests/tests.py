@@ -10,7 +10,11 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-
+try:
+    from django.db.transaction import Atomic, atomic
+except ImportError:
+    # django < 1.6 doesn't have this
+    pass
 try:
     from django.test.utils import override_settings
 except ImportError:
@@ -29,11 +33,6 @@ from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 decorator_tag = register.decorator_tag
 from .models import *
-try:
-    from cacheops.transaction import Atomic, atomic
-except ImportError:
-    # django version is too old for this.
-    pass
 
 class BaseTestCase(TestCase):
     def setUp(self):
