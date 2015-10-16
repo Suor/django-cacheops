@@ -69,6 +69,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
         ]
     )
 
+_marker = object()
 
 def cached_as(*samples, **kwargs):
     """
@@ -117,7 +118,7 @@ def cached_as(*samples, **kwargs):
                     # not in transaction
                     pass
                 else:
-                    if cache_data is not None and cache_data.get('data', None) is not None:
+                    if cache_data is not None and cache_data.get('data', _marker) is not _marker:
                         return cache_data['data']
 
             cache_data = redis_client.get(cache_key)
