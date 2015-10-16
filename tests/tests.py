@@ -960,9 +960,17 @@ class ThreadWithReturnValue(Thread):
             if self._Thread__target is not None:
                 self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
 
-    def join(self):
-        super(ThreadWithReturnValue, self).join()
+    def join(self, *args, **kwargs):
+        super(ThreadWithReturnValue, self).join(*args, **kwargs)
         return self._return
+
+
+def get_category_filter_pk_1():
+    try:
+        return list(Category.objects.filter(pk=1).cache())
+    finally:
+        from django.db import connection
+        connection.close()
 
 
 class TransactionalLocalCacheTests(TransactionTestCase):
@@ -984,7 +992,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 'Fjango'
             )
 
-            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
             t.start()
             uncommitted_remote_cache_results = t.join()
             self.assertEqual(
@@ -998,7 +1006,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             'Fjango'
         )
 
-        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
         t.start()
         committed_remote_cache_results = t.join()
         self.assertEqual(
@@ -1020,7 +1028,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 )
 
                 t = ThreadWithReturnValue(
-                    target=lambda: list(Category.objects.filter(pk=1).cache())
+                    target=get_category_filter_pk_1
                 )
                 t.start()
                 uncommitted_remote_cache_results = t.join()
@@ -1040,7 +1048,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             'Django'
         )
 
-        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
         t.start()
         committed_remote_cache_results = t.join()
         self.assertEqual(
@@ -1063,7 +1071,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 )
 
                 t = ThreadWithReturnValue(
-                    target=lambda: list(Category.objects.filter(pk=1).cache())
+                    target=get_category_filter_pk_1
                 )
                 t.start()
                 uncommitted_savepoint_remote_cache_results = t.join()
@@ -1078,7 +1086,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 'Fjango'
             )
 
-            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
             t.start()
             uncommitted_remote_cache_results = t.join()
             self.assertEqual(
@@ -1092,7 +1100,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             'Fjango'
         )
 
-        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
         t.start()
         committed_remote_cache_results = t.join()
         self.assertEqual(
@@ -1116,7 +1124,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                     )
 
                     t = ThreadWithReturnValue(
-                        target=lambda: list(Category.objects.filter(pk=1).cache())
+                        target=get_category_filter_pk_1
                     )
                     t.start()
                     uncommitted_savepoint_remote_cache_results = t.join()
@@ -1135,7 +1143,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                 'Django'
             )
 
-            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
             t.start()
             uncommitted_remote_cache_results = t.join()
             self.assertEqual(
@@ -1149,7 +1157,7 @@ class TransactionalLocalCacheTests(TransactionTestCase):
             'Django'
         )
 
-        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
         t.start()
         committed_remote_cache_results = t.join()
         self.assertEqual(
