@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import pickle
 import re, copy
 import unittest
 from threading import Thread
@@ -10,11 +9,10 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-from django.db.transaction import Atomic, atomic
+from django.db.transaction import atomic
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
-from cacheops.conf import redis_client
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 decorator_tag = register.decorator_tag
@@ -1016,7 +1014,9 @@ class TransactionalLocalCacheTests(TransactionTestCase):
                     'Fjango'
                 )
 
-                t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+                t = ThreadWithReturnValue(
+                    target=lambda: list(Category.objects.filter(pk=1).cache())
+                )
                 t.start()
                 uncommitted_remote_cache_results = t.join()
                 self.assertEqual(
