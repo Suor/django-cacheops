@@ -45,7 +45,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     try:
         # are we in a transaction?
         Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
-            'data': data,
+            'data': pickle.dumps(data, -1),
             'cond_dnfs': cond_dnfs,
             'timeout': timeout,
             # these two help us out later for possible invalidation
@@ -64,8 +64,6 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
             timeout
         ]
     )
-
-_marker = object()
 
 def cached_as(*samples, **kwargs):
     """
@@ -105,16 +103,6 @@ def cached_as(*samples, **kwargs):
         @wraps(func)
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
-
-            # try transaction local cache first
-            try:
-                cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
-            except AttributeError:
-                # not in transaction
-                pass
-            else:
-                if cache_data is not None and cache_data.get('data', _marker) is not _marker:
-                    return cache_data['data']
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -292,22 +280,9 @@ class QuerySetMixin(object):
                 # Trying get data from cache
                 results = None
 
-                # try transaction local cache first
-                try:
-                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(
-                        cache_key, None
-                    )
-                except AttributeError:
-                    # not in transaction
-                    pass
-                else:
-                    if cache_data is not None and cache_data.get('data', None) is not None:
-                        results = cache_data['data']
-
-                if results is None:
-                    cache_data = redis_client.get(cache_key)
-                    if cache_data is not None:
-                        results = pickle.loads(cache_data)
+                cache_data = redis_client.get(cache_key)
+                if cache_data is not None:
+                    results = pickle.loads(cache_data)
 
                 if results is not None:
                     for obj in results:

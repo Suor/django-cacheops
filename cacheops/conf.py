@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import warnings
+from cacheops.redis import LocalCachedTransactionRedis
 import six
 import redis
 from funcy import memoize, decorator, identity, merge
@@ -26,8 +27,8 @@ if DEGRADE_ON_FAILURE:
 else:
     handle_connection_failure = identity
 
-class SafeRedis(redis.StrictRedis):
-    get = handle_connection_failure(redis.StrictRedis.get)
+class SafeRedis(LocalCachedTransactionRedis):
+    get = handle_connection_failure(LocalCachedTransactionRedis.get)
 
 
 class LazyRedis(object):
@@ -38,7 +39,7 @@ class LazyRedis(object):
         except AttributeError:
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-        client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
+        client = (SafeRedis if DEGRADE_ON_FAILURE else LocalCachedTransactionRedis)(**redis_conf)
 
         object.__setattr__(self, '__class__', client.__class__)
         object.__setattr__(self, '__dict__', client.__dict__)

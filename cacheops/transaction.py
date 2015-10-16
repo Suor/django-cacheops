@@ -38,7 +38,7 @@ class AtomicMixIn(object):
                     load_script('cache_thing', LRU)(
                         keys=[key],
                         args=[
-                            pickle.dumps(value['data'], -1),
+                            value['data'],
                             json.dumps(value['cond_dnfs'], default=str),
                             value['timeout']
                         ]
