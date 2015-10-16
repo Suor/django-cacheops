@@ -5,7 +5,6 @@ try:
 except ImportError:
     from chainmap import ChainMap
 
-from django.conf import settings
 try:
     from django.db.transaction import Atomic, get_connection
 except ImportError:
