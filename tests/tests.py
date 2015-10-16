@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re, copy
 import unittest
+import mock
 
 from django.db import connection, connections
 from django.test import TestCase
@@ -952,3 +953,70 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class SignalsTests(BaseTestCase):
+
+    @mock.patch('cacheops.signals.post_lookup.send')
+    def test_cacheops_signal_post_lookup_with_get(self, mock_post_lookup_send):
+        self.assertFalse(mock_post_lookup_send.called)
+
+        test_model = SignalTest.objects.create(name="foo")
+
+        SignalTest.objects.get(id=test_model.id) # miss
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=False
+        )
+
+        # Reset mock and try again, this time it should hit cache
+        mock_post_lookup_send.reset_mock()
+        SignalTest.objects.get(id=test_model.id) # hit
+
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=True
+        )
+
+        # Test that it is called again on every cache hit
+        mock_post_lookup_send.reset_mock()
+        SignalTest.objects.get(id=test_model.id) # hit
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=True
+        )
+
+    @mock.patch('cacheops.signals.post_lookup.send')
+    def test_cacheops_signal_post_lookup_with_filter(self, mock_post_lookup_send):
+        self.assertFalse(mock_post_lookup_send.called)
+
+        test_model = SignalTest.objects.create(name="foo")
+
+        # Force to evaluate queryset
+        list(SignalTest.objects.filter(id=test_model.id)) # miss
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=False
+        )
+
+        # Reset mock and try again, this time it should hit cache
+        mock_post_lookup_send.reset_mock()
+        list(SignalTest.objects.filter(id=test_model.id)) # hit
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=True
+        )
+
+        # Test that it is called again on every cache hit
+        mock_post_lookup_send.reset_mock()
+        list(SignalTest.objects.filter(id=test_model.id)) # hit
+        mock_post_lookup_send.assert_called_once_with(
+            sender='cacheops.iterator',
+            model='tests.models.SignalTest',
+            hit_cache=True
+        )
