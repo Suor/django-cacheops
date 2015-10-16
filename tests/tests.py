@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import pickle
-import os, re, copy
+import re, copy
 import unittest
+from threading import Thread
 
 from django.db import connection, connections
 from django.test import TestCase, TransactionTestCase
@@ -946,6 +947,21 @@ class IntentionalRollback(RuntimeError):
     pass
 
 
+class ThreadWithReturnValue(Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs, Verbose)
+        self._return = None
+
+    def run(self):
+        if self._Thread__target is not None:
+            self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
+
+    def join(self):
+        Thread.join(self)
+        return self._return
+
+
 class TransactionalLocalCacheTests(TransactionTestCase):
     fixtures = ['basic']
 
@@ -955,93 +971,57 @@ class TransactionalLocalCacheTests(TransactionTestCase):
 
     def test_transaction_with_commit(self):
         with atomic():
-            qs = Category.objects.filter(pk=1).cache()
-            orig_object = list(qs)
-            cache_key = qs._cache_key()
+            new_object = list(Category.objects.filter(pk=1).cache())
+            new_object[0].title = 'Fjango'
+            new_object[0].save()
 
-            uncommitted_local_cache_results = None
-            try:
-                uncommitted_local_cache_results =\
-                    Atomic.thread_local.cacheops_transaction_cache.get(
-                        cache_key, None
-                    )
-            except AttributeError:
-                pass
-            self.assertIsNotNone(
-                uncommitted_local_cache_results,
-                msg='Local cache was not populated.'
-            )
+            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
             self.assertEqual(
-                uncommitted_local_cache_results['data'],
-                orig_object
+                uncommitted_local_cache_results[0].title,
+                'Fjango'
             )
 
-            uncommitted_remote_cache_results = redis_client.get(cache_key)
-            if uncommitted_remote_cache_results is not None:
-                uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
-            self.assertIsNone(
-                uncommitted_remote_cache_results,
-                msg='Remote cache populated early, during transaction.'
+            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t.start()
+            uncommitted_remote_cache_results = t.join()
+            self.assertEqual(
+                uncommitted_remote_cache_results[0].title,
+                'Django'
             )
 
-        committed_local_cache_results = None
-        try:
-            committed_local_cache_results = \
-                Atomic.thread_local.cacheops_transaction_cache.get(
-                    cache_key, None
-                )
-        except AttributeError:
-            pass
-        self.assertIsNone(
-            committed_local_cache_results,
-            msg='Local cache was not cleared on committed transaction.'
-        )
-
-        committed_remote_cache_results = redis_client.get(cache_key)
-        if committed_remote_cache_results is not None:
-            committed_remote_cache_results = pickle.loads(
-                committed_remote_cache_results
-            )
-        self.assertIsNotNone(
-            committed_remote_cache_results,
-            msg='Remote cache was not populated on committed transaction.'
-        )
+        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
         self.assertEqual(
-            committed_remote_cache_results,
-            orig_object
+            committed_local_cache_results[0].title,
+            'Fjango'
+        )
+
+        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t.start()
+        committed_remote_cache_results = t.join()
+        self.assertEqual(
+            committed_remote_cache_results[0].title,
+            'Fjango'
         )
 
     def test_transaction_with_rollback(self):
         try:
             with atomic():
-                qs = Category.objects.filter(pk=1).cache()
-                orig_object = list(qs)
-                cache_key = qs._cache_key()
+                new_object = list(Category.objects.filter(pk=1).cache())
+                new_object[0].title = 'Fjango'
+                new_object[0].save()
 
-                uncommitted_local_cache_results = None
-                try:
-                    uncommitted_local_cache_results = \
-                        Atomic.thread_local.cacheops_transaction_cache.get(
-                            cache_key, None
-                        )
-                except AttributeError:
-                    pass
-                self.assertIsNotNone(
-                    uncommitted_local_cache_results,
-                    msg='Local cache was not populated.'
-                )
+                uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
                 self.assertEqual(
-                    uncommitted_local_cache_results['data'], orig_object
+                    uncommitted_local_cache_results[0].title,
+                    'Fjango'
                 )
 
-                uncommitted_remote_cache_results = redis_client.get(cache_key)
-                if uncommitted_remote_cache_results is not None:
-                    uncommitted_remote_cache_results = pickle.loads(
-                        uncommitted_remote_cache_results
-                    )
-                self.assertIsNone(
-                    uncommitted_remote_cache_results,
-                    msg='Remote cache populated early, during transaction.'
+                t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+                t.start()
+                uncommitted_remote_cache_results = t.join()
+                self.assertEqual(
+                    uncommitted_remote_cache_results[0].title,
+                    'Django'
                 )
 
                 raise IntentionalRollback('test out caches after rolled back transaction.')
@@ -1049,184 +1029,125 @@ class TransactionalLocalCacheTests(TransactionTestCase):
         except IntentionalRollback:
             pass
 
-        committed_local_cache_results = None
-        try:
-            committed_local_cache_results = \
-                Atomic.thread_local.cacheops_transaction_cache.get(
-                    cache_key, None
-                )
-        except AttributeError:
-            pass
-        self.assertIsNone(
-            committed_local_cache_results,
-            msg='Local cache was not cleared on rolled back transaction.'
+        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
+        self.assertEqual(
+            committed_local_cache_results[0].title,
+            'Django'
         )
 
-        committed_remote_cache_results = redis_client.get(cache_key)
-        if committed_remote_cache_results is not None:
-            committed_remote_cache_results = pickle.loads(
-                committed_remote_cache_results
-            )
-        self.assertIsNone(
-            committed_remote_cache_results,
-            msg='Remote cache was populated on rolled back transaction.'
+        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t.start()
+        committed_remote_cache_results = t.join()
+        self.assertEqual(
+            committed_remote_cache_results[0].title,
+            'Django'
         )
 
     def test_savepoint_with_commit(self):
         with atomic():
             with atomic():
-                qs = Category.objects.filter(pk=1).cache()
-                orig_object = list(qs)
-                cache_key = qs._cache_key()
+                new_object = list(Category.objects.filter(pk=1).cache())
+                new_object[0].title = 'Fjango'
+                new_object[0].save()
 
-                uncommitted_savepoint_local_cache_results = None
-                try:
-                    uncommitted_savepoint_local_cache_results = \
-                        Atomic.thread_local.cacheops_transaction_cache.get(
-                            cache_key, None
-                        )
-                except AttributeError:
-                    pass
-                self.assertIsNotNone(
-                    uncommitted_savepoint_local_cache_results,
-                    msg='Local cache was not populated.'
-                )
+                uncommitted_savepoint_local_cache_results = \
+                    list(Category.objects.filter(pk=1).cache())
                 self.assertEqual(
-                    uncommitted_savepoint_local_cache_results['data'],
-                    orig_object
+                    uncommitted_savepoint_local_cache_results[0].title,
+                    'Fjango'
                 )
 
-                uncommitted_savepoint_remote_cache_results = redis_client.get(cache_key)
-                if uncommitted_savepoint_remote_cache_results is not None:
-                    uncommitted_savepoint_remote_cache_results = pickle.loads(
-                        uncommitted_savepoint_remote_cache_results
-                    )
-                self.assertIsNone(
-                    uncommitted_savepoint_remote_cache_results,
-                    msg='Remote cache populated early, during savepoint.'
+                t = ThreadWithReturnValue(
+                    target=lambda: list(Category.objects.filter(pk=1).cache())
+                )
+                t.start()
+                uncommitted_savepoint_remote_cache_results = t.join()
+                self.assertEqual(
+                    uncommitted_savepoint_remote_cache_results[0].title,
+                    'Django'
                 )
 
-            uncommitted_local_cache_results = None
-            try:
-                uncommitted_local_cache_results = \
-                    Atomic.thread_local.cacheops_transaction_cache.get(
-                        cache_key, None
-                    )
-            except AttributeError:
-                pass
-            self.assertIsNotNone(
-                uncommitted_local_cache_results,
-                msg='Local cache was cleared on commit savepoint.'
-            )
+            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
             self.assertEqual(
-                uncommitted_local_cache_results['data'],
-                orig_object
+                uncommitted_local_cache_results[0].title,
+                'Fjango'
             )
 
-            uncommitted_remote_cache_results = redis_client.get(cache_key)
-            if uncommitted_remote_cache_results is not None:
-                uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
-            self.assertIsNone(
-                uncommitted_remote_cache_results,
-                msg='Remote cache was populated early, after savepoint commit.'
+            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t.start()
+            uncommitted_remote_cache_results = t.join()
+            self.assertEqual(
+                uncommitted_remote_cache_results[0].title,
+                'Django'
             )
 
-        committed_local_cache_results = None
-        try:
-            committed_local_cache_results = \
-                Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
-        except AttributeError:
-            pass
-        self.assertIsNone(
-            committed_local_cache_results,
-            msg='Local cache was not cleared on committed transaction.'
+        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
+        self.assertEqual(
+            committed_local_cache_results[0].title,
+            'Fjango'
         )
 
-        committed_remote_cache_results = redis_client.get(cache_key)
-        if committed_remote_cache_results is not None:
-            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
-        self.assertIsNotNone(
-            committed_remote_cache_results,
-            msg='Remote cache was not populated on committed transaction.'
+        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t.start()
+        committed_remote_cache_results = t.join()
+        self.assertEqual(
+            committed_remote_cache_results[0].title,
+            'Fjango'
         )
-        self.assertEqual(committed_remote_cache_results, orig_object)
 
     def test_savepoint_with_rollback(self):
         with atomic():
             try:
                 with atomic():
-                    qs = Category.objects.filter(pk=1).cache()
-                    orig_object = list(qs)
-                    cache_key = qs._cache_key()
+                    new_object = list(Category.objects.filter(pk=1).cache())
+                    new_object[0].title = 'Fjango'
+                    new_object[0].save()
 
-                    uncommitted_local_cache_results = None
-                    try:
-                        uncommitted_local_cache_results = \
-                            Atomic.thread_local.cacheops_transaction_cache.get(
-                                cache_key, None
-                            )
-                    except AttributeError:
-                        pass
-                    self.assertIsNotNone(
-                        uncommitted_local_cache_results, msg='Local cache was not populated.'
-                    )
+                    uncommitted_savepoint_local_cache_results = \
+                        list(Category.objects.filter(pk=1).cache())
                     self.assertEqual(
-                        uncommitted_local_cache_results['data'],
-                        orig_object
+                        uncommitted_savepoint_local_cache_results[0].title,
+                        'Fjango'
                     )
 
-                    uncommitted_remote_cache_results = redis_client.get(cache_key)
-                    if uncommitted_remote_cache_results is not None:
-                        uncommitted_remote_cache_results = pickle.loads(
-                            uncommitted_remote_cache_results
-                        )
-                    self.assertIsNone(
-                        uncommitted_remote_cache_results, msg='Remote cache populated early.'
+                    t = ThreadWithReturnValue(
+                        target=lambda: list(Category.objects.filter(pk=1).cache())
                     )
-
+                    t.start()
+                    uncommitted_savepoint_remote_cache_results = t.join()
+                    self.assertEqual(
+                        uncommitted_savepoint_remote_cache_results[0].title,
+                        'Django'
+                    )
                     raise IntentionalRollback('test out caches after rolled back savepoint.')
 
             except IntentionalRollback:
                 pass
 
-            committed_local_cache_results = None
-            try:
-                committed_local_cache_results = \
-                    Atomic.thread_local.cacheops_transaction_cache.get(
-                        cache_key, None
-                    )
-            except AttributeError:
-                pass
-            self.assertIsNone(
-                committed_local_cache_results,
-                msg='Local cache was not cleared on rolled back savepoint.'
+            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
+            self.assertEqual(
+                uncommitted_local_cache_results[0].title,
+                'Django'
             )
 
-            uncommitted_remote_cache_results = redis_client.get(cache_key)
-            if uncommitted_remote_cache_results is not None:
-                uncommitted_remote_cache_results = pickle.loads(uncommitted_remote_cache_results)
-            self.assertIsNone(
-                uncommitted_remote_cache_results,
-                msg='Remote cache was populated on rolled back savepoint.'
+            t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+            t.start()
+            uncommitted_remote_cache_results = t.join()
+            self.assertEqual(
+                uncommitted_remote_cache_results[0].title,
+                'Django'
             )
 
-        committed_local_cache_results = None
-        try:
-            committed_local_cache_results = \
-                Atomic.thread_local.cacheops_transaction_cache.get(
-                    cache_key, None
-                )
-        except AttributeError:
-            pass
-        self.assertIsNone(
-            committed_local_cache_results,
-            msg='Local cache was not cleared on committed transaction.'
+        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
+        self.assertEqual(
+            committed_local_cache_results[0].title,
+            'Django'
         )
 
-        committed_remote_cache_results = redis_client.get(cache_key)
-        if committed_remote_cache_results is not None:
-            committed_remote_cache_results = pickle.loads(committed_remote_cache_results)
-        self.assertIsNone(
-            committed_remote_cache_results,
-            msg='Remote cache was populated on empty committed transaction.'
+        t = ThreadWithReturnValue(target=lambda: list(Category.objects.filter(pk=1).cache()))
+        t.start()
+        committed_remote_cache_results = t.join()
+        self.assertEqual(
+            committed_remote_cache_results[0].title,
+            'Django'
         )
