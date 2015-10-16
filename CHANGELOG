@@ -1,3 +1,7 @@
+2.4.2
+- fixed .values() and .values_list() in Django 1.9
+- stopped sharing cache between proxies and base
+
 2.4.1
 - export FileCache and RedisCache from cacheops
 - allow non-ascii in str params
