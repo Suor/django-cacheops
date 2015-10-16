@@ -973,7 +973,7 @@ def get_category_filter_pk_1():
         connection.close()
 
 
-class TransactionalLocalCacheTests(TransactionTestCase):
+class LocalCachedTransactionTests(TransactionTestCase):
     fixtures = ['basic']
 
     def setUp(self):
