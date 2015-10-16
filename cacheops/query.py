@@ -3,14 +3,11 @@ import sys
 import json
 import threading
 import six
+from threading import local
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
-try:
-    from .transaction import Atomic
-except ImportError:
-    # django is too old for this
-    Atomic = None
+from .transaction import AtomicMixIn
 
 import django
 from django.utils.encoding import smart_str
@@ -25,6 +22,11 @@ try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
     MAX_GET_RESULTS = None
+try:
+    from django.db.transaction import Atomic
+except ImportError:
+    Atomic = None
+
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, stamp_fields, load_script, \
@@ -532,6 +534,11 @@ def install_cacheops():
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
     QuerySet._cloning = QuerySetMixin._cloning
+
+    # django.db.transaction.Atomic exists in Django 1.6+
+    if Atomic:
+        monkey_mix(Atomic, AtomicMixIn)
+        Atomic.thread_local = local()
 
     # DateQuerySet existed in Django 1.7 and earlier
     # Values*QuerySet existed in Django 1.8 and earlier
