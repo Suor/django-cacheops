@@ -22,10 +22,7 @@ try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
     MAX_GET_RESULTS = None
-try:
-    from django.db.transaction import Atomic
-except ImportError:
-    Atomic = None
+from django.db.transaction import Atomic
 
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
@@ -45,21 +42,20 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    if Atomic:
-        try:
-            # are we in a transaction?
-            Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
-                'data': data,
-                'cond_dnfs': cond_dnfs,
-                'timeout': timeout,
-                # these two help us out later for possible invalidation
-                'db_tables': [x for x, y in cond_dnfs],
-                'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
-            }
-            return
-        except AttributeError:
-            # we are not in a transaction.
-            pass
+    try:
+        # are we in a transaction?
+        Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
+            'data': data,
+            'cond_dnfs': cond_dnfs,
+            'timeout': timeout,
+            # these two help us out later for possible invalidation
+            'db_tables': [x for x, y in cond_dnfs],
+            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
+        }
+        return
+    except AttributeError:
+        # we are not in a transaction.
+        pass
     load_script('cache_thing', LRU)(
         keys=[cache_key],
         args=[
@@ -111,15 +107,14 @@ def cached_as(*samples, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             # try transaction local cache first
-            if Atomic:
-                try:
-                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
-                except AttributeError:
-                    # not in transaction
-                    pass
-                else:
-                    if cache_data is not None and cache_data.get('data', _marker) is not _marker:
-                        return cache_data['data']
+            try:
+                cache_data = Atomic.thread_local.cacheops_transaction_cache.get(cache_key, None)
+            except AttributeError:
+                # not in transaction
+                pass
+            else:
+                if cache_data is not None and cache_data.get('data', _marker) is not _marker:
+                    return cache_data['data']
 
             cache_data = redis_client.get(cache_key)
             if cache_data is not None:
@@ -298,17 +293,16 @@ class QuerySetMixin(object):
                 results = None
 
                 # try transaction local cache first
-                if Atomic:
-                    try:
-                        cache_data = Atomic.thread_local.cacheops_transaction_cache.get(
-                            cache_key, None
-                        )
-                    except AttributeError:
-                        # not in transaction
-                        pass
-                    else:
-                        if cache_data is not None and cache_data.get('data', None) is not None:
-                            results = cache_data['data']
+                try:
+                    cache_data = Atomic.thread_local.cacheops_transaction_cache.get(
+                        cache_key, None
+                    )
+                except AttributeError:
+                    # not in transaction
+                    pass
+                else:
+                    if cache_data is not None and cache_data.get('data', None) is not None:
+                        results = cache_data['data']
 
                 if results is None:
                     cache_data = redis_client.get(cache_key)
@@ -537,9 +531,8 @@ def install_cacheops():
     QuerySet._cloning = QuerySetMixin._cloning
 
     # django.db.transaction.Atomic exists in Django 1.6+
-    if Atomic:
-        monkey_mix(Atomic, AtomicMixIn)
-        Atomic.thread_local = local()
+    monkey_mix(Atomic, AtomicMixIn)
+    Atomic.thread_local = local()
 
     # DateQuerySet existed in Django 1.7 and earlier
     # Values*QuerySet existed in Django 1.8 and earlier

@@ -3,28 +3,13 @@ import pickle
 import os, re, copy
 import unittest
 
-import django
 from django.db import connection, connections
 from django.test import TestCase, TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-try:
-    from django.db.transaction import Atomic, atomic
-except ImportError:
-    # django < 1.6 doesn't have this
-    pass
-try:
-    from django.test.utils import override_settings
-except ImportError:
-    # django < 1.4 doesn't have this
-    class override_settings(object):
-        def __init__(*args, **kwargs):
-            pass
-
-        def __call__(self, fn):
-            return fn
+from django.db.transaction import Atomic, atomic
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
@@ -961,7 +946,6 @@ class IntentionalRollback(RuntimeError):
     pass
 
 
-@unittest.skipUnless(django.VERSION >= (1, 6), "Only for Django 1.6+")
 class TransactionalLocalCacheTests(TransactionTestCase):
     fixtures = ['basic']
 

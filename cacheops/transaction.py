@@ -5,12 +5,7 @@ try:
 except ImportError:
     from chainmap import ChainMap
 
-try:
-    from django.db.transaction import Atomic, get_connection
-except ImportError:
-    # django is too old for this.
-    Atomic = None
-    get_connection = None
+from django.db.transaction import Atomic, get_connection
 
 from .conf import LRU
 from .utils import load_script
