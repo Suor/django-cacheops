@@ -38,10 +38,6 @@ Or you can get latest one from github::
 Setup
 -----
 
-**Note:** settings format has changed in cacheops 2.2,
-for old style settings see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
-Old format is still supported in cacheops 2.2+, but considered deprecated.
-
 Add ``cacheops`` to your ``INSTALLED_APPS``.
 
 Setup redis connection and enable caching for desired models:
