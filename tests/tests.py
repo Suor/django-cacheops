@@ -951,8 +951,14 @@ class ThreadWithReturnValue(Thread):
         self._return = None
 
     def run(self):
-        if self._Thread__target is not None:
-            self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
+        try:
+            # python 3
+            if self._target is not None:
+                self._return = self._target(*self._args, **self._kwargs)
+        except AttributeError:
+            # python 2
+            if self._Thread__target is not None:
+                self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
 
     def join(self):
         Thread.join(self)
