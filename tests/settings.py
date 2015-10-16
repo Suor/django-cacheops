@@ -76,7 +76,7 @@ else:
             # make in memory sqlite test db work with threads for python prior to 3.4
             # see https://code.djangoproject.com/ticket/12118
             'TEST': {
-                'NAME': '/dev/shm/cacheo_sqlite.db'
+                'NAME': '/dev/shm/cacheops_sqlite.db'
             }
         },
         'slave': {
@@ -85,7 +85,7 @@ else:
             # make in memory sqlite test db work with threads for python prior to 3.4
             # see https://code.djangoproject.com/ticket/12118
             'TEST': {
-                'NAME': '/dev/shm/cacheo_sqlite_slave.db'
+                'NAME': '/dev/shm/cacheops_sqlite_slave.db'
             }
         }
     }
