@@ -8,7 +8,6 @@ from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
 from .cross import md5hex
 
-import django
 from django.db import models
 from django.http import HttpRequest
 
