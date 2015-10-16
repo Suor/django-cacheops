@@ -961,7 +961,7 @@ class ThreadWithReturnValue(Thread):
                 self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
 
     def join(self):
-        Thread.join(self)
+        super(ThreadWithReturnValue, self).join()
         return self._return
 
 
