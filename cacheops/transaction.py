@@ -9,7 +9,6 @@ from django.db.transaction import Atomic, get_connection
 
 from .conf import LRU
 from .utils import load_script
-from .cross import pickle
 
 class AtomicMixIn(object):
     def __enter__(self):
