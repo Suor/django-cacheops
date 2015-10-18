@@ -993,10 +993,14 @@ class SignalsTests(BaseTestCase):
     def test_cacheops_signal_post_lookup_with_filter(self, mock_post_lookup_send):
         self.assertFalse(mock_post_lookup_send.called)
 
-        test_model = SignalTest.objects.create(name="foo")
+        # Create some data
+        SignalTest.objects.create(name="foo")
+        SignalTest.objects.create(name="bar")
 
         # Force to evaluate queryset
-        list(SignalTest.objects.filter(id=test_model.id)) # miss
+        list(SignalTest.objects.filter()) # miss
+
+        # make sure we got miss signal only once
         mock_post_lookup_send.assert_called_once_with(
             sender='cacheops.iterator',
             model='tests.models.SignalTest',
@@ -1005,7 +1009,10 @@ class SignalsTests(BaseTestCase):
 
         # Reset mock and try again, this time it should hit cache
         mock_post_lookup_send.reset_mock()
-        list(SignalTest.objects.filter(id=test_model.id)) # hit
+
+        list(SignalTest.objects.filter()) # hit
+
+        # make sure we got hit signal only once
         mock_post_lookup_send.assert_called_once_with(
             sender='cacheops.iterator',
             model='tests.models.SignalTest',
@@ -1014,7 +1021,10 @@ class SignalsTests(BaseTestCase):
 
         # Test that it is called again on every cache hit
         mock_post_lookup_send.reset_mock()
-        list(SignalTest.objects.filter(id=test_model.id)) # hit
+
+        list(SignalTest.objects.filter()) # hit
+
+        # make sure we got miss signal only once
         mock_post_lookup_send.assert_called_once_with(
             sender='cacheops.iterator',
             model='tests.models.SignalTest',

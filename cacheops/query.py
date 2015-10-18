@@ -273,8 +273,8 @@ class QuerySetMixin(object):
                     results = pickle.loads(cache_data)
                     for obj in results:
                         # Notify about cache hit
-                        self._send_post_lookup_signal(hit_cache=True)
                         yield obj
+                    self._send_post_lookup_signal(hit_cache=True)
                     raise StopIteration
 
         # Cache miss - fallback to overriden implementation
