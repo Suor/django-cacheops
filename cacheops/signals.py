@@ -1,3 +1,3 @@
 import django.dispatch
 
-post_lookup = django.dispatch.Signal(providing_args=["model", "hit_cache"])
+cache_read = django.dispatch.Signal(providing_args=["func", "hit"])

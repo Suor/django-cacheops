@@ -27,7 +27,7 @@ from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import in_transaction
-from .signals import post_lookup
+from .signals import cache_read
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -93,6 +93,7 @@ def cached_as(*samples, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
+            cache_read.send(sender=None, func=func, hit=cache_data is not None)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -252,10 +253,6 @@ class QuerySetMixin(object):
             clone._cloning = self._cloning - 1 if self._cloning else 0
             return clone
 
-    def _send_post_lookup_signal(self, hit_cache):
-        model_path = "%s.%s" % (self.model.__module__, self.model.__name__)
-        post_lookup.send(sender='cacheops.iterator', model=model_path, hit_cache=hit_cache)
-
     def iterator(self):
         # TODO: do not cache empty queries?
         superiter = self._no_monkey.iterator
@@ -274,7 +271,7 @@ class QuerySetMixin(object):
                     for obj in results:
                         # Notify about cache hit
                         yield obj
-                    self._send_post_lookup_signal(hit_cache=True)
+                    cache_read.send(sender=self.model, func=self.model, hit=True)
                     raise StopIteration
 
         # Cache miss - fallback to overriden implementation
@@ -287,7 +284,7 @@ class QuerySetMixin(object):
         if cache_this:
             self._cache_results(cache_key, results)
         # Notify about not hitting cache
-        self._send_post_lookup_signal(hit_cache=False)
+        cache_read.send(sender=self.model, func=self.model, hit=False)
         raise StopIteration
 
     def count(self):

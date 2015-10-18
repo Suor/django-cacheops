@@ -956,42 +956,49 @@ class GISTests(BaseTestCase):
 
 
 class SignalsTests(BaseTestCase):
+    def _make_func(self, deco):
+        calls = [0]
 
-    @mock.patch('cacheops.signals.post_lookup.send')
-    def test_cacheops_signal_post_lookup_with_get(self, mock_post_lookup_send):
-        self.assertFalse(mock_post_lookup_send.called)
+        @deco
+        def get_calls(_=None):
+            calls[0] += 1
+            return calls[0]
+
+        return get_calls
+
+    @mock.patch('cacheops.signals.cache_read.send')
+    def test_cacheops_signal_post_queryset_with_get(self, mock_cache_read_send):
+        self.assertFalse(mock_cache_read_send.called)
 
         test_model = SignalTest.objects.create(name="foo")
-
         SignalTest.objects.get(id=test_model.id) # miss
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=False
+        mock_cache_read_send.assert_called_once_with(
+            sender=SignalTest,
+            func=SignalTest,
+            hit=False
         )
 
         # Reset mock and try again, this time it should hit cache
-        mock_post_lookup_send.reset_mock()
+        mock_cache_read_send.reset_mock()
         SignalTest.objects.get(id=test_model.id) # hit
-
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=True
+        mock_cache_read_send.assert_called_once_with(
+            sender=SignalTest,
+            func=SignalTest,
+            hit=True
         )
 
         # Test that it is called again on every cache hit
-        mock_post_lookup_send.reset_mock()
+        mock_cache_read_send.reset_mock()
         SignalTest.objects.get(id=test_model.id) # hit
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=True
+        mock_cache_read_send.assert_called_once_with(
+            sender=SignalTest,
+            func=SignalTest,
+            hit=True
         )
 
-    @mock.patch('cacheops.signals.post_lookup.send')
-    def test_cacheops_signal_post_lookup_with_filter(self, mock_post_lookup_send):
-        self.assertFalse(mock_post_lookup_send.called)
+    @mock.patch('cacheops.signals.cache_read.send')
+    def test_cacheops_signal_post_queryset_with_filter(self, mock_cache_read_send):
+        self.assertFalse(mock_cache_read_send.called)
 
         # Create some data
         SignalTest.objects.create(name="foo")
@@ -999,34 +1006,57 @@ class SignalsTests(BaseTestCase):
 
         # Force to evaluate queryset
         list(SignalTest.objects.filter()) # miss
-
         # make sure we got miss signal only once
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=False
+        mock_cache_read_send.assert_called_once_with(
+            sender=SignalTest,
+            func=SignalTest,
+            hit=False
         )
 
         # Reset mock and try again, this time it should hit cache
-        mock_post_lookup_send.reset_mock()
+        mock_cache_read_send.reset_mock()
 
         list(SignalTest.objects.filter()) # hit
-
         # make sure we got hit signal only once
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=True
+        mock_cache_read_send.assert_called_once_with(
+            sender=SignalTest,
+            func=SignalTest,
+            hit=True
         )
 
         # Test that it is called again on every cache hit
-        mock_post_lookup_send.reset_mock()
+        mock_cache_read_send.reset_mock()
 
         list(SignalTest.objects.filter()) # hit
-
         # make sure we got miss signal only once
-        mock_post_lookup_send.assert_called_once_with(
-            sender='cacheops.iterator',
-            model='tests.models.SignalTest',
-            hit_cache=True
-        )
+
+    @mock.patch('cacheops.signals.cache_read.send')
+    def test_cacheops_signal_works_with_cached_as(self, mock_cache_read_send):
+        get_calls = self._make_func(cached_as(SignalTest.objects.filter(name='test')))
+
+        self.assertEqual(get_calls(), 1)      # cache
+
+        _, kwargs = mock_cache_read_send.call_args
+        self.assertIsNone(kwargs['sender'])
+        self.assertEqual(kwargs['func'].__name__, 'get_calls')
+        self.assertFalse(kwargs['hit'])
+
+        mock_cache_read_send.reset_mock()
+
+        SignalTest.objects.create(name='miss') # don't invalidate
+        self.assertEqual(get_calls(), 1)      # hit
+
+        _, kwargs = mock_cache_read_send.call_args
+        self.assertIsNone(kwargs['sender'])
+        self.assertEqual(kwargs['func'].__name__, 'get_calls')
+        self.assertTrue(kwargs['hit'])
+
+        mock_cache_read_send.reset_mock()
+
+        SignalTest.objects.create(name='test') # invalidate
+        self.assertEqual(get_calls(), 2)      # miss
+
+        _, kwargs = mock_cache_read_send.call_args
+        self.assertIsNone(kwargs['sender'])
+        self.assertEqual(kwargs['func'].__name__, 'get_calls')
+        self.assertFalse(kwargs['hit'])
