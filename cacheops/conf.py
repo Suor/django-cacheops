@@ -43,6 +43,8 @@ if DEGRADE_ON_FAILURE:
             warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
         except redis.TimeoutError as e:
             warnings.warn("The cacheops cache timed out! Error: %s" % e, RuntimeWarning)
+        except redis.ResponseError as e:
+            warnings.warn("The cacheops cache returned error! Error: %s" % e, RuntimeWarning)
 else:
     handle_connection_failure = identity
 
