@@ -9,7 +9,7 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-from django.db.transaction import atomic
+from django.db.transaction import atomic, Atomic
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
@@ -965,9 +965,9 @@ class ThreadWithReturnValue(Thread):
         return self._return
 
 
-def get_category_filter_pk_1():
+def get_category_filter_pk_1_title():
     try:
-        return list(Category.objects.filter(pk=1).cache())
+        return list(Category.objects.filter(pk=1).cache())[0].title
     finally:
         # django does not drop postgres connections opened due to new threads.
         # results in Postgres complaining about connected users when django tries to delete test db
@@ -983,187 +983,257 @@ class LocalCachedTransactionTests(TransactionTestCase):
         super(TransactionTestCase, self).setUp()
         invalidate_all()
 
-    def test_transaction_with_commit(self):
-        with atomic():
-            new_object = list(Category.objects.filter(pk=1).cache())
-            new_object[0].title = 'Fjango'
-            new_object[0].save()
+    def set_title(self, title):
+        new_object = list(Category.objects.filter(pk=1).cache())
+        new_object[0]._cacheprofile['cache_on_save'] = True
+        new_object[0].title = title
+        new_object[0].save()
 
-            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
-            self.assertEqual(
-                uncommitted_local_cache_results[0].title,
-                'Fjango'
-            )
-
-            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-            t.start()
-            uncommitted_remote_cache_results = t.join()
-            self.assertEqual(
-                uncommitted_remote_cache_results[0].title,
-                'Django'
-            )
-
-        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
+    def assert_local_cache_title(self, title):
+        local_cache_results = list(Category.objects.filter(pk=1).cache())
         self.assertEqual(
-            committed_local_cache_results[0].title,
-            'Fjango'
+            local_cache_results[0].title,
+            title
         )
 
-        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
+    def assert_remote_cache_title(self, title):
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1_title)
         t.start()
-        committed_remote_cache_results = t.join()
+        remote_cache_results = t.join()
+        # remote cache results will be None if any exceptions happen in get_category_filter_pk_1
         self.assertEqual(
-            committed_remote_cache_results[0].title,
-            'Fjango'
+            remote_cache_results,
+            title
         )
 
-    def test_transaction_with_rollback(self):
+    def test_outside_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_local_cache_title('outside')
+
+    def test_inside_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
+
+    def test_inside_atomic_rollback(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
         try:
             with atomic():
-                new_object = list(Category.objects.filter(pk=1).cache())
-                new_object[0].title = 'Fjango'
-                new_object[0].save()
-
-                uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
-                self.assertEqual(
-                    uncommitted_local_cache_results[0].title,
-                    'Fjango'
-                )
-
-                t = ThreadWithReturnValue(
-                    target=get_category_filter_pk_1
-                )
-                t.start()
-                uncommitted_remote_cache_results = t.join()
-                self.assertEqual(
-                    uncommitted_remote_cache_results[0].title,
-                    'Django'
-                )
-
-                raise IntentionalRollback('test out caches after rolled back transaction.')
-
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
         except IntentionalRollback:
             pass
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
 
-        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
-        self.assertEqual(
-            committed_local_cache_results[0].title,
-            'Django'
-        )
+    def test_after_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_local_cache_title('outside')
 
-        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-        t.start()
-        committed_remote_cache_results = t.join()
-        self.assertEqual(
-            committed_remote_cache_results[0].title,
-            'Django'
-        )
+    def test_after_atomic_rollback(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        try:
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_local_cache_title('outside')
 
-    def test_savepoint_with_commit(self):
+    def test_before_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_local_cache_title('outside')
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('outside')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
+
+    def test_inside_nested_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
         with atomic():
             with atomic():
-                new_object = list(Category.objects.filter(pk=1).cache())
-                new_object[0].title = 'Fjango'
-                new_object[0].save()
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
 
-                uncommitted_savepoint_local_cache_results = \
-                    list(Category.objects.filter(pk=1).cache())
-                self.assertEqual(
-                    uncommitted_savepoint_local_cache_results[0].title,
-                    'Fjango'
-                )
-
-                t = ThreadWithReturnValue(
-                    target=get_category_filter_pk_1
-                )
-                t.start()
-                uncommitted_savepoint_remote_cache_results = t.join()
-                self.assertEqual(
-                    uncommitted_savepoint_remote_cache_results[0].title,
-                    'Django'
-                )
-
-            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
-            self.assertEqual(
-                uncommitted_local_cache_results[0].title,
-                'Fjango'
-            )
-
-            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-            t.start()
-            uncommitted_remote_cache_results = t.join()
-            self.assertEqual(
-                uncommitted_remote_cache_results[0].title,
-                'Django'
-            )
-
-        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
-        self.assertEqual(
-            committed_local_cache_results[0].title,
-            'Fjango'
-        )
-
-        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-        t.start()
-        committed_remote_cache_results = t.join()
-        self.assertEqual(
-            committed_remote_cache_results[0].title,
-            'Fjango'
-        )
-
-    def test_savepoint_with_rollback(self):
+    def test_inside_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
         with atomic():
             try:
                 with atomic():
-                    new_object = list(Category.objects.filter(pk=1).cache())
-                    new_object[0].title = 'Fjango'
-                    new_object[0].save()
-
-                    uncommitted_savepoint_local_cache_results = \
-                        list(Category.objects.filter(pk=1).cache())
-                    self.assertEqual(
-                        uncommitted_savepoint_local_cache_results[0].title,
-                        'Fjango'
-                    )
-
-                    t = ThreadWithReturnValue(
-                        target=get_category_filter_pk_1
-                    )
-                    t.start()
-                    uncommitted_savepoint_remote_cache_results = t.join()
-                    self.assertEqual(
-                        uncommitted_savepoint_remote_cache_results[0].title,
-                        'Django'
-                    )
-                    raise IntentionalRollback('test out caches after rolled back savepoint.')
-
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                    raise IntentionalRollback()
             except IntentionalRollback:
                 pass
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('Django')
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
 
-            uncommitted_local_cache_results = list(Category.objects.filter(pk=1).cache())
-            self.assertEqual(
-                uncommitted_local_cache_results[0].title,
-                'Django'
-            )
+    def test_inside_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        try:
+            with atomic():
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
 
-            t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-            t.start()
-            uncommitted_remote_cache_results = t.join()
-            self.assertEqual(
-                uncommitted_remote_cache_results[0].title,
-                'Django'
-            )
+    def test_before_nested_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            self.set_title('before')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('before')
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
 
-        committed_local_cache_results = list(Category.objects.filter(pk=1).cache())
-        self.assertEqual(
-            committed_local_cache_results[0].title,
-            'Django'
-        )
+    def test_before_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            self.set_title('before')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('before')
+            try:
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                    raise IntentionalRollback()
+            except IntentionalRollback:
+                pass
+            self.assert_remote_cache_title('Django')
+            # failing here can point to broken transactional invalidation handling.
+            self.assert_local_cache_title('before')
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('before')
 
-        t = ThreadWithReturnValue(target=get_category_filter_pk_1)
-        t.start()
-        committed_remote_cache_results = t.join()
-        self.assertEqual(
-            committed_remote_cache_results[0].title,
-            'Django'
-        )
+    def test_before_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        try:
+            with atomic():
+                self.set_title('before')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('before')
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+
+    def test_after_nested_atomic(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            with atomic():
+                self.set_title('inside_savepoint')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside_savepoint')
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
+
+    def test_after_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        with atomic():
+            try:
+                with atomic():
+                    self.set_title('inside_savepoint')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside_savepoint')
+                    raise IntentionalRollback()
+            except IntentionalRollback:
+                pass
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('Django')
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_local_cache_title('inside')
+
+    def test_after_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
+        try:
+            with atomic():
+                with atomic():
+                    self.set_title('inside_savepoint')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside_savepoint')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside_savepoint')
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_local_cache_title('Django')
