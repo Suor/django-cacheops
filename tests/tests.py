@@ -9,7 +9,7 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
-from django.db.transaction import atomic, Atomic
+from django.db.transaction import atomic
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as

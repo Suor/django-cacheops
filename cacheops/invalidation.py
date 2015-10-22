@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import F

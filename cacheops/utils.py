@@ -11,7 +11,6 @@ from django.db import models
 from django.http import HttpRequest
 
 from .conf import model_profile
-from .redis_client import redis_client
 
 
 # NOTE: we don't serialize this fields since their values could be very long

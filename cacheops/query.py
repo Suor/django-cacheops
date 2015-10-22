@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import sys
-import json
 import threading
 from cacheops import CacheMiss
 import six

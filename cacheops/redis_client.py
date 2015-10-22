@@ -70,7 +70,6 @@ class LocalCachedTransactionRedis(StrictRedis):
             raise CacheMiss
         return pickle.loads(cache_data)
 
-
     @handle_connection_failure
     def cache_thing(self, cache_key, data, cond_dnfs, timeout):
         """
