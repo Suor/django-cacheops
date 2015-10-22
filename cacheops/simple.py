@@ -5,15 +5,12 @@ from .cross import pickle, md5hex
 from django.conf import settings
 from funcy import wraps
 
-from .redis_client import redis_client, handle_connection_failure
+from .redis_client import redis_client, handle_connection_failure, CacheMiss
 from .utils import func_cache_key, cached_view_fab
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
 
-
-class CacheMiss(Exception):
-    pass
 
 class CacheKey(str):
     @classmethod
@@ -88,10 +85,8 @@ class RedisCache(BaseCache):
         self.conn = conn
 
     def get(self, cache_key):
-        data = self.conn.get(cache_key)
-        if data is None:
-            raise CacheMiss
-        return pickle.loads(data)
+        # LocalCachedTransactionRedis handles pickle on get.
+        return self.conn.get(cache_key)
 
     @handle_connection_failure
     def set(self, cache_key, data, timeout=None):

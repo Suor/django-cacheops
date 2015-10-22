@@ -35,6 +35,10 @@ else:
     handle_connection_failure = identity
 
 
+class CacheMiss(Exception):
+    pass
+
+
 class LocalCachedTransactionRedis(StrictRedis):
     def __init__(self, *args, **kwargs):
         super(LocalCachedTransactionRedis, self).__init__(*args, **kwargs)
@@ -61,7 +65,11 @@ class LocalCachedTransactionRedis(StrictRedis):
         else:
             if cache_data is not None and cache_data.get('data', _marker) is not _marker:
                 return cache_data['data']
-        return super(LocalCachedTransactionRedis, self).get(name)
+        cache_data = super(LocalCachedTransactionRedis, self).get(name)
+        if cache_data is None:
+            raise CacheMiss
+        return pickle.loads(cache_data)
+
 
     @handle_connection_failure
     def cache_thing(self, cache_key, data, cond_dnfs, timeout):
@@ -71,7 +79,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         try:
             # are we in a transaction?
             self._local.cacheops_transaction_cache[cache_key] = {
-                'data': pickle.dumps(data, -1),
+                'data': data,
                 'cond_dnfs': cond_dnfs,
                 'timeout': timeout,
                 # these two help us out later for possible invalidation
@@ -100,7 +108,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             self.load_script('cache_thing', LRU)(
                 keys=[key],
                 args=[
-                    value['data'],
+                    pickle.dumps(value['data'], -1),
                     json.dumps(value['cond_dnfs'], default=str),
                     value['timeout']
                 ]

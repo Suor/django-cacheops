@@ -2,10 +2,11 @@
 import sys
 import json
 import threading
+from cacheops import CacheMiss
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
-from .cross import pickle, md5
+from .cross import md5
 from .transaction import AtomicMixIn
 
 import django
@@ -75,12 +76,11 @@ def cached_as(*samples, **kwargs):
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
-            cache_data = redis_client.get(cache_key)
-            if cache_data is not None:
-                return pickle.loads(cache_data)
-
-            result = func(*args, **kwargs)
-            redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
+            try:
+                result = redis_client.get(cache_key)
+            except CacheMiss:
+                result = func(*args, **kwargs)
+                redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
         return wrapper
@@ -249,10 +249,11 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
-                if cache_data is not None:
-                    results = pickle.loads(cache_data)
-
+                try:
+                    results = redis_client.get(cache_key)
+                except CacheMiss:
+                    pass
+                else:
                     for obj in results:
                         yield obj
                     raise StopIteration
