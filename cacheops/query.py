@@ -278,13 +278,10 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
-                results = None
-
                 cache_data = redis_client.get(cache_key)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
 
-                if results is not None:
                     for obj in results:
                         yield obj
                     raise StopIteration
