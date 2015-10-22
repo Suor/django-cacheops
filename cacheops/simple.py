@@ -5,7 +5,7 @@ from .cross import pickle, md5hex
 from django.conf import settings
 from funcy import wraps
 
-from .conf import redis_client, handle_connection_failure
+from .redis_client import redis_client, handle_connection_failure
 from .utils import func_cache_key, cached_view_fab
 
 
@@ -112,6 +112,7 @@ cached_view = cache.cached_view
 
 FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
 FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
+
 
 class FileCache(BaseCache):
     """

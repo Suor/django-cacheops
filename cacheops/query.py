@@ -3,7 +3,6 @@ import sys
 import json
 import threading
 import six
-from threading import local
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
@@ -25,9 +24,9 @@ except ImportError:
 from django.db.transaction import Atomic
 
 
-from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
-from .utils import monkey_mix, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, family_has_profile
+from .conf import model_profile, ALL_OPS
+from .redis_client import redis_client
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 
@@ -36,34 +35,6 @@ __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
 
-
-@handle_connection_failure
-def cache_thing(cache_key, data, cond_dnfs, timeout):
-    """
-    Writes data to cache and creates appropriate invalidators.
-    """
-    try:
-        # are we in a transaction?
-        Atomic.thread_local.cacheops_transaction_cache[cache_key] = {
-            'data': pickle.dumps(data, -1),
-            'cond_dnfs': cond_dnfs,
-            'timeout': timeout,
-            # these two help us out later for possible invalidation
-            'db_tables': [x for x, y in cond_dnfs],
-            'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
-        }
-        return
-    except AttributeError:
-        # we are not in a transaction.
-        pass
-    load_script('cache_thing', LRU)(
-        keys=[cache_key],
-        args=[
-            pickle.dumps(data, -1),
-            json.dumps(cond_dnfs, default=str),
-            timeout
-        ]
-    )
 
 def cached_as(*samples, **kwargs):
     """
@@ -109,7 +80,7 @@ def cached_as(*samples, **kwargs):
                 return pickle.loads(cache_data)
 
             result = func(*args, **kwargs)
-            cache_thing(cache_key, result, cond_dnfs, timeout)
+            redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
         return wrapper
@@ -178,7 +149,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
+        redis_client.cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -504,7 +475,6 @@ def install_cacheops():
 
     # django.db.transaction.Atomic exists in Django 1.6+
     monkey_mix(Atomic, AtomicMixIn)
-    Atomic.thread_local = local()
 
     # DateQuerySet existed in Django 1.7 and earlier
     # Values*QuerySet existed in Django 1.8 and earlier
