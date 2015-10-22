@@ -969,6 +969,9 @@ def get_category_filter_pk_1():
     try:
         return list(Category.objects.filter(pk=1).cache())
     finally:
+        # django does not drop postgres connections opened due to new threads.
+        # results in Postgres complaining about connected users when django tries to delete test db
+        # https://code.djangoproject.com/ticket/22420#comment:18
         from django.db import connection
         connection.close()
 
