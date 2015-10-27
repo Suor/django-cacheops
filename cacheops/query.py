@@ -405,12 +405,7 @@ class ManagerMixin(object):
                 del instance.__dict__[k]
 
             key = 'pk' if cache_on_save is True else cache_on_save
-            # Django doesn't allow filters like related_id = 1337.
-            # So we just hacky strip _id from end of a key
-            # TODO: make it right, _meta.get_field() should help
-            filter_key = key[:-3] if key.endswith('_id') else key
-
-            cond = {filter_key: getattr(instance, key)}
+            cond = {key: getattr(instance, key)}
             qs = sender.objects.inplace().filter(**cond).order_by()
             if MAX_GET_RESULTS:
                 qs = qs[:MAX_GET_RESULTS + 1]
