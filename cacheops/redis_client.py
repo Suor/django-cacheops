@@ -60,6 +60,27 @@ def find_latest_context_list(contexts):
     return return_value
 
 
+def _find_second_latest_context(contexts):
+    if not contexts:
+        return contexts
+    latest = contexts[-1]
+    if isinstance(latest, list):
+        return_value = _find_second_latest_context(latest)
+        if return_value is _marker:
+            return latest
+        if return_value is not None:
+            return return_value
+        return _marker
+    return None
+
+
+def find_second_latest_context_list(contexts):
+    return_value = _find_second_latest_context(contexts)
+    if return_value is None or return_value is _marker:
+        return contexts
+    return return_value
+
+
 def _drop_latest_context(contexts):
     if not contexts:
         return True
@@ -88,7 +109,7 @@ def flatten_contexts(contexts):
         else:
             yield item
 
-cachegetter = itemgetter('cache')
+cache_getter = itemgetter('cache')
 
 
 class LocalCachedTransactionRedis(StrictRedis):
@@ -123,7 +144,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         else:
             # ChainMap looks left to right, our latest contexts are on the right.
             cache_data = ChainMap(
-                *map(cachegetter, flatten_contexts(reversed(all_contexts)))
+                *map(cache_getter, flatten_contexts(reversed(all_contexts)))
             ).get(name, None)
             if cache_data is not None and cache_data.get('data', _marker) is not _marker:
                 return cache_data['data']
@@ -169,11 +190,28 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     @handle_connection_failure
     def commit_transaction(self):
-        # todo: apply all invalidation to caches previous to them ...
         contexts = self._local.cacheops_transaction_contexts
         # del now so attribute errors in invalidate_* and cache_thing methods skip local
         del self._local.cacheops_transaction_contexts
 
+        # apply all invalidation to caches previous to them ...
+        for i, context in enumerate(contexts):
+            for item in context['invalidation']:
+                for previous_context in contexts[i:]:
+                    previous_cache = previous_context['cache']
+                    if item['type'] == 'dict':
+                        self._local_cache_invalidate_dict(
+                            previous_cache, **{x: y for x, y in six.iteritems(item) if x != 'type'}
+                        )
+                    elif item['type'] == 'model':
+                        self._local_cache_invalidate_model(
+                            previous_cache, **{x: y for x, y in six.iteritems(item) if x != 'type'}
+                        )
+                    elif item['type'] == 'all':
+                        self._local_cache_invalidate_all(previous_cache)
+        # todo: optimize redundant invalidation
+
+        # send it out to redis
         for context in flatten_contexts(contexts):
             # local caches already have invalidation applied, so do our queued invalidators first
             for item in context['invalidation']:
@@ -200,12 +238,48 @@ class LocalCachedTransactionRedis(StrictRedis):
         }])
 
     def commit_savepoint(self):
-        # todo: apply invalidators to outer context
-        # todo: should cache get mashed together?
-        pass
+        # apply savepoints invalidation to the outer contexts and add savepoint cache and
+        #  invalidation to the outer context list
+        outer_contexts = find_second_latest_context_list(self._local.cacheops_transaction_contexts)
+        inner_contexts = outer_contexts.pop()
+        last_outer_cache = outer_contexts[-1]['cache']
+        last_outer_invalidation = outer_contexts[-1]['invalidation']
+        for inner_context in inner_contexts:
+            for item in inner_context['invalidation']:
+                for outer_context in outer_contexts:
+                    outer_cache = outer_context['cache']
+                    if item['type'] == 'dict':
+                        self._local_cache_invalidate_dict(
+                            outer_cache, **{x: y for x, y in six.iteritems(item) if x != 'type'}
+                        )
+                    elif item['type'] == 'model':
+                        self._local_cache_invalidate_model(
+                            outer_cache, **{x: y for x, y in six.iteritems(item) if x != 'type'}
+                        )
+                    elif item['type'] == 'all':
+                        self._local_cache_invalidate_all(outer_cache)
+            last_outer_cache.update(inner_context['cache'])
+            last_outer_invalidation.extend(inner_context['invalidation'])
+            # todo: optimize redundant invalidation
+
 
     def rollback_savepoint(self):
         drop_latest_context(self._local.cacheops_transaction_contexts)
+
+    def _local_cache_invalidate_dict(self, cache, db_table, obj_dict):
+        obj_dict_keyset = set(obj_dict.keys())
+        for key, value in list(cache.items()):
+            for table, cond_dict in six.moves.zip(value['db_tables'], value['cond_dicts']):
+                if table == db_table:
+                    match = False
+                    # check equality of any shared keys in obj_dict and cond_dict
+                    for obj_key in obj_dict_keyset & set(cond_dict.keys()):
+                        if obj_dict[obj_key] != cond_dict[obj_key]:
+                            break
+                    else:
+                        match = True
+                    if match or not cond_dict:
+                        cache.pop(key)
 
     @handle_connection_failure
     def invalidate_dict(self, db_table, obj_dict):
@@ -226,20 +300,13 @@ class LocalCachedTransactionRedis(StrictRedis):
             })
             # todo: optimize previous context invalidators here?
             # is this thing in our local cache?
-            obj_dict_keyset = set(obj_dict.keys())
-            cache = context['cache']
-            for key, value in list(cache.items()):
-                for table, cond_dict in six.izip(value['db_tables'], value['cond_dicts']):
-                    if table == db_table:
-                        match = False
-                        # check equality of any shared keys in obj_dict and cond_dict
-                        for obj_key in obj_dict_keyset & set(cond_dict.keys()):
-                            if obj_dict[obj_key] != cond_dict[obj_key]:
-                                break
-                        else:
-                            match = True
-                        if match or not cond_dict:
-                            cache.pop(key)
+            self._local_cache_invalidate_dict(context['cache'], db_table, obj_dict)
+
+    def _local_cache_invalidate_model(self, cache, db_table):
+        for key, value in list(cache.items()):
+            if db_table in value.get('db_tables', []):
+                cache.pop(key)
+
 
     @handle_connection_failure
     def invalidate_model(self, db_table):
@@ -259,10 +326,10 @@ class LocalCachedTransactionRedis(StrictRedis):
             })
             # todo: optimize previous context invalidators here?
             # remove the same keys from our local context
-            cache = context['cache']
-            for key, value in list(cache.items()):
-                if db_table in value.get('db_tables', []):
-                    cache.pop(key)
+            self._local_cache_invalidate_model(context['cache'], db_table)
+
+    def _local_cache_invalidate_all(self, cache):
+        cache.clear()
 
     @handle_connection_failure
     def invalidate_all(self):
@@ -276,7 +343,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             context['invalidation'] = [{
                 'type': 'all'
             }]  # no previous invalidators matter.
-            context['cache'].clear()
+            self._local_cache_invalidate_all(context['cache'])
 
 
 class SafeRedis(LocalCachedTransactionRedis):
