@@ -20,8 +20,10 @@ class AtomicMixIn(object):
         if not connection.in_atomic_block:
             if commit:
                 redis_client.commit_transaction()
-            redis_client.end_transaction()
+            else:
+                redis_client.rollback_transaction()
         else:
             if commit:
                 redis_client.commit_savepoint()
-            redis_client.end_savepoint()
+            else:
+                redis_client.rollback_savepoint()
