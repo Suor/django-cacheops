@@ -25,7 +25,7 @@ from .conf import model_profile, redis_client, handle_connection_failure, LRU, A
 from .utils import monkey_mix, stamp_fields, load_script, \
                    func_cache_key, cached_view_fab, family_has_profile
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict
+from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -370,7 +370,7 @@ class ManagerMixin(object):
         self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
-        if instance.pk is not None:
+        if instance.pk is not None and not no_invalidation.active:
             try:
                 _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
             except sender.DoesNotExist:
