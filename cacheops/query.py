@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import json
+import threading
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
@@ -22,7 +23,7 @@ except ImportError:
 
 from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
 from .utils import monkey_mix, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, get_thread_id, family_has_profile
+                   func_cache_key, cached_view_fab, family_has_profile
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict
 
@@ -342,7 +343,7 @@ def connect_first(signal, receiver, sender):
     signal.receivers += old_receivers
 
 # We need to stash old object before Model.save() to invalidate on its properties
-_old_objs = {}
+_old_objs = threading.local()
 
 class ManagerMixin(object):
     @once_per('cls')
@@ -371,13 +372,13 @@ class ManagerMixin(object):
     def _pre_save(self, sender, instance, **kwargs):
         if instance.pk is not None:
             try:
-                _old_objs[get_thread_id(), sender, instance.pk] = sender.objects.get(pk=instance.pk)
+                _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
     def _post_save(self, sender, instance, **kwargs):
         # Invoke invalidations for both old and new versions of saved object
-        old = _old_objs.pop((get_thread_id(), sender, instance.pk), None)
+        old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
-from collections import defaultdict
+import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import F
 # Since Django 1.8, `ExpressionNode` is `Expression`
@@ -10,13 +10,10 @@ except ImportError:
     from django.db.models.expressions import Expression
 
 from .conf import redis_client, handle_connection_failure
-from .utils import non_proxy, load_script, get_thread_id, NOT_SERIALIZED_FIELDS
+from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
-
-
-_no_invalidation_depth = defaultdict(int)
 
 
 @handle_connection_failure
@@ -58,16 +55,22 @@ def invalidate_all():
     redis_client.flushdb()
 
 
+class InvalidationState(threading.local):
+    def __init__(self):
+        self.depth = 0
+
 class _no_invalidation(ContextDecorator):
+    state = InvalidationState()
+
     def __enter__(self):
-        _no_invalidation_depth[get_thread_id()] += 1
+        self.state.depth += 1
 
     def __exit__(self, type, value, traceback):
-        _no_invalidation_depth[get_thread_id()] -= 1
+        self.state.depth -= 1
 
     @property
     def active(self):
-        return _no_invalidation_depth.get(get_thread_id())
+        return self.state.depth
 
 no_invalidation = _no_invalidation()
 

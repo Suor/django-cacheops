@@ -2,7 +2,6 @@
 import re
 import json
 import inspect
-import threading
 import six
 from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
@@ -181,9 +180,3 @@ def carefully_strip_whitespace(text):
     text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
     text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
     return text
-
-
-# This will help mimic thread globals via dicts
-
-def get_thread_id():
-    return threading.current_thread().ident
