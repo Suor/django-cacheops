@@ -81,6 +81,7 @@ def cached_as(*samples, **kwargs):
             except NotLocal:
                 if local_only:
                     raise
+            except CacheMiss:
                 result = func(*args, **kwargs)
                 redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
