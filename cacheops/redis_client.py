@@ -261,7 +261,6 @@ class LocalCachedTransactionRedis(StrictRedis):
             for cache_key, value in six.iteritems(context['cache']):
                 self.cache_thing(
                     cache_key,
-                    pre_pickled=True,
                     **{x: y for x, y in six.iteritems(value) if x in (
                         'data',
                         'cond_dnfs',
