@@ -953,12 +953,10 @@ class ThreadWithReturnValue(Thread):
         self._return = None
 
     def run(self):
-        try:
-            # python 3
+        if six.PY3:
             if self._target is not None:
                 self._return = self._target(*self._args, **self._kwargs)
-        except AttributeError:
-            # python 2
+        if six.PY2:
             if self._Thread__target is not None:
                 self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
 
@@ -1037,7 +1035,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         t.start()
         remote_cache_results = t.join()
         # remote cache results will be None if any exceptions happen in get_category_filter_pk_1
-        if isinstance(remote_cache_results, AssertionError):
+        if isinstance(remote_cache_results, Exception):
             raise remote_cache_results
         self.assertEqual(
             remote_cache_results,

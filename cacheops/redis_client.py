@@ -185,7 +185,10 @@ class LocalCachedTransactionRedis(StrictRedis):
                                         for obj_key in obj_dict_keys & set(cond_dict.keys()):
                                             if obj_dict[obj_key] != cond_dict[obj_key]:
                                                 raise InvalidatedData()
-                    return cache_item.get('data')
+                    cache_data = cache_item.get('data')
+                    if cache_data is not None:
+                        return pickle.loads(cache_data)
+                    return cache_data
                 except InvalidatedData:
                     pass
         if local_only:
@@ -196,7 +199,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         return pickle.loads(cache_data)
 
     @handle_connection_failure
-    def cache_thing(self, cache_key, data, cond_dnfs, timeout):
+    def cache_thing(self, cache_key, data, cond_dnfs, timeout, pre_pickled=None):
         """
         Writes data to cache and creates appropriate invalidators.
         """
@@ -208,7 +211,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             self.load_script('cache_thing', LRU)(
                 keys=[cache_key],
                 args=[
-                    pickle.dumps(data, -1),
+                    data if pre_pickled else pickle.dumps(data, -1),
                     json.dumps(cond_dnfs, default=str),
                     timeout
                 ]
@@ -216,7 +219,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         else:
             context = find_latest_context_list(contexts)[-1]
             context['cache'][cache_key] = {
-                'data': data,
+                'data': pickle.dumps(data, -1),
                 'cond_dnfs': cond_dnfs,
                 'timeout': timeout,
                 # these two help us out later for possible invalidation
@@ -268,7 +271,7 @@ class LocalCachedTransactionRedis(StrictRedis):
                 elif item['type'] == 'all':
                     self.invalidate_all()
             for cache_key, value in six.iteritems(context['cache']):
-                self.cache_thing(cache_key, **{x: y for x, y in six.iteritems(value) if x in (
+                self.cache_thing(cache_key, pre_pickled=True, **{x: y for x, y in six.iteritems(value) if x in (
                     'data',
                     'cond_dnfs',
                     'timeout'
