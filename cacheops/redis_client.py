@@ -11,7 +11,6 @@ import six
 from redis import ConnectionError, TimeoutError
 from redis.client import StrictRedis
 
-from .cross import pickle
 from .conf import LRU, DEGRADE_ON_FAILURE, REDIS_CONF
 import warnings
 
@@ -180,21 +179,15 @@ class LocalCachedTransactionRedis(StrictRedis):
                                         for obj_key in obj_dict_keys & set(cond_dict.keys()):
                                             if obj_dict[obj_key] != cond_dict[obj_key]:
                                                 raise InvalidatedData()
-                    cache_data = cache_item.get('data')
-                    if cache_data is not None:
-                        return pickle.loads(cache_data)
-                    return cache_data
+                    return cache_item.get('data')
                 except InvalidatedData:
                     pass
         if local_only:
             raise NotLocal(name)
-        cache_data = super(LocalCachedTransactionRedis, self).get(name)
-        if cache_data is None:
-            raise CacheMiss
-        return pickle.loads(cache_data)
+        return super(LocalCachedTransactionRedis, self).get(name)
 
     @handle_connection_failure
-    def cache_thing(self, cache_key, data, cond_dnfs, timeout, pre_pickled=None):
+    def cache_thing(self, cache_key, data, cond_dnfs, timeout):
         """
         Writes data to cache and creates appropriate invalidators.
         """
@@ -206,7 +199,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             self.load_script('cache_thing', LRU)(
                 keys=[cache_key],
                 args=[
-                    data if pre_pickled else pickle.dumps(data, -1),
+                    data,
                     json.dumps(cond_dnfs, default=str),
                     timeout
                 ]
@@ -214,7 +207,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         else:
             context = find_latest_context_list(contexts)[-1]
             context['cache'][cache_key] = {
-                'data': data if pre_pickled else pickle.dumps(data, -1),
+                'data': data,
                 'cond_dnfs': cond_dnfs,
                 'timeout': timeout,
                 # these two help us out later for possible invalidation

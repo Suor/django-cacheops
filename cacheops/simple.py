@@ -85,8 +85,10 @@ class RedisCache(BaseCache):
         self.conn = conn
 
     def get(self, cache_key):
-        # LocalCachedTransactionRedis handles pickle on get.
-        return self.conn.get(cache_key)
+        data = self.conn.get(cache_key)
+        if data is None:
+            raise CacheMiss
+        return pickle.loads(data)
 
     @handle_connection_failure
     def set(self, cache_key, data, timeout=None):

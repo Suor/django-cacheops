@@ -5,7 +5,7 @@ from cacheops import CacheMiss
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
-from .cross import md5
+from .cross import md5, pickle
 from .transaction import AtomicMixIn
 
 import django
@@ -76,14 +76,12 @@ def cached_as(*samples, **kwargs):
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
-            try:
-                result = redis_client.get(cache_key, local_only=local_only)
-            except NotLocal:
-                if local_only:
-                    raise
-            except CacheMiss:
-                result = func(*args, **kwargs)
-                redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
+            cache_data = redis_client.get(cache_key)
+            if cache_data is not None:
+                return pickle.loads(cache_data)
+
+            result = func(*args, **kwargs)
+            redis_client.cache_thing(cache_key, pickle.dumps(result, -1), cond_dnfs, timeout)
             return result
 
         return wrapper
@@ -152,7 +150,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        redis_client.cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
+        redis_client.cache_thing(cache_key, pickle.dumps(results, -1), cond_dnfs, self._cacheconf['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None, local_only=None):
         """
@@ -250,19 +248,15 @@ class QuerySetMixin(object):
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
         local_only = self._cacheprofile and self._cacheconf.get('local_only', None) or None
+        cache_key = None
 
         if cache_this:
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
-                try:
-                    results = redis_client.get(
-                        cache_key,
-                        local_only=local_only
-                    )
-                except CacheMiss:
-                    pass
-                else:
+                cache_data = redis_client.get(cache_key)
+                if cache_data is not None:
+                    results = pickle.loads(cache_data)
                     for obj in results:
                         yield obj
                     raise StopIteration
