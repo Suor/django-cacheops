@@ -1189,9 +1189,8 @@ class LocalCachedTransactionTests(TransactionTestCase):
             except IntentionalRollback:
                 pass
             self.assert_remote_cache_title('Django')
-            # failing here can point to broken transactional invalidation handling.
             self.assert_local_cache_title('before')
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('before')
         self.assert_local_cache_title('before')
 
     def test_before_nested_atomic_rollback_outer(self):
