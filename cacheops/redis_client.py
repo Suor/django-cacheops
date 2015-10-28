@@ -1,5 +1,6 @@
 import json
 from operator import itemgetter
+import itertools
 import os.path
 import re
 from threading import local
@@ -112,6 +113,10 @@ def flatten_contexts(contexts):
 cache_getter = itemgetter('cache')
 
 
+class InvalidatedData(Exception):
+    pass
+
+
 class LocalCachedTransactionRedis(StrictRedis):
     def __init__(self, *args, **kwargs):
         super(LocalCachedTransactionRedis, self).__init__(*args, **kwargs)
@@ -142,12 +147,43 @@ class LocalCachedTransactionRedis(StrictRedis):
             # not in transaction
             pass
         else:
-            # ChainMap looks left to right, our latest contexts are on the right.
-            cache_data = ChainMap(
-                *map(cache_getter, flatten_contexts(reversed(all_contexts)))
-            ).get(name, None)
-            if cache_data is not None and cache_data.get('data', _marker) is not _marker:
-                return cache_data['data']
+            cache_item = _marker
+            # check for data in cache newest to oldest, starting at newest
+            for context in flatten_contexts(reversed(all_contexts)):
+                cache_item = context['cache'].get(name, _marker)
+                if cache_item is not _marker:
+                    break
+            if cache_item is not _marker:
+                try:
+                    # check for invalidation in cache oldest to newest
+                    contexts = flatten_contexts(all_contexts)
+                    # starting at where we left of looking for data.
+                    for c in contexts:
+                        if context is c:
+                            break
+                    for context in itertools.chain([context], contexts):
+                        for db_table, cond_dict in six.moves.zip(
+                            cache_item['db_tables'],
+                            cache_item['cond_dicts']
+                        ):
+                            for invalidation in context['invalidation']:
+                                inv_type = invalidation['type']
+                                if inv_type == 'all':
+                                    raise InvalidatedData()
+                                inv_table = invalidation['db_table']
+                                obj_dict = invalidation['obj_dict']
+                                obj_dict_keys = set(obj_dict.keys())
+                                if db_table == inv_table:
+                                    if inv_type == 'model':
+                                        raise InvalidatedData()
+                                    elif inv_type == 'dict':
+                                        # check equality of shared keys in obj_dict and cond_dict
+                                        for obj_key in obj_dict_keys & set(cond_dict.keys()):
+                                            if obj_dict[obj_key] != cond_dict[obj_key]:
+                                                raise InvalidatedData()
+                    return cache_item.get('data')
+                except InvalidatedData:
+                    pass
         cache_data = super(LocalCachedTransactionRedis, self).get(name)
         if cache_data is None:
             raise CacheMiss
@@ -272,7 +308,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             for table, cond_dict in six.moves.zip(value['db_tables'], value['cond_dicts']):
                 if table == db_table:
                     match = False
-                    # check equality of any shared keys in obj_dict and cond_dict
+                    # check equality of shared keys in obj_dict and cond_dict
                     for obj_key in obj_dict_keyset & set(cond_dict.keys()):
                         if obj_dict[obj_key] != cond_dict[obj_key]:
                             break
