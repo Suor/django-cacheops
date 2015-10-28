@@ -179,7 +179,7 @@ class QuerySetMixin(object):
         if ops is None or ops == 'all':
             ops = ALL_OPS
         if isinstance(ops, str):
-            ops = [ops]
+            ops = {ops}
         self._cacheconf['ops'] = set(ops)
 
         if timeout is not None:

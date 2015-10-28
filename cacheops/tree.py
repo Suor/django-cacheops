@@ -133,14 +133,14 @@ def dnfs(qs):
     main_alias = model._meta.db_table
 
     dnf = _dnf(where)
-    aliases = set(alias for conj in dnf
-                        for alias, _, _, _ in conj
-                        if alias)
+    aliases = {alias for conj in dnf
+                     for alias, _, _, _ in conj
+                     if alias}
     aliases.add(main_alias)
     return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
 
 
 def attname_of(model, col, cache={}):
     if model not in cache:
-        cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
+        cache[model] = {f.db_column: f.attname for f in model._meta.fields}
     return cache[model].get(col, col)

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
-ALL_OPS = ('get', 'fetch', 'count', 'exists')
+ALL_OPS = {'get', 'fetch', 'count', 'exists'}
 LRU = getattr(settings, 'CACHEOPS_LRU', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
@@ -79,7 +79,7 @@ def prepare_profiles():
             mp['ops'] = ALL_OPS
         # People will do that anyway :)
         if isinstance(mp['ops'], six.string_types):
-            mp['ops'] = [mp['ops']]
+            mp['ops'] = {mp['ops']}
         mp['ops'] = set(mp['ops'])
 
         if 'timeout' not in mp:
