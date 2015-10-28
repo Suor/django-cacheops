@@ -233,10 +233,14 @@ class LocalCachedTransactionRedis(StrictRedis):
         del self._local.cacheops_transaction_contexts
 
         # apply all invalidation to caches previous to them ...
-        for i, context in enumerate(contexts):
+        for context in flatten_contexts(reversed(contexts)):
             for item in context['invalidation']:
-                for previous_context in contexts[i:]:
-                    previous_cache = previous_context['cache']
+                invalidation_contexts = flatten_contexts(contexts)
+                for c in invalidation_contexts:
+                    if context is c:
+                        break
+                for invalidation_context in invalidation_contexts:
+                    previous_cache = invalidation_context['cache']
                     if item['type'] == 'dict':
                         self._local_cache_invalidate_dict(
                             previous_cache, **{x: y for x, y in six.iteritems(item) if x != 'type'}
