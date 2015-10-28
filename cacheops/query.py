@@ -251,7 +251,6 @@ class QuerySetMixin(object):
         cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
         local_only = self._cacheprofile and self._cacheconf.get('local_only', None) or None
 
-
         if cache_this:
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
@@ -271,7 +270,7 @@ class QuerySetMixin(object):
         if local_only:
             if not cache_key:
                 cache_key = self._cache_key()
-            raise NotLocal('%r: %r' %(self, cache_key))
+            raise NotLocal('%r: %r' % (self, cache_key))
 
         # Cache miss - fallback to overriden implementation
         results = []

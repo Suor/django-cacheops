@@ -8,11 +8,6 @@ from threading import local
 from funcy import decorator, identity, memoize
 import six
 
-try:
-    from collections import ChainMap
-except ImportError:
-    from chainmap import ChainMap
-
 from redis import ConnectionError, TimeoutError
 from redis.client import StrictRedis
 
@@ -271,11 +266,15 @@ class LocalCachedTransactionRedis(StrictRedis):
                 elif item['type'] == 'all':
                     self.invalidate_all()
             for cache_key, value in six.iteritems(context['cache']):
-                self.cache_thing(cache_key, pre_pickled=True, **{x: y for x, y in six.iteritems(value) if x in (
-                    'data',
-                    'cond_dnfs',
-                    'timeout'
-                )})
+                self.cache_thing(
+                    cache_key,
+                    pre_pickled=True,
+                    **{x: y for x, y in six.iteritems(value) if x in (
+                        'data',
+                        'cond_dnfs',
+                        'timeout'
+                    )}
+                )
 
     def rollback_transaction(self):
         del self._local.cacheops_transaction_contexts
@@ -310,7 +309,6 @@ class LocalCachedTransactionRedis(StrictRedis):
             last_outer_cache.update(inner_context['cache'])
             last_outer_invalidation.extend(inner_context['invalidation'])
             # todo: optimize redundant invalidation
-
 
     def rollback_savepoint(self):
         drop_latest_context(self._local.cacheops_transaction_contexts)
@@ -355,7 +353,6 @@ class LocalCachedTransactionRedis(StrictRedis):
         for key, value in list(cache.items()):
             if db_table in value.get('db_tables', []):
                 cache.pop(key)
-
 
     @handle_connection_failure
     def invalidate_model(self, db_table):

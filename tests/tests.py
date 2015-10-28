@@ -6,7 +6,7 @@ import unittest
 from threading import Thread
 
 from django.db import connection, connections, DEFAULT_DB_ALIAS
-from django.test import TestCase, TransactionTestCase
+from django.test import TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
@@ -1025,7 +1025,7 @@ class LocalCachedTransactionTests(BaseTestCase):
 
     def assert_not_local_cache(self):
         with self.assertRaises(NotLocal):
-            local_cache_results = list(Category.objects.filter(pk=1).cache(local_only=True))
+            list(Category.objects.filter(pk=1).cache(local_only=True))
 
     def assert_remote_cache_title(self, title, queries=0):
         t = ThreadWithReturnValue(target=get_category_filter_pk_1_title, args=(queries, ))
