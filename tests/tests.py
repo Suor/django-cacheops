@@ -1015,7 +1015,8 @@ class LocalCachedTransactionTests(BaseTestCase):
 
     def assert_local_cache_title(self, title):
         try:
-            local_cache_results = list(Category.objects.filter(pk=1).cache(local_only=True))
+            with self.assertNumQueries(0):
+                local_cache_results = list(Category.objects.filter(pk=1).cache(local_only=True))
         except NotLocal:
             self.fail('Not found in local cache.')
         self.assertEqual(
@@ -1025,7 +1026,8 @@ class LocalCachedTransactionTests(BaseTestCase):
 
     def assert_not_local_cache(self):
         with self.assertRaises(NotLocal):
-            list(Category.objects.filter(pk=1).cache(local_only=True))
+            with self.assertNumQueries(0):
+                list(Category.objects.filter(pk=1).cache(local_only=True))
 
     def assert_remote_cache_title(self, title, queries=0):
         t = ThreadWithReturnValue(target=get_category_filter_pk_1_title, args=(queries, ))
