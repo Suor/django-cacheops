@@ -139,7 +139,7 @@ class LocalCachedTransactionRedis(StrictRedis):
             code = STRIP_RE.sub('', code)
         return self.register_script(code)
 
-    def get(self, name):
+    def get(self, name, local_only=None):
         # try transaction local cache first
         try:
             all_contexts = self._local.cacheops_transaction_contexts
@@ -184,6 +184,8 @@ class LocalCachedTransactionRedis(StrictRedis):
                     return cache_item.get('data')
                 except InvalidatedData:
                     pass
+        if local_only:
+            raise CacheMiss
         cache_data = super(LocalCachedTransactionRedis, self).get(name)
         if cache_data is None:
             raise CacheMiss

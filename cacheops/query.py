@@ -44,6 +44,7 @@ def cached_as(*samples, **kwargs):
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
     key_func = kwargs.get('key_func', func_cache_key)
+    local_only = kwargs.get('local_only', None)
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -76,8 +77,10 @@ def cached_as(*samples, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             try:
-                result = redis_client.get(cache_key)
+                result = redis_client.get(cache_key, local_only=local_only)
             except CacheMiss:
+                if local_only:
+                    raise
                 result = func(*args, **kwargs)
                 redis_client.cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
@@ -150,7 +153,7 @@ class QuerySetMixin(object):
         cond_dnfs = dnfs(self)
         redis_client.cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
 
-    def cache(self, ops=None, timeout=None, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None, local_only=None):
         """
         Enables caching for given ops
             ops        - a subset of {'get', 'fetch', 'count', 'exists'},
@@ -173,6 +176,8 @@ class QuerySetMixin(object):
             self._cacheconf['timeout'] = timeout
         if write_only is not None:
             self._cacheconf['write_only'] = write_only
+        if local_only is not None:
+            self._cacheconf['write_only'] = local_only
 
         return self
 
@@ -243,19 +248,29 @@ class QuerySetMixin(object):
         # TODO: do not cache empty queries?
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
+        local_only = self._cacheprofile and self._cacheconf.get('local_only', None) or None
+
 
         if cache_this:
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
                 try:
-                    results = redis_client.get(cache_key)
+                    results = redis_client.get(
+                        cache_key,
+                        local_only=local_only
+                    )
                 except CacheMiss:
                     pass
                 else:
                     for obj in results:
                         yield obj
                     raise StopIteration
+
+        if local_only:
+            if not cache_key:
+                cache_key = self._cache_key()
+            raise CacheMiss('%r: %r' %(self, cache_key))
 
         # Cache miss - fallback to overriden implementation
         results = []
