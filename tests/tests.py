@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+from django.test.utils import CaptureQueriesContext
 import re, copy
 import unittest
 from threading import Thread
 
-from django.db import connection, connections
+from django.db import connection, connections, DEFAULT_DB_ALIAS
 from django.test import TestCase, TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
@@ -965,9 +966,36 @@ class ThreadWithReturnValue(Thread):
         return self._return
 
 
-def get_category_filter_pk_1_title():
+class _AssertNumQueriesForNonTestCaseContext(CaptureQueriesContext):
+    def __init__(self, num, using=None):
+        self.num = num
+        if not using:
+            using = DEFAULT_DB_ALIAS
+        conn = connections[using]
+        super(_AssertNumQueriesForNonTestCaseContext, self).__init__(conn)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        super(_AssertNumQueriesForNonTestCaseContext, self).__exit__(exc_type, exc_value, traceback)
+        if exc_type is not None:
+            return
+        executed = len(self)
+        if executed != self.num:
+            raise AssertionError(
+                "%d queries executed, %d expected\nCaptured queries were:\n%s" % (
+                    executed, self.num,
+                    '\n'.join(
+                        query['sql'] for query in self.captured_queries
+                    )
+                )
+            )
+
+
+def get_category_filter_pk_1_title(queries):
     try:
-        return list(Category.objects.filter(pk=1).cache())[0].title
+        with _AssertNumQueriesForNonTestCaseContext(queries):
+            return list(Category.objects.filter(pk=1).cache())[0].title
+    except AssertionError as e:
+        return e
     finally:
         # django does not drop postgres connections opened due to new threads.
         # results in Postgres complaining about connected users when django tries to delete test db
@@ -990,31 +1018,33 @@ class LocalCachedTransactionTests(TransactionTestCase):
         new_object[0].save()
 
     def assert_local_cache_title(self, title):
-        local_cache_results = list(Category.objects.filter(pk=1).cache())
+        local_cache_results = list(Category.objects.filter(pk=1).cache(local_only=True))
         self.assertEqual(
             local_cache_results[0].title,
             title
         )
 
-    def assert_remote_cache_title(self, title):
-        t = ThreadWithReturnValue(target=get_category_filter_pk_1_title)
+    def assert_remote_cache_title(self, title, queries=0):
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1_title, args=(queries, ))
         t.start()
         remote_cache_results = t.join()
         # remote cache results will be None if any exceptions happen in get_category_filter_pk_1
+        if isinstance(remote_cache_results, AssertionError):
+            raise remote_cache_results
         self.assertEqual(
             remote_cache_results,
             title
         )
 
     def test_outside_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         self.set_title('outside')
         self.assert_remote_cache_title('outside')
         self.assert_local_cache_title('outside')
 
     def test_inside_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             self.set_title('inside')
@@ -1024,7 +1054,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_inside_atomic_rollback(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         try:
             with atomic():
@@ -1038,7 +1068,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('Django')
 
     def test_after_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             self.set_title('inside')
@@ -1051,7 +1081,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('outside')
 
     def test_after_atomic_rollback(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         try:
             with atomic():
@@ -1068,7 +1098,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('outside')
 
     def test_before_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         self.set_title('outside')
         self.assert_remote_cache_title('outside')
@@ -1081,7 +1111,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_inside_nested_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             with atomic():
@@ -1094,7 +1124,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_inside_nested_atomic_rollback_inner(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             try:
@@ -1111,7 +1141,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('Django')
 
     def test_inside_nested_atomic_rollback_outer(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         try:
             with atomic():
@@ -1128,7 +1158,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('Django')
 
     def test_before_nested_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             self.set_title('before')
@@ -1144,7 +1174,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_before_nested_atomic_rollback_inner(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             self.set_title('before')
@@ -1165,7 +1195,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('before')
 
     def test_before_nested_atomic_rollback_outer(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         try:
             with atomic():
@@ -1185,7 +1215,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('Django')
 
     def test_after_nested_atomic(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             with atomic():
@@ -1199,7 +1229,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_after_nested_atomic_rollback_inner(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         with atomic():
             try:
@@ -1219,7 +1249,7 @@ class LocalCachedTransactionTests(TransactionTestCase):
         self.assert_local_cache_title('inside')
 
     def test_after_nested_atomic_rollback_outer(self):
-        self.assert_remote_cache_title('Django')
+        self.assert_remote_cache_title('Django', queries=1)
         self.assert_local_cache_title('Django')
         try:
             with atomic():
