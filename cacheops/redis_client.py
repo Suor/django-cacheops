@@ -219,7 +219,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         else:
             context = find_latest_context_list(contexts)[-1]
             context['cache'][cache_key] = {
-                'data': pickle.dumps(data, -1),
+                'data': data if pre_pickled else pickle.dumps(data, -1),
                 'cond_dnfs': cond_dnfs,
                 'timeout': timeout,
                 # these two help us out later for possible invalidation
