@@ -115,6 +115,7 @@ class LocalCachedTransactionRedis(StrictRedis):
     def __init__(self, *args, **kwargs):
         super(LocalCachedTransactionRedis, self).__init__(*args, **kwargs)
         self._local = local()
+        self._local.in_transaction = False
 
     def __repr__(self):
         return '<LocalCachedTransactionReids : %r : %r>' % (
@@ -135,12 +136,8 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     def get(self, name, local_only=None):
         # try transaction local cache first
-        try:
+        if getattr(self._local, 'in_transaction', False):
             all_contexts = self._local.cacheops_transaction_contexts
-        except AttributeError:
-            # not in transaction
-            pass
-        else:
             cache_item = _marker
             # check for data in cache newest to oldest, starting at newest
             for context in flatten_contexts(reversed(all_contexts)):
@@ -187,20 +184,8 @@ class LocalCachedTransactionRedis(StrictRedis):
         """
         Writes data to cache and creates appropriate invalidators.
         """
-        try:
-            # are we in a transaction?
+        if getattr(self._local, 'in_transaction', False):
             contexts = self._local.cacheops_transaction_contexts
-        except AttributeError:
-            # we are not in a transaction.
-            self.load_script('cache_thing', LRU)(
-                keys=[cache_key],
-                args=[
-                    data,
-                    json.dumps(cond_dnfs, default=str),
-                    timeout
-                ]
-            )
-        else:
             context = find_latest_context_list(contexts)[-1]
             context['cache'][cache_key] = {
                 'data': data,
@@ -210,8 +195,18 @@ class LocalCachedTransactionRedis(StrictRedis):
                 'db_tables': [x for x, y in cond_dnfs],
                 'cond_dicts': [dict(i) for x, y in cond_dnfs for i in y]
             }
+        else:
+            self.load_script('cache_thing', LRU)(
+                keys=[cache_key],
+                args=[
+                    data,
+                    json.dumps(cond_dnfs, default=str),
+                    timeout
+                ]
+            )
 
     def start_transaction(self):
+        self._local.in_transaction = True
         self._local.cacheops_transaction_contexts = [{
             'cache': {},
             'invalidation': []
@@ -220,8 +215,8 @@ class LocalCachedTransactionRedis(StrictRedis):
     @handle_connection_failure
     def commit_transaction(self):
         contexts = self._local.cacheops_transaction_contexts
-        # del now so attribute errors in invalidate_* and cache_thing methods skip local
-        del self._local.cacheops_transaction_contexts
+        # get invalidate_* and cache_thing methods to skip local now that we want to commit
+        self._local.in_transaction = False
 
         # apply all invalidation to caches previous to them ...
         for context in flatten_contexts(reversed(contexts)):
@@ -264,6 +259,8 @@ class LocalCachedTransactionRedis(StrictRedis):
                     )}
                 )
 
+        del self._local.cacheops_transaction_contexts
+
     def rollback_transaction(self):
         del self._local.cacheops_transaction_contexts
 
@@ -301,7 +298,8 @@ class LocalCachedTransactionRedis(StrictRedis):
     def rollback_savepoint(self):
         drop_latest_context(self._local.cacheops_transaction_contexts)
 
-    def _local_cache_invalidate_dict(self, cache, db_table, obj_dict):
+    @staticmethod
+    def _local_cache_invalidate_dict(cache, db_table, obj_dict):
         obj_dict_keyset = set(obj_dict.keys())
         for key, value in list(cache.items()):
             for table, cond_dict in six.moves.zip(value['db_tables'], value['cond_dicts']):
@@ -318,16 +316,8 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     @handle_connection_failure
     def invalidate_dict(self, db_table, obj_dict):
-        try:
-            all_contexts = self._local.cacheops_transaction_contexts
-        except AttributeError:
-            # not in a transaction
-            self.load_script('invalidate')(args=[
-                db_table,
-                json.dumps(obj_dict, default=str)
-            ])
-        else:
-            context = find_latest_context_list(all_contexts)[-1]
+        if getattr(self._local, 'in_transaction', False):
+            context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'].append({
                 'type': 'dict',
                 'db_table': db_table,
@@ -336,24 +326,23 @@ class LocalCachedTransactionRedis(StrictRedis):
             # todo: optimize previous context invalidators here?
             # is this thing in our local cache?
             self._local_cache_invalidate_dict(context['cache'], db_table, obj_dict)
+        else:
+            # not in a transaction
+            self.load_script('invalidate')(args=[
+                db_table,
+                json.dumps(obj_dict, default=str)
+            ])
 
-    def _local_cache_invalidate_model(self, cache, db_table):
+    @staticmethod
+    def _local_cache_invalidate_model(cache, db_table):
         for key, value in list(cache.items()):
             if db_table in value.get('db_tables', []):
                 cache.pop(key)
 
     @handle_connection_failure
     def invalidate_model(self, db_table):
-        try:
-            all_contexts = self._local.cacheops_transaction_contexts
-        except AttributeError:
-            # we are not in a transaction
-            conjs_keys = redis_client.keys('conj:%s:*' % db_table)
-            if conjs_keys:
-                cache_keys = redis_client.sunion(conjs_keys)
-                redis_client.delete(*(list(cache_keys) + conjs_keys))
-        else:
-            context = find_latest_context_list(all_contexts)[-1]
+        if getattr(self._local, 'in_transaction', False):
+            context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'].append({
                 'type': 'model',
                 'db_table': db_table
@@ -361,23 +350,28 @@ class LocalCachedTransactionRedis(StrictRedis):
             # todo: optimize previous context invalidators here?
             # remove the same keys from our local context
             self._local_cache_invalidate_model(context['cache'], db_table)
+        else:
+            # we are not in a transaction
+            conjs_keys = redis_client.keys('conj:%s:*' % db_table)
+            if conjs_keys:
+                cache_keys = redis_client.sunion(conjs_keys)
+                redis_client.delete(*(list(cache_keys) + conjs_keys))
 
-    def _local_cache_invalidate_all(self, cache):
+    @staticmethod
+    def _local_cache_invalidate_all(cache):
         cache.clear()
 
     @handle_connection_failure
     def invalidate_all(self):
-        try:
-            all_contexts = self._local.cacheops_transaction_contexts
-        except AttributeError:
-            # we are not in a transaction
-            self.flushdb()
-        else:
-            context = find_latest_context_list(all_contexts)[-1]
+        if getattr(self._local, 'in_transaction', False):
+            context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'] = [{
                 'type': 'all'
-            }]  # no previous invalidators matter.
+            }]  # no previous invalidators matter in this context.
             self._local_cache_invalidate_all(context['cache'])
+        else:
+            # we are not in a transaction
+            self.flushdb()
 
 
 class SafeRedis(LocalCachedTransactionRedis):
