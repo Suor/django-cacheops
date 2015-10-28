@@ -65,7 +65,7 @@ def cached_as(*samples, **kwargs):
 
     def _get_queryset(sample):
         if isinstance(sample, Model):
-            queryset = sample.__class__.objects.inplace().filter(pk=sample.pk)
+            queryset = sample.__class__.objects.filter(pk=sample.pk)
         elif isinstance(sample, type) and issubclass(sample, Model):
             queryset = sample.objects.all()
         else:
