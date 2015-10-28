@@ -115,12 +115,12 @@ class LocalCachedTransactionRedis(StrictRedis):
     def __init__(self, *args, **kwargs):
         super(LocalCachedTransactionRedis, self).__init__(*args, **kwargs)
         self._local = local()
-        self._local.in_transaction = False
+        self._local.cacheops_in_transaction = False
 
     def __repr__(self):
         return '<LocalCachedTransactionReids : %r : %r>' % (
-            getattr(self._local, 'cacheops_transaction_cache', None),
-            getattr(self._local, 'cacheops_invalidation_queue', None)
+            getattr(self._local, 'cacheops_in_transaction', None),
+            getattr(self._local, 'cacheops_transaction_contexts', None)
         )
 
     @memoize
@@ -136,18 +136,17 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     def get(self, name, local_only=None):
         # try transaction local cache first
-        if getattr(self._local, 'in_transaction', False):
-            all_contexts = self._local.cacheops_transaction_contexts
+        if getattr(self._local, 'cacheops_in_transaction', False):
             cache_item = _marker
             # check for data in cache newest to oldest, starting at newest
-            for context in flatten_contexts(reversed(all_contexts)):
+            for context in flatten_contexts(reversed(self._local.cacheops_transaction_contexts)):
                 cache_item = context['cache'].get(name, _marker)
                 if cache_item is not _marker:
                     break
             if cache_item is not _marker:
                 try:
                     # check for invalidation in cache oldest to newest
-                    contexts = flatten_contexts(all_contexts)
+                    contexts = flatten_contexts(self._local.cacheops_transaction_contexts)
                     # starting at where we left of looking for data.
                     for c in contexts:
                         if context is c:
@@ -184,7 +183,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         """
         Writes data to cache and creates appropriate invalidators.
         """
-        if getattr(self._local, 'in_transaction', False):
+        if getattr(self._local, 'cacheops_in_transaction', False):
             contexts = self._local.cacheops_transaction_contexts
             context = find_latest_context_list(contexts)[-1]
             context['cache'][cache_key] = {
@@ -206,17 +205,17 @@ class LocalCachedTransactionRedis(StrictRedis):
             )
 
     def start_transaction(self):
-        self._local.in_transaction = True
         self._local.cacheops_transaction_contexts = [{
             'cache': {},
             'invalidation': []
         }]
+        self._local.cacheops_in_transaction = True
 
     @handle_connection_failure
     def commit_transaction(self):
         contexts = self._local.cacheops_transaction_contexts
         # get invalidate_* and cache_thing methods to skip local now that we want to commit
-        self._local.in_transaction = False
+        self._local.cacheops_in_transaction = False
 
         # apply all invalidation to caches previous to them ...
         for context in flatten_contexts(reversed(contexts)):
@@ -262,6 +261,7 @@ class LocalCachedTransactionRedis(StrictRedis):
         del self._local.cacheops_transaction_contexts
 
     def rollback_transaction(self):
+        self._local.cacheops_in_transaction = False
         del self._local.cacheops_transaction_contexts
 
     def start_savepoint(self):
@@ -316,7 +316,7 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     @handle_connection_failure
     def invalidate_dict(self, db_table, obj_dict):
-        if getattr(self._local, 'in_transaction', False):
+        if getattr(self._local, 'cacheops_in_transaction', False):
             context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'].append({
                 'type': 'dict',
@@ -341,7 +341,7 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     @handle_connection_failure
     def invalidate_model(self, db_table):
-        if getattr(self._local, 'in_transaction', False):
+        if getattr(self._local, 'cacheops_in_transaction', False):
             context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'].append({
                 'type': 'model',
@@ -363,7 +363,7 @@ class LocalCachedTransactionRedis(StrictRedis):
 
     @handle_connection_failure
     def invalidate_all(self):
-        if getattr(self._local, 'in_transaction', False):
+        if getattr(self._local, 'cacheops_in_transaction', False):
             context = find_latest_context_list(self._local.cacheops_transaction_contexts)[-1]
             context['invalidation'] = [{
                 'type': 'all'
