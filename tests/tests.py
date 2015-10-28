@@ -20,7 +20,8 @@ from cacheops.templatetags.cacheops import register
 decorator_tag = register.decorator_tag
 from .models import *
 
-class BaseTestCase(TestCase):
+
+class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
@@ -1003,12 +1004,8 @@ def get_category_filter_pk_1_title(queries):
         connection.close()
 
 
-class LocalCachedTransactionTests(TransactionTestCase):
+class LocalCachedTransactionTests(BaseTestCase):
     fixtures = ['basic']
-
-    def setUp(self):
-        super(TransactionTestCase, self).setUp()
-        invalidate_all()
 
     def set_title(self, title):
         new_object = list(Category.objects.filter(pk=1).cache())
