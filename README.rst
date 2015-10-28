@@ -122,11 +122,11 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 Usage
 -----
 
-| **Automatic caching.**
+| **Automatic caching**
 
 It's automatic you just need to set it up.
 
-| **Manual caching.**
+| **Manual caching**
 
 You can force any queryset to use cache by calling it's ``.cache()`` method:
 
@@ -162,7 +162,7 @@ You can also override default timeout for particular queryset with ``.cache(time
 or make queryset only write cache, but don't try to fetch it with ``.cache(write_only=True)``.
 
 
-| **Function caching.**
+| **Function caching**
 
 You can cache and invalidate result of a function the same way as a queryset.
 Cache of the next function will be invalidated on any ``Article`` change, addition
@@ -218,7 +218,7 @@ Another possibility is to make function cache invalidate on changes to any one o
 
 As you can see, we can mix querysets and models here.
 
-| **View caching.**
+| **View caching**
 
 You can also cache and invalidate a view as a queryset. This works mostly the same way as function
 caching, but only path of the request parameter is used to construct cache key:
