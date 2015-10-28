@@ -32,10 +32,6 @@ else:
     handle_connection_failure = identity
 
 
-class CacheMiss(Exception):
-    pass
-
-
 class NotLocal(Exception):
     pass
 
