@@ -29,7 +29,7 @@ setup(
         'django>=1.7',
         'redis>=2.9.1',
         'funcy>=1.2,<2.0',
-        'six>=1.4.0',
+        'six>=1.4.0'
     ],
 
     classifiers=[

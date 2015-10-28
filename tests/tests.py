@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
-import os, re, copy
+from cacheops.redis_client import NotLocal
+from django.test.utils import CaptureQueriesContext
+import re, copy
 import unittest
+from threading import Thread
 
-from django.db import connection, connections
-from django.test import TestCase
+from django.db import connection, connections, DEFAULT_DB_ALIAS
+from django.test import TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
+from django.db.transaction import atomic
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
@@ -17,7 +21,7 @@ decorator_tag = register.decorator_tag
 from .models import *
 
 
-class BaseTestCase(TestCase):
+class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
@@ -938,3 +942,336 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class IntentionalRollback(RuntimeError):
+    pass
+
+
+class ThreadWithReturnValue(Thread):
+    def __init__(self, *args, **kwargs):
+        super(ThreadWithReturnValue, self).__init__(*args, **kwargs)
+        self._return = None
+
+    def run(self):
+        if six.PY3:
+            if self._target is not None:
+                self._return = self._target(*self._args, **self._kwargs)
+        if six.PY2:
+            if self._Thread__target is not None:
+                self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
+
+    def join(self, *args, **kwargs):
+        super(ThreadWithReturnValue, self).join(*args, **kwargs)
+        return self._return
+
+
+class _AssertNumQueriesForNonTestCaseContext(CaptureQueriesContext):
+    def __init__(self, num, using=None):
+        self.num = num
+        if not using:
+            using = DEFAULT_DB_ALIAS
+        conn = connections[using]
+        super(_AssertNumQueriesForNonTestCaseContext, self).__init__(conn)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        super(_AssertNumQueriesForNonTestCaseContext, self).__exit__(exc_type, exc_value, traceback)
+        if exc_type is not None:
+            return
+        executed = len(self)
+        if executed != self.num:
+            raise AssertionError(
+                "%d queries executed, %d expected\nCaptured queries were:\n%s" % (
+                    executed, self.num,
+                    '\n'.join(
+                        query['sql'] for query in self.captured_queries
+                    )
+                )
+            )
+
+
+def get_category_filter_pk_1_title(queries):
+    try:
+        with _AssertNumQueriesForNonTestCaseContext(queries):
+            return list(Category.objects.filter(pk=1).cache())[0].title
+    except AssertionError as e:
+        return e
+    finally:
+        # django does not drop postgres connections opened due to new threads.
+        # results in Postgres complaining about connected users when django tries to delete test db
+        # https://code.djangoproject.com/ticket/22420#comment:18
+        from django.db import connection
+        connection.close()
+
+
+class LocalCachedTransactionTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def set_title(self, title):
+        new_object = list(Category.objects.filter(pk=1).cache())
+        new_object[0]._cacheprofile['cache_on_save'] = True
+        new_object[0].title = title
+        new_object[0].save()
+
+    def assert_local_cache_title(self, title):
+        try:
+            with self.assertNumQueries(0):
+                local_cache_results = list(Category.objects.filter(pk=1).cache(local_only=True))
+        except NotLocal:
+            self.fail('Not found in local cache.')
+        self.assertEqual(
+            local_cache_results[0].title,
+            title
+        )
+
+    def assert_not_local_cache(self):
+        with self.assertRaises(NotLocal):
+            with self.assertNumQueries(0):
+                list(Category.objects.filter(pk=1).cache(local_only=True))
+
+    def assert_remote_cache_title(self, title, queries=0):
+        t = ThreadWithReturnValue(target=get_category_filter_pk_1_title, args=(queries, ))
+        t.start()
+        remote_cache_results = t.join()
+        # remote cache results will be None if any exceptions happen in get_category_filter_pk_1
+        if isinstance(remote_cache_results, Exception):
+            raise remote_cache_results
+        self.assertEqual(
+            remote_cache_results,
+            title
+        )
+
+    def test_outside_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_not_local_cache()
+
+    def test_inside_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_inside_atomic_rollback(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        try:
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()
+
+    def test_after_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        # local cache should be empty since we are not in a transaction.
+        self.assert_not_local_cache()
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        # local cache should be empty since we are not in a transaction.
+        self.assert_not_local_cache()
+
+    def test_after_atomic_rollback(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        try:
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_not_local_cache()
+
+    def test_before_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        self.set_title('outside')
+        self.assert_remote_cache_title('outside')
+        self.assert_not_local_cache()
+        with atomic():
+            self.set_title('inside')
+            self.assert_remote_cache_title('outside')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_inside_nested_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_inside_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            try:
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                    raise IntentionalRollback()
+            except IntentionalRollback:
+                pass
+            self.assert_remote_cache_title('Django')
+            # local cache was rolled back.
+            self.assert_not_local_cache()
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()
+
+    def test_inside_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        try:
+            with atomic():
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()
+
+    def test_before_nested_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            self.set_title('before')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('before')
+            with atomic():
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_before_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            self.set_title('before')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('before')
+            try:
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                    raise IntentionalRollback()
+            except IntentionalRollback:
+                pass
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('before')
+        self.assert_remote_cache_title('before')
+        self.assert_not_local_cache()
+
+    def test_before_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        try:
+            with atomic():
+                self.set_title('before')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('before')
+                with atomic():
+                    self.set_title('inside')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()
+
+    def test_after_nested_atomic(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            with atomic():
+                self.set_title('inside_savepoint')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside_savepoint')
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_after_nested_atomic_rollback_inner(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        with atomic():
+            try:
+                with atomic():
+                    self.set_title('inside_savepoint')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside_savepoint')
+                    raise IntentionalRollback()
+            except IntentionalRollback:
+                pass
+            self.assert_remote_cache_title('Django')
+            # local cache was rolled back.
+            self.assert_not_local_cache()
+            self.set_title('inside')
+            self.assert_remote_cache_title('Django')
+            self.assert_local_cache_title('inside')
+        self.assert_remote_cache_title('inside')
+        self.assert_not_local_cache()
+
+    def test_after_nested_atomic_rollback_outer(self):
+        self.assert_remote_cache_title('Django', queries=1)
+        self.assert_not_local_cache()
+        try:
+            with atomic():
+                with atomic():
+                    self.set_title('inside_savepoint')
+                    self.assert_remote_cache_title('Django')
+                    self.assert_local_cache_title('inside_savepoint')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside_savepoint')
+                self.set_title('inside')
+                self.assert_remote_cache_title('Django')
+                self.assert_local_cache_title('inside')
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assert_remote_cache_title('Django')
+        self.assert_not_local_cache()

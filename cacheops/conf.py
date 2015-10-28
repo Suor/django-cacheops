@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-import warnings
 import six
-import redis
-from funcy import memoize, decorator, identity, merge
+from funcy import memoize, merge
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -12,47 +10,10 @@ ALL_OPS = {'get', 'fetch', 'count', 'exists'}
 LRU = getattr(settings, 'CACHEOPS_LRU', False)
 DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
-
-# Support DEGRADE_ON_FAILURE
-if DEGRADE_ON_FAILURE:
-    @decorator
-    def handle_connection_failure(call):
-        try:
-            return call()
-        except redis.ConnectionError as e:
-            warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
-        except redis.TimeoutError as e:
-            warnings.warn("The cacheops cache timed out! Error: %s" % e, RuntimeWarning)
-else:
-    handle_connection_failure = identity
-
-class SafeRedis(redis.StrictRedis):
-    get = handle_connection_failure(redis.StrictRedis.get)
-
-
-class LazyRedis(object):
-    def _setup(self):
-        # Connecting to redis
-        try:
-            redis_conf = settings.CACHEOPS_REDIS
-        except AttributeError:
-            raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
-
-        client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
-
-        object.__setattr__(self, '__class__', client.__class__)
-        object.__setattr__(self, '__dict__', client.__dict__)
-
-    def __getattr__(self, name):
-        self._setup()
-        return getattr(self, name)
-
-    def __setattr__(self, name, value):
-        self._setup()
-        return setattr(self, name, value)
-
-redis_client = LazyRedis()
-
+try:
+    REDIS_CONF = settings.CACHEOPS_REDIS
+except AttributeError:
+    raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
 @memoize
 def prepare_profiles():

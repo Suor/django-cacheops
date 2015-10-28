@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import F
@@ -9,22 +8,18 @@ try:
 except ImportError:
     from django.db.models.expressions import Expression
 
-from .conf import redis_client, handle_connection_failure
-from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
-
+from .redis_client import redis_client, handle_connection_failure
+from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
-@handle_connection_failure
 def invalidate_dict(model, obj_dict):
     if no_invalidation.active:
         return
     model = non_proxy(model)
-    load_script('invalidate')(args=[
-        model._meta.db_table,
-        json.dumps(obj_dict, default=str)
-    ])
+    db_table = model._meta.db_table
+    redis_client.invalidate_dict(db_table, obj_dict)
 
 def invalidate_obj(obj):
     """
@@ -43,16 +38,14 @@ def invalidate_model(model):
     if no_invalidation.active:
         return
     model = non_proxy(model)
-    conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
-    if conjs_keys:
-        cache_keys = redis_client.sunion(conjs_keys)
-        redis_client.delete(*(list(cache_keys) + conjs_keys))
+    db_table = model._meta.db_table
+    redis_client.invalidate_model(db_table)
 
 @handle_connection_failure
 def invalidate_all():
     if no_invalidation.active:
         return
-    redis_client.flushdb()
+    redis_client.invalidate_all()
 
 
 class InvalidationState(threading.local):

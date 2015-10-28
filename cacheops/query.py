@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys
-import json
 import threading
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
-from .cross import pickle, md5
+from .cross import md5, pickle
+from .transaction import AtomicMixIn
 
 import django
 from django.utils.encoding import smart_str
@@ -20,10 +20,12 @@ try:
     from django.db.models.query import MAX_GET_RESULTS
 except ImportError:
     MAX_GET_RESULTS = None
+from django.db.transaction import Atomic
 
-from .conf import model_profile, redis_client, handle_connection_failure, LRU, ALL_OPS
-from .utils import monkey_mix, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, family_has_profile
+
+from .conf import model_profile, ALL_OPS
+from .redis_client import redis_client, NotLocal
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 
@@ -31,21 +33,6 @@ from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
-
-
-@handle_connection_failure
-def cache_thing(cache_key, data, cond_dnfs, timeout):
-    """
-    Writes data to cache and creates appropriate invalidators.
-    """
-    load_script('cache_thing', LRU)(
-        keys=[cache_key],
-        args=[
-            pickle.dumps(data, -1),
-            json.dumps(cond_dnfs, default=str),
-            timeout
-        ]
-    )
 
 
 def cached_as(*samples, **kwargs):
@@ -56,6 +43,7 @@ def cached_as(*samples, **kwargs):
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
     key_func = kwargs.get('key_func', func_cache_key)
+    local_only = kwargs.get('local_only', None)
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -87,12 +75,12 @@ def cached_as(*samples, **kwargs):
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
-            cache_data = redis_client.get(cache_key)
+            cache_data = redis_client.get(cache_key, local_only=local_only)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
             result = func(*args, **kwargs)
-            cache_thing(cache_key, result, cond_dnfs, timeout)
+            redis_client.cache_thing(cache_key, pickle.dumps(result, -1), cond_dnfs, timeout)
             return result
 
         return wrapper
@@ -161,9 +149,14 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
+        redis_client.cache_thing(
+            cache_key,
+            pickle.dumps(results, -1),
+            cond_dnfs,
+            self._cacheconf['timeout']
+        )
 
-    def cache(self, ops=None, timeout=None, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None, local_only=None):
         """
         Enables caching for given ops
             ops        - a subset of {'get', 'fetch', 'count', 'exists'},
@@ -186,6 +179,8 @@ class QuerySetMixin(object):
             self._cacheconf['timeout'] = timeout
         if write_only is not None:
             self._cacheconf['write_only'] = write_only
+        if local_only is not None:
+            self._cacheconf['local_only'] = local_only
 
         return self
 
@@ -256,17 +251,24 @@ class QuerySetMixin(object):
         # TODO: do not cache empty queries?
         superiter = self._no_monkey.iterator
         cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
+        local_only = self._cacheprofile and self._cacheconf.get('local_only', None) or None
+        cache_key = None
 
         if cache_this:
             cache_key = self._cache_key()
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
+                cache_data = redis_client.get(cache_key, local_only=local_only)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:
                         yield obj
                     raise StopIteration
+
+        if local_only:
+            if not cache_key:
+                cache_key = self._cache_key()
+            raise NotLocal('%r: %r' % (self, cache_key))
 
         # Cache miss - fallback to overriden implementation
         results = []
@@ -483,6 +485,9 @@ def install_cacheops():
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
     QuerySet._cloning = QuerySetMixin._cloning
+
+    # django.db.transaction.Atomic exists in Django 1.6+
+    monkey_mix(Atomic, AtomicMixIn)
 
     # DateQuerySet existed in Django 1.7 and earlier
     # Values*QuerySet existed in Django 1.8 and earlier
