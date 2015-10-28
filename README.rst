@@ -175,8 +175,8 @@ or deletion:
     @cached_as(Article, timeout=120)
     def article_stats():
         return {
-            'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
-            'categories': list( Article.objects.values('category').annotate(count=Count('id')) )
+            'tags': list(Article.objects.values('tag').annotate(Count('id')))
+            'categories': list(Article.objects.values('category').annotate(Count('id')))
         }
 
 
@@ -189,19 +189,16 @@ e.g. to make invalidation more granular, you can use a local function:
 .. code:: python
 
     def articles_block(category, count=5):
+        qs = Article.objects.filter(category=category)
 
-        @cached_as(Article.objects.filter(category=category), extra=count)
+        @cached_as(qs, extra=count)
         def _articles_block():
-            qs = Article.objects.filter(category=category)
             articles = list(qs.filter(photo=True)[:count])
-
             if len(articles) < count:
-                articles += list(qs[:count-len(articles)])
-
+                articles += list(qs.filter(photo=False)[:count-len(articles)])
             return articles
 
         return _articles_block()
-
 
 We added ``extra`` here to make different keys for calls with same ``category`` but different
 ``count``. Cache key will also depend on function arguments, so we could just pass ``count`` as
