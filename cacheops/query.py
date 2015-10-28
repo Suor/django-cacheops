@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import threading
-from cacheops import CacheMiss
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps
 from funcy.py2 import mapcat, map
@@ -76,7 +75,7 @@ def cached_as(*samples, **kwargs):
         def wrapper(*args, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
-            cache_data = redis_client.get(cache_key)
+            cache_data = redis_client.get(cache_key, local_only=local_only)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -150,7 +149,12 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        redis_client.cache_thing(cache_key, pickle.dumps(results, -1), cond_dnfs, self._cacheconf['timeout'])
+        redis_client.cache_thing(
+            cache_key,
+            pickle.dumps(results, -1),
+            cond_dnfs,
+            self._cacheconf['timeout']
+        )
 
     def cache(self, ops=None, timeout=None, write_only=None, local_only=None):
         """
