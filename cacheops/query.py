@@ -25,7 +25,7 @@ from django.db.transaction import Atomic
 
 
 from .conf import model_profile, ALL_OPS
-from .redis_client import redis_client
+from .redis_client import redis_client, NotLocal
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -78,7 +78,7 @@ def cached_as(*samples, **kwargs):
 
             try:
                 result = redis_client.get(cache_key, local_only=local_only)
-            except CacheMiss:
+            except NotLocal:
                 if local_only:
                     raise
                 result = func(*args, **kwargs)
@@ -177,7 +177,7 @@ class QuerySetMixin(object):
         if write_only is not None:
             self._cacheconf['write_only'] = write_only
         if local_only is not None:
-            self._cacheconf['write_only'] = local_only
+            self._cacheconf['local_only'] = local_only
 
         return self
 
@@ -270,7 +270,7 @@ class QuerySetMixin(object):
         if local_only:
             if not cache_key:
                 cache_key = self._cache_key()
-            raise CacheMiss('%r: %r' %(self, cache_key))
+            raise NotLocal('%r: %r' %(self, cache_key))
 
         # Cache miss - fallback to overriden implementation
         results = []

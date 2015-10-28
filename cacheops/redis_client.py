@@ -42,6 +42,10 @@ class CacheMiss(Exception):
     pass
 
 
+class NotLocal(Exception):
+    pass
+
+
 def _find_latest_context(contexts):
     if not contexts:
         return contexts
@@ -185,7 +189,7 @@ class LocalCachedTransactionRedis(StrictRedis):
                 except InvalidatedData:
                     pass
         if local_only:
-            raise CacheMiss
+            raise NotLocal(name)
         cache_data = super(LocalCachedTransactionRedis, self).get(name)
         if cache_data is None:
             raise CacheMiss
