@@ -1005,9 +1005,9 @@ def return_from_other_thread(target, queries=0, **kwargs):
         except AssertionError as e:
             return e
         finally:
-            # django does not drop postgres connections opened due to new threads.
-            # results in Postgres complaining about connected users when django tries to delete test db
-            # https://code.djangoproject.com/ticket/22420#comment:18
+            # django does not drop postgres connections opened due to new threads. results in
+            #  Postgres complaining about connected users when django tries to delete test db
+            #  See https://code.djangoproject.com/ticket/22420#comment:18
             from django.db import connection
             connection.close()
     t = ThreadWithReturnValue(target=target, **kwargs)
@@ -1217,7 +1217,10 @@ class TransactionalInvalidationTests(BaseTestCase):
                 obj.save()
                 invalidate_obj(obj)
                 with self.assertNumQueries(1):
-                    self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
+                    self.assertEqual(
+                        'Changed',
+                        list(Category.objects.filter(pk=1).cache())[0].title
+                    )
                 self.assertEqual(
                     'Django',
                     return_from_other_thread(
@@ -1228,7 +1231,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                 self.assertEqual('invalidate_dict', queue_item['func'].__name__)
                 self.assertEqual(obj.__class__, queue_item['args'][0])
                 raise IntentionalRollback()
-        except IntentionalRollback as e:
+        except IntentionalRollback:
             pass
         self.assertFalse(in_transaction())
         with self.assertNumQueries(0):
@@ -1250,7 +1253,10 @@ class TransactionalInvalidationTests(BaseTestCase):
                 with atomic():
                     self.assertTrue(in_transaction())
                     with self.assertNumQueries(1):
-                        self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
+                        self.assertEqual(
+                            'Django',
+                            list(Category.objects.filter(pk=1).cache())[0].title
+                        )
                     self.assertEqual(
                         'Django',
                         return_from_other_thread(
@@ -1276,7 +1282,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                     self.assertEqual('invalidate_model', queue_item['func'].__name__)
                     self.assertEqual(obj.__class__, queue_item['args'][0])
                     raise IntentionalRollback()
-            except IntentionalRollback as e:
+            except IntentionalRollback:
                 pass
             with self.assertNumQueries(1):
                 self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
@@ -1337,7 +1343,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                         queue_item = list(_function_queue)[-1]
                         self.assertEqual('invalidate_all', queue_item['func'].__name__)
                         raise IntentionalRollback()
-                except IntentionalRollback as e:
+                except IntentionalRollback:
                     pass
                 with self.assertNumQueries(1):
                     self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
