@@ -132,18 +132,18 @@ class FunctionQueue(TransactionQueue):
             item['func'](*item['args'], **item['kwargs'])
         super(FunctionQueue, self).commit_transaction()
 
-function_queue = FunctionQueue()
+_function_queue = FunctionQueue()
 
 
 def in_transaction():
-    return function_queue.in_transaction()
+    return _function_queue.in_transaction()
 
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if function_queue.in_transaction():
-            function_queue.append({
+        if _function_queue.in_transaction():
+            _function_queue.append({
                 'func': func,
                 'args': args,
                 'kwargs': kwargs
@@ -157,9 +157,9 @@ class AtomicMixIn(object):
     def __enter__(self):
         connection = get_connection(self.using)
         if not connection.in_atomic_block:
-            function_queue.start_transaction()
+            _function_queue.start_transaction()
         else:
-            function_queue.start_savepoint()
+            _function_queue.start_savepoint()
         self._no_monkey.__enter__(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -170,14 +170,14 @@ class AtomicMixIn(object):
                       not connection.needs_rollback
         if not connection.in_atomic_block:
             if commit:
-                function_queue.commit_transaction()
+                _function_queue.commit_transaction()
             else:
-                function_queue.rollback_transaction()
+                _function_queue.rollback_transaction()
         else:
             if commit:
-                function_queue.commit_savepoint()
+                _function_queue.commit_savepoint()
             else:
-                function_queue.rollback_savepoint()
+                _function_queue.rollback_savepoint()
 
 
 @once
