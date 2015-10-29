@@ -8,13 +8,20 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 
+CACHEOPS_REDIS = getattr(settings, 'CACHEOPS_REDIS', None)
+CACHEOPS_DEFAULTS = getattr(settings, 'CACHEOPS_DEFAULTS', {})
+CACHEOPS = getattr(settings, 'CACHEOPS', {})
+CACHEOPS_LRU = getattr(settings, 'CACHEOPS_LRU', False)
+CACHEOPS_DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
+
+FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
+FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
+
 ALL_OPS = {'get', 'fetch', 'count', 'exists'}
-LRU = getattr(settings, 'CACHEOPS_LRU', False)
-DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
 
 
 # Support DEGRADE_ON_FAILURE
-if DEGRADE_ON_FAILURE:
+if CACHEOPS_DEGRADE_ON_FAILURE:
     @decorator
     def handle_connection_failure(call):
         try:
@@ -32,13 +39,10 @@ class SafeRedis(redis.StrictRedis):
 
 class LazyRedis(object):
     def _setup(self):
-        # Connecting to redis
-        try:
-            redis_conf = settings.CACHEOPS_REDIS
-        except AttributeError:
+        if not CACHEOPS_REDIS:
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-        client = (SafeRedis if DEGRADE_ON_FAILURE else redis.StrictRedis)(**redis_conf)
+        client = (SafeRedis if CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis)(**CACHEOPS_REDIS)
 
         object.__setattr__(self, '__class__', client.__class__)
         object.__setattr__(self, '__dict__', client.__dict__)
@@ -64,12 +68,10 @@ def prepare_profiles():
         'local_get': False,
         'db_agnostic': True,
     }
-    if hasattr(settings, 'CACHEOPS_DEFAULTS'):
-        profile_defaults.update(settings.CACHEOPS_DEFAULTS)
+    profile_defaults.update(CACHEOPS_DEFAULTS)
 
     model_profiles = {}
-    ops = getattr(settings, 'CACHEOPS', {})
-    for app_model, profile in ops.items():
+    for app_model, profile in CACHEOPS.items():
         if profile is None:
             model_profiles[app_model] = None
             continue
