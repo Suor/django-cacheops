@@ -1,5 +1,5 @@
 from cacheops import invalidate_obj, invalidate_model
-from cacheops.conf import redis_client
+from cacheops.redis import redis_client
 from cacheops.cross import pickle
 
 from .models import Category, Post, Extra
