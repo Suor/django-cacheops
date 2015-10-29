@@ -97,13 +97,15 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
 
 Besides ``ops`` and ``timeout`` options you can also use:
 
-``local_get: True`` to cache simple gets for this model in process local memory.
-This is very fast, but is not invalidated in any way until process is restarted.
-Still could be useful for extremely rarely changed things.
+``local_get: True``
+    To cache simple gets for this model in process local memory.
+    This is very fast, but is not invalidated in any way until process is restarted.
+    Still could be useful for extremely rarely changed things.
 
-``cache_on_save=True | 'field_name'`` will write an instance to cache upon save.
-Cached instance will be retrieved on ``.get(field_name=...)`` request.
-Setting to ``True`` causes caching by primary key.
+``cache_on_save=True | 'field_name'``
+    To write an instance to cache upon save.
+    Cached instance will be retrieved on ``.get(field_name=...)`` request.
+    Setting to ``True`` causes caching by primary key.
 
 
 Additionally, you can tell cacheops to degrade gracefully on redis fail with:
