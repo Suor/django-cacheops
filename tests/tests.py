@@ -3,7 +3,7 @@ import os, re, copy
 import unittest
 
 from django.db import connection, connections
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
@@ -17,7 +17,12 @@ decorator_tag = register.decorator_tag
 from .models import *
 
 
-class BaseTestCase(TestCase):
+# django.test.TestCase wraps individual tests in atomic blocks. Old tests were not written to check
+#  the change in functionality cacheop's transaction support implements when in atomic blocks.
+#  Changing to django.test.TransactionTestCase fixes this issue. Tests are not in atomic blocks.
+#  This does make tests run slower then before, since tables are truncated and fixtures reapplied
+#  between tests.
+class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
@@ -938,3 +943,9 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class TransactionalInvalidationTests(BaseTestCase):
+    fixtures = ['basic']
+
+    # todo: write tests

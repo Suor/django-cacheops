@@ -12,6 +12,7 @@ if not FAKE:
     from .query import *
     from .invalidation import *
     from .templatetags.cacheops import *
+    from .transaction import install_cacheops_transaction_support
 else:
     from .fake import *
 
@@ -21,5 +22,6 @@ class CacheopsConfig(AppConfig):
 
     def ready(self):
         install_cacheops()
+        install_cacheops_transaction_support()
 
 default_app_config = 'cacheops.CacheopsConfig'

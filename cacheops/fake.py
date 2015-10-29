@@ -65,3 +65,7 @@ class _no_invalidation(ContextDecorator):
         pass
 
 no_invalidation = _no_invalidation()
+
+
+def install_cacheops_transaction_support():
+    pass
