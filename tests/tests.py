@@ -26,6 +26,9 @@ class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
+        # for mysql, django will add the query 'SET SQL_AUTO_IS_NULL = 0' before the first query
+        #  run a query before our tests in order to trigger this before we start counting queries.
+        Category.objects.nocache().exists()
 
 
 class BasicTests(BaseTestCase):
