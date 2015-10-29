@@ -21,9 +21,9 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, redis_client, handle_connection_failure, CACHEOPS_LRU, ALL_OPS
-from .utils import monkey_mix, stamp_fields, load_script, \
-                   func_cache_key, cached_view_fab, family_has_profile
+from .conf import model_profile, CACHEOPS_LRU, ALL_OPS
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 

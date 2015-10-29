@@ -4,8 +4,9 @@ from .cross import pickle, md5hex
 
 from funcy import wraps
 
-from .conf import redis_client, handle_connection_failure, FILE_CACHE_DIR, FILE_CACHE_TIMEOUT
+from .conf import FILE_CACHE_DIR, FILE_CACHE_TIMEOUT
 from .utils import func_cache_key, cached_view_fab
+from .redis import redis_client, handle_connection_failure
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')

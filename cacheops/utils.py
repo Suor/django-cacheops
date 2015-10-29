@@ -10,7 +10,7 @@ from .cross import md5hex
 from django.db import models
 from django.http import HttpRequest
 
-from .conf import redis_client, model_profile
+from .conf import model_profile
 
 
 # NOTE: we don't serialize this fields since their values could be very long
@@ -150,23 +150,6 @@ def cached_view_fab(_cached):
             return wrapper
         return decorator
     return cached_view
-
-
-### Lua script loader
-
-import os.path
-
-STRIP_RE = re.compile(r'TOSTRIP.*/TOSTRIP', re.S)
-
-@memoize
-def load_script(name, strip=False):
-    # TODO: strip comments
-    filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
-    with open(filename) as f:
-        code = f.read()
-    if strip:
-        code = STRIP_RE.sub('', code)
-    return redis_client.register_script(code)
 
 
 ### Whitespace handling for template tags

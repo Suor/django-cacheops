@@ -9,8 +9,8 @@ try:
 except ImportError:
     from django.db.models.expressions import Expression
 
-from .conf import redis_client, handle_connection_failure
-from .utils import non_proxy, load_script, NOT_SERIALIZED_FIELDS
+from .utils import non_proxy, NOT_SERIALIZED_FIELDS
+from .redis import redis_client, handle_connection_failure, load_script
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
