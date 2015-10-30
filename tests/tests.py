@@ -979,13 +979,7 @@ def return_from_other_thread(target, **kwargs):
             # make sure other thread exceptions make it out to the test thread, instead of having
             # None returned and the test thread continuing.
             return e
-        finally:
-            # django does not drop postgres connections opened due to new threads. results in
-            #  Postgres complaining about connected users when django tries to delete test db
-            #  See https://code.djangoproject.com/ticket/22420#comment:18
-            from django.db import connection
-            connection.close()
-    t = ThreadWithReturnValue(target=target, **kwargs)
+    t = ThreadWithReturnValue(target=wrapper, **kwargs)
     t.start()
     results = t.join()
     # make sure other thread exceptions make it out to the test thread, instead of having
