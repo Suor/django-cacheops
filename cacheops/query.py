@@ -87,20 +87,17 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            use_cache = not in_transaction()
-            # ignore reads while in transaction. redis isn't going to know what is happening
-            #  in the database transaction.
-            if use_cache:
-                cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+            if in_transaction():
+                return func(*args, **kwargs)
 
-                cache_data = redis_client.get(cache_key)
-                if cache_data is not None:
-                    return pickle.loads(cache_data)
+            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+
+            cache_data = redis_client.get(cache_key)
+            if cache_data is not None:
+                return pickle.loads(cache_data)
 
             result = func(*args, **kwargs)
-            # ignore writes while in transaction. no point in writing data that might be rolled back
-            if use_cache:
-                cache_thing(cache_key, result, cond_dnfs, timeout)
+            cache_thing(cache_key, result, cond_dnfs, timeout)
             return result
 
         return wrapper
