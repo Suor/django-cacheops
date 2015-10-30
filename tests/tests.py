@@ -978,8 +978,8 @@ def return_from_other_thread(target, **kwargs):
         try:
             return target(*args, **wrapper_kwargs)
         except Exception as e:
-            # make sure other thread exceptions make it out to the test thread, instead of having None
-            # returned and the test thread continuing.
+            # make sure other thread exceptions make it out to the test thread, instead of having
+            # None returned and the test thread continuing.
             return e
         finally:
             # django does not drop postgres connections opened due to new threads. results in
@@ -990,8 +990,8 @@ def return_from_other_thread(target, **kwargs):
     t = ThreadWithReturnValue(target=target, **kwargs)
     t.start()
     results = t.join()
-    # make sure other thread exceptions make it out to the test thread, instead of having None
-    # returned and the test thread continuing.
+    # make sure other thread exceptions make it out to the test thread, instead of having
+    # None returned and the test thread continuing.
     if isinstance(results, Exception):
         raise results
     return results
