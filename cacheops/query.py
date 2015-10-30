@@ -39,16 +39,15 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    # ignore writes while in transaction. no point in writing data that might be rolled back.
-    if not in_transaction():
-        load_script('cache_thing', CACHEOPS_LRU)(
-            keys=[cache_key],
-            args=[
-                pickle.dumps(data, -1),
-                json.dumps(cond_dnfs, default=str),
-                timeout
-            ]
-        )
+    assert(not in_transaction())
+    load_script('cache_thing', CACHEOPS_LRU)(
+        keys=[cache_key],
+        args=[
+            pickle.dumps(data, -1),
+            json.dumps(cond_dnfs, default=str),
+            timeout
+        ]
+    )
 
 
 def cached_as(*samples, **kwargs):
