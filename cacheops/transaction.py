@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import threading
 from django.db.transaction import get_connection, Atomic
-from funcy import wraps, once, is_list
-from funcy.py2 import ikeep, iflatten
+from funcy import wraps, once
 
 from .utils import monkey_mix
 
@@ -27,56 +26,30 @@ class TransactionQueue(threading.local):
         self._queue = []
 
     def begin(self):
-        if self.in_transaction:
-            # savepoint
-            latest_context = self._queue
-            while latest_context and isinstance(latest_context[-1], list):
-                latest_context = latest_context[-1]
-            latest_context.append([])
-        else:
+        self._queue.append([])
+        if not self.in_transaction:
             # transaction
-            self._queue = []
             self.in_transaction = True
 
     def commit(self):
-        if self._queue and isinstance(self._queue[-1], list):
+        context = self._queue.pop()
+        if self._queue:
             # savepoint
-            previous_context = None
-            latest_context = self._queue
-            while latest_context and isinstance(latest_context[-1], list):
-                previous_context = latest_context
-                latest_context = latest_context[-1]
-            previous_context.append(None)
+            self._queue[-1].extend(context)
         else:
             # transaction
-            for func, args, kwargs in self:
+            for func, args, kwargs in context:
                 func(*args, **kwargs)
             self.in_transaction = False
-            self._queue = []
 
     def rollback(self):
-        if self._queue and isinstance(self._queue[-1], list):
-            # savepoint
-            previous_context = None
-            latest_context = self._queue
-            while latest_context and isinstance(latest_context[-1], list):
-                previous_context = latest_context
-                latest_context = latest_context[-1]
-            assert(previous_context is not None)
-            previous_context.pop()
-        else:
+        self._queue.pop()
+        if not self._queue:
             # transaction
             self.in_transaction = False
-            self._queue = None
 
     def append(self, item):
-        latest_context = self._queue
-        while latest_context and isinstance(latest_context[-1], list):
-            latest_context = latest_context[-1]
-        latest_context.append(item)
-
-    def __iter__(self):
-        return ikeep(iflatten(self._queue, follow=is_list))
+        self._queue[-1].append(item)
 
 _transaction_queue = TransactionQueue()
 
