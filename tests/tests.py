@@ -997,6 +997,10 @@ def return_from_other_thread(target, **kwargs):
     return results
 
 
+def get_category_pk1_title():
+    return Category.objects.cache().get(pk=1).title
+
+
 class IntentionalRollback(Exception):
     pass
 
@@ -1004,109 +1008,48 @@ class IntentionalRollback(Exception):
 class TransactionalInvalidationTests(BaseTestCase):
     fixtures = ['basic']
 
-    def setUp(self):
-        super(TransactionalInvalidationTests, self).setUp()
-        # fill redis so we can tell if invalidation happened later in the tests.
-        Category.objects.cache().get(pk=1)
-
     def test_atomic_block_change(self):
         with atomic():
             self.assertTrue(in_transaction())
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-            self.assertEqual(
-                'Django',
-                return_from_other_thread(
-                    lambda: Category.objects.cache().get(pk=1).title
-                )
-            )
             obj = Category.objects.cache().get(pk=1)
             obj.title = 'Changed'
             obj.save()
-            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
-            self.assertEqual(
-                'Django',
-                return_from_other_thread(
-                    lambda: Category.objects.cache().get(pk=1).title
-                )
-            )
+            self.assertEqual('Changed', get_category_pk1_title())
+            self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
         self.assertFalse(in_transaction())
-        self.assertEqual(
-            'Changed',
-            return_from_other_thread(
-                target=lambda: Category.objects.cache().get(pk=1).title
-            )
-        )
-        self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Changed', return_from_other_thread(get_category_pk1_title))
+        self.assertEqual('Changed', get_category_pk1_title())
 
     def test_nested_atomic_block_change(self):
         with atomic():
             self.assertTrue(in_transaction())
             with atomic():
-                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-                self.assertEqual(
-                    'Django',
-                    return_from_other_thread(
-                        lambda: Category.objects.cache().get(pk=1).title
-                    )
-                )
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
                 obj.save()
-                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
-                self.assertEqual(
-                    'Django',
-                    return_from_other_thread(
-                        lambda: Category.objects.cache().get(pk=1).title
-                    )
-                )
-            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
-            self.assertEqual(
-                'Django',
-                return_from_other_thread(
-                    lambda: Category.objects.cache().get(pk=1).title
-                )
-            )
+                self.assertEqual('Changed', get_category_pk1_title())
+                self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
+            self.assertEqual('Changed', get_category_pk1_title())
+            self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
         self.assertFalse(in_transaction())
-        self.assertEqual(
-            'Changed',
-            return_from_other_thread(
-                target=lambda: Category.objects.cache().get(pk=1).title
-            )
-        )
-        self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Changed', return_from_other_thread(get_category_pk1_title))
+        self.assertEqual('Changed', get_category_pk1_title())
 
     def test_atomic_block_change_with_rollback(self):
         try:
             with atomic():
                 self.assertTrue(in_transaction())
-                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-                self.assertEqual(
-                    'Django',
-                    return_from_other_thread(
-                        lambda: Category.objects.cache().get(pk=1).title
-                    )
-                )
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
                 obj.save()
-                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
-                self.assertEqual(
-                    'Django',
-                    return_from_other_thread(
-                        lambda: Category.objects.cache().get(pk=1).title
-                    )
-                )
+                self.assertEqual('Changed', get_category_pk1_title())
+                self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
                 raise IntentionalRollback()
         except IntentionalRollback:
             pass
         self.assertFalse(in_transaction())
-        self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-        self.assertEqual(
-            'Django',
-            return_from_other_thread(
-                lambda: Category.objects.cache().get(pk=1).title
-            )
-        )
+        self.assertEqual('Django', get_category_pk1_title())
+        self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
 
     def test_nested_atomic_block_change_with_rollback(self):
         with atomic():
@@ -1116,28 +1059,13 @@ class TransactionalInvalidationTests(BaseTestCase):
                     obj = Category.objects.cache().get(pk=1)
                     obj.title = 'Changed'
                     obj.save()
-                    self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
-                    self.assertEqual(
-                        'Django',
-                        return_from_other_thread(
-                            lambda: Category.objects.cache().get(pk=1).title
-                        )
-                    )
+                    self.assertEqual('Changed', get_category_pk1_title())
+                    self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
                     raise IntentionalRollback()
             except IntentionalRollback:
                 pass
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-            self.assertEqual(
-                'Django',
-                return_from_other_thread(
-                    lambda: Category.objects.cache().get(pk=1).title
-                )
-            )
+            self.assertEqual('Django', get_category_pk1_title())
+            self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
         self.assertFalse(in_transaction())
-        self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
-        self.assertEqual(
-            'Django',
-            return_from_other_thread(
-                lambda: Category.objects.cache().get(pk=1).title
-            )
-        )
+        self.assertEqual('Django', get_category_pk1_title())
+        self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
