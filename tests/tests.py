@@ -1042,7 +1042,6 @@ class TransactionalInvalidationTests(BaseTestCase):
             obj = list(Category.objects.filter(pk=1).cache())[0]
             obj.title = 'Changed'
             obj.save()
-            invalidate_obj(obj)
             with self.assertNumQueries(1):
                 self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
             self.assertEqual(
@@ -1067,8 +1066,8 @@ class TransactionalInvalidationTests(BaseTestCase):
         with self.assertNumQueries(1):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         with atomic():
+            self.assertTrue(in_transaction())
             with atomic():
-                self.assertTrue(in_transaction())
                 with self.assertNumQueries(1):
                     self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
                 self.assertEqual(
@@ -1091,7 +1090,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                         lambda: list(Category.objects.filter(pk=1).cache())[0].title
                     )
                 )
-            self.assertTrue(in_transaction())
             with self.assertNumQueries(1):
                 self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
             self.assertEqual(
@@ -1100,7 +1098,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            self.assertTrue(in_transaction())
         self.assertFalse(in_transaction())
         self.assertEqual(
             'Changed',
@@ -1130,7 +1127,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                 obj = list(Category.objects.filter(pk=1).cache())[0]
                 obj.title = 'Changed'
                 obj.save()
-                invalidate_obj(obj)
                 with self.assertNumQueries(1):
                     self.assertEqual(
                         'Changed',
@@ -1160,9 +1156,9 @@ class TransactionalInvalidationTests(BaseTestCase):
         with self.assertNumQueries(1):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         with atomic():
+            self.assertTrue(in_transaction())
             try:
                 with atomic():
-                    self.assertTrue(in_transaction())
                     with self.assertNumQueries(1):
                         self.assertEqual(
                             'Django',
@@ -1177,7 +1173,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     obj = list(Category.objects.filter(pk=1).cache())[0]
                     obj.title = 'Changed'
                     obj.save()
-                    invalidate_model(obj.__class__)
                     with self.assertNumQueries(1):
                         self.assertEqual(
                             'Changed',
