@@ -4,11 +4,10 @@ from funcy import wraps
 import re, copy
 import unittest
 
-from django.db import connection, connections, DEFAULT_DB_ALIAS
+from django.db import connection, connections
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
 from django.test.client import RequestFactory
-from django.test.utils import CaptureQueriesContext
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
