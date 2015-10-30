@@ -11,14 +11,10 @@ __all__ = ('in_transaction', 'queue_when_in_transaction', 'install_cacheops_tran
 class TransactionState(threading.local):
     def __init__(self, *args, **kwargs):
         super(TransactionState, self).__init__(*args, **kwargs)
-        self.in_transaction = False
         self._stack = []
 
     def begin(self):
         self._stack.append([])
-        if not self.in_transaction:
-            # transaction
-            self.in_transaction = True
 
     def commit(self):
         context = self._stack.pop()
@@ -29,13 +25,9 @@ class TransactionState(threading.local):
             # transaction
             for func, args, kwargs in context:
                 func(*args, **kwargs)
-            self.in_transaction = False
 
     def rollback(self):
         self._stack.pop()
-        if not self._stack:
-            # transaction
-            self.in_transaction = False
 
     def append(self, item):
         self._stack[-1].append(item)
@@ -44,13 +36,13 @@ _transaction_state = TransactionState()
 
 
 def in_transaction():
-    return bool(_transaction_state.in_transaction)
+    return bool(_transaction_state._stack)
 
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if _transaction_state.in_transaction:
+        if _transaction_state._stack:
             _transaction_state.append((func, args, kwargs))
         else:
             func(*args, **kwargs)
