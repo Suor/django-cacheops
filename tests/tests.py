@@ -17,7 +17,7 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
-from cacheops.transaction import _function_queue, in_transaction
+from cacheops.transaction import in_transaction
 
 decorator_tag = register.decorator_tag
 from .models import *
@@ -1052,9 +1052,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            queue_item = list(_function_queue)[-1]
-            self.assertEqual('invalidate_dict', queue_item['func'].__name__)
-            self.assertEqual(obj.__class__, queue_item['args'][0])
         self.assertFalse(in_transaction())
         self.assertEqual(
             'Changed',
@@ -1097,9 +1094,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                         lambda: list(Category.objects.filter(pk=1).cache())[0].title
                     )
                 )
-                queue_item = list(_function_queue)[-1]
-                self.assertEqual('invalidate_model', queue_item['func'].__name__)
-                self.assertEqual(obj.__class__, queue_item['args'][0])
             with self.assertNumQueries(1):
                 self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
             self.assertEqual(
@@ -1108,9 +1102,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            queue_item = list(_function_queue)[-1]
-            self.assertEqual('invalidate_model', queue_item['func'].__name__)
-            self.assertEqual(obj.__class__, queue_item['args'][0])
             self.assertTrue(in_transaction())
         self.assertFalse(in_transaction())
         self.assertEqual(
@@ -1158,8 +1149,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                             lambda: list(Category.objects.filter(pk=1).cache())[0].title
                         )
                     )
-                    queue_item = list(_function_queue)[-1]
-                    self.assertEqual('invalidate_all', queue_item['func'].__name__)
                 with self.assertNumQueries(1):
                     self.assertEqual(
                         'Changed',
@@ -1171,8 +1160,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                         lambda: list(Category.objects.filter(pk=1).cache())[0].title
                     )
                 )
-                queue_item = list(_function_queue)[-1]
-            self.assertEqual('invalidate_all', queue_item['func'].__name__)
             self.assertTrue(in_transaction())
             with self.assertNumQueries(1):
                 self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
@@ -1182,8 +1169,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            queue_item = list(_function_queue)[-1]
-            self.assertEqual('invalidate_all', queue_item['func'].__name__)
             self.assertTrue(in_transaction())
         self.assertFalse(in_transaction())
         self.assertEqual(
@@ -1227,9 +1212,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                         lambda: list(Category.objects.filter(pk=1).cache())[0].title
                     )
                 )
-                queue_item = list(_function_queue)[-1]
-                self.assertEqual('invalidate_dict', queue_item['func'].__name__)
-                self.assertEqual(obj.__class__, queue_item['args'][0])
                 raise IntentionalRollback()
         except IntentionalRollback:
             pass
@@ -1278,9 +1260,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                             lambda: list(Category.objects.filter(pk=1).cache())[0].title
                         )
                     )
-                    queue_item = list(_function_queue)[-1]
-                    self.assertEqual('invalidate_model', queue_item['func'].__name__)
-                    self.assertEqual(obj.__class__, queue_item['args'][0])
                     raise IntentionalRollback()
             except IntentionalRollback:
                 pass
@@ -1292,8 +1271,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            self.assertEqual(0, len(list(_function_queue)))
-            self.assertTrue(in_transaction())
         self.assertFalse(in_transaction())
         with self.assertNumQueries(0):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
@@ -1340,8 +1317,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                                 lambda: list(Category.objects.filter(pk=1).cache())[0].title
                             )
                         )
-                        queue_item = list(_function_queue)[-1]
-                        self.assertEqual('invalidate_all', queue_item['func'].__name__)
                         raise IntentionalRollback()
                 except IntentionalRollback:
                     pass
@@ -1353,7 +1328,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                         lambda: list(Category.objects.filter(pk=1).cache())[0].title
                     )
                 )
-                self.assertEqual(0, len(list(_function_queue)))
                 self.assertTrue(in_transaction())
             with self.assertNumQueries(1):
                 self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
@@ -1363,7 +1337,6 @@ class TransactionalInvalidationTests(BaseTestCase):
                     lambda: list(Category.objects.filter(pk=1).cache())[0].title
                 )
             )
-            self.assertEqual(0, len(list(_function_queue)))
             self.assertTrue(in_transaction())
         self.assertFalse(in_transaction())
         with self.assertNumQueries(0):
