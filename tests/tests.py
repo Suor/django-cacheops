@@ -16,7 +16,6 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
-from cacheops.transaction import in_transaction
 
 decorator_tag = register.decorator_tag
 from .models import *
@@ -31,8 +30,8 @@ class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
-        # for mysql, django will add the query 'SET SQL_AUTO_IS_NULL = 0' before the first query
-        #  run a query before our tests in order to trigger this before we start counting queries.
+        # For mysql, django will add the query 'SET SQL_AUTO_IS_NULL = 0' before the first query.
+        #  Run a query before our tests in order to trigger this, before we start counting queries.
         Category.objects.nocache().exists()
 
 
@@ -1009,19 +1008,16 @@ class TransactionalInvalidationTests(BaseTestCase):
 
     def test_atomic_block_change(self):
         with atomic():
-            self.assertTrue(in_transaction())
             obj = Category.objects.cache().get(pk=1)
             obj.title = 'Changed'
             obj.save()
             self.assertEqual('Changed', get_category_pk1_title())
             self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
-        self.assertFalse(in_transaction())
         self.assertEqual('Changed', return_from_other_thread(get_category_pk1_title))
         self.assertEqual('Changed', get_category_pk1_title())
 
     def test_nested_atomic_block_change(self):
         with atomic():
-            self.assertTrue(in_transaction())
             with atomic():
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
@@ -1030,14 +1026,12 @@ class TransactionalInvalidationTests(BaseTestCase):
                 self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
             self.assertEqual('Changed', get_category_pk1_title())
             self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
-        self.assertFalse(in_transaction())
         self.assertEqual('Changed', return_from_other_thread(get_category_pk1_title))
         self.assertEqual('Changed', get_category_pk1_title())
 
     def test_atomic_block_change_with_rollback(self):
         try:
             with atomic():
-                self.assertTrue(in_transaction())
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
                 obj.save()
@@ -1046,13 +1040,11 @@ class TransactionalInvalidationTests(BaseTestCase):
                 raise IntentionalRollback()
         except IntentionalRollback:
             pass
-        self.assertFalse(in_transaction())
         self.assertEqual('Django', get_category_pk1_title())
         self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
 
     def test_nested_atomic_block_change_with_rollback(self):
         with atomic():
-            self.assertTrue(in_transaction())
             try:
                 with atomic():
                     obj = Category.objects.cache().get(pk=1)
@@ -1065,6 +1057,5 @@ class TransactionalInvalidationTests(BaseTestCase):
                 pass
             self.assertEqual('Django', get_category_pk1_title())
             self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
-        self.assertFalse(in_transaction())
         self.assertEqual('Django', get_category_pk1_title())
         self.assertEqual('Django', return_from_other_thread(get_category_pk1_title))
