@@ -1025,10 +1025,9 @@ class IntentionalRollback(Exception):
 class TransactionalInvalidationTests(BaseTestCase):
     fixtures = ['basic']
 
-    def test_atomic_block_change_and_invalidate_obj(self):
+    def test_atomic_block_change(self):
+        # fill redis so we can tell if invalidation happened.
         with self.assertNumQueries(1):
-            self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
-        with self.assertNumQueries(0):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         with atomic():
             self.assertTrue(in_transaction())
@@ -1063,10 +1062,9 @@ class TransactionalInvalidationTests(BaseTestCase):
         with self.assertNumQueries(0):
             self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
 
-    def test_nested_atomic_block_change_and_invalidate_model(self):
+    def test_nested_atomic_block_change(self):
+        # fill redis so we can tell if invalidation happened.
         with self.assertNumQueries(1):
-            self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
-        with self.assertNumQueries(0):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         with atomic():
             with atomic():
@@ -1115,9 +1113,8 @@ class TransactionalInvalidationTests(BaseTestCase):
             self.assertEqual('Changed', list(Category.objects.filter(pk=1).cache())[0].title)
 
     def test_atomic_block_change_with_rollback(self):
+        # fill redis so we can tell if invalidation happened.
         with self.assertNumQueries(1):
-            self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
-        with self.assertNumQueries(0):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         try:
             with atomic():
@@ -1159,9 +1156,8 @@ class TransactionalInvalidationTests(BaseTestCase):
         )
 
     def test_nested_atomic_block_change_with_rollback(self):
+        # fill redis so we can tell if invalidation happened.
         with self.assertNumQueries(1):
-            self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
-        with self.assertNumQueries(0):
             self.assertEqual('Django', list(Category.objects.filter(pk=1).cache())[0].title)
         with atomic():
             try:
