@@ -404,7 +404,7 @@ class ManagerMixin(object):
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
         # <cache_on_save_field> is pk unless specified.
         # This sweet trick saves a db request and helps with slave lag.
-        cache_on_save = instance._cacheprofile.get('cache_on_save')
+        cache_on_save = instance._cacheprofile.get('cache_on_save') and not in_transaction()
         if cache_on_save:
             # HACK: We get this object "from field" so it can contain
             #       some undesirable attributes or other objects attached.
