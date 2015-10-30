@@ -11,7 +11,7 @@ if names and re.search(r'^\d+$', names):
 elif names and not names.startswith('tests.'):
     names = 'tests.tests.' + names
 else:
-    names = 'tests.tests'
+    names = 'tests'
 
 
 django.setup()
