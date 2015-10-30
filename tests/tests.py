@@ -972,37 +972,14 @@ class ThreadWithReturnValue(Thread):
         return self._return
 
 
-class _AssertNumQueriesForNonTestCaseContext(CaptureQueriesContext):
-    def __init__(self, num, using=None):
-        self.num = num
-        if not using:
-            using = DEFAULT_DB_ALIAS
-        conn = connections[using]
-        super(_AssertNumQueriesForNonTestCaseContext, self).__init__(conn)
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        super(_AssertNumQueriesForNonTestCaseContext, self).__exit__(exc_type, exc_value, traceback)
-        if exc_type is not None:
-            return
-        executed = len(self)
-        if executed != self.num:
-            raise AssertionError(
-                "%d queries executed, %d expected\nCaptured queries were:\n%s" % (
-                    executed, self.num,
-                    '\n'.join(
-                        query['sql'] for query in self.captured_queries
-                    )
-                )
-            )
-
-
-def return_from_other_thread(target, queries=0, **kwargs):
+def return_from_other_thread(target, **kwargs):
     @wraps(target)
     def wrapper(*args, **wrapper_kwargs):
         try:
-            with _AssertNumQueriesForNonTestCaseContext(queries):
-                return target(*args, **wrapper_kwargs)
-        except AssertionError as e:
+            return target(*args, **wrapper_kwargs)
+        except Exception as e:
+            # make sure other thread exceptions make it out to the test thread, instead of having None
+            # returned and the test thread continuing.
             return e
         finally:
             # django does not drop postgres connections opened due to new threads. results in
@@ -1013,6 +990,8 @@ def return_from_other_thread(target, queries=0, **kwargs):
     t = ThreadWithReturnValue(target=target, **kwargs)
     t.start()
     results = t.join()
+    # make sure other thread exceptions make it out to the test thread, instead of having None
+    # returned and the test thread continuing.
     if isinstance(results, Exception):
         raise results
     return results
@@ -1025,14 +1004,15 @@ class IntentionalRollback(Exception):
 class TransactionalInvalidationTests(BaseTestCase):
     fixtures = ['basic']
 
+    def setUp(self):
+        super(TransactionalInvalidationTests, self).setUp()
+        # fill redis so we can tell if invalidation happened later in the tests.
+        Category.objects.cache().get(pk=1)
+
     def test_atomic_block_change(self):
-        # fill redis so we can tell if invalidation happened.
-        with self.assertNumQueries(1):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         with atomic():
             self.assertTrue(in_transaction())
-            with self.assertNumQueries(1):
-                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
             self.assertEqual(
                 'Django',
                 return_from_other_thread(
@@ -1042,8 +1022,7 @@ class TransactionalInvalidationTests(BaseTestCase):
             obj = Category.objects.cache().get(pk=1)
             obj.title = 'Changed'
             obj.save()
-            with self.assertNumQueries(1):
-                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
             self.assertEqual(
                 'Django',
                 return_from_other_thread(
@@ -1054,22 +1033,16 @@ class TransactionalInvalidationTests(BaseTestCase):
         self.assertEqual(
             'Changed',
             return_from_other_thread(
-                target=lambda: Category.objects.cache().get(pk=1).title,
-                queries=1
+                target=lambda: Category.objects.cache().get(pk=1).title
             )
         )
-        with self.assertNumQueries(0):
-            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
 
     def test_nested_atomic_block_change(self):
-        # fill redis so we can tell if invalidation happened.
-        with self.assertNumQueries(1):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         with atomic():
             self.assertTrue(in_transaction())
             with atomic():
-                with self.assertNumQueries(1):
-                    self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
                 self.assertEqual(
                     'Django',
                     return_from_other_thread(
@@ -1079,19 +1052,14 @@ class TransactionalInvalidationTests(BaseTestCase):
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
                 obj.save()
-                with self.assertNumQueries(1):
-                    self.assertEqual(
-                        'Changed',
-                        Category.objects.cache().get(pk=1).title
-                    )
+                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
                 self.assertEqual(
                     'Django',
                     return_from_other_thread(
                         lambda: Category.objects.cache().get(pk=1).title
                     )
                 )
-            with self.assertNumQueries(1):
-                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
             self.assertEqual(
                 'Django',
                 return_from_other_thread(
@@ -1102,22 +1070,16 @@ class TransactionalInvalidationTests(BaseTestCase):
         self.assertEqual(
             'Changed',
             return_from_other_thread(
-                target=lambda: Category.objects.cache().get(pk=1).title,
-                queries=1
+                target=lambda: Category.objects.cache().get(pk=1).title
             )
         )
-        with self.assertNumQueries(0):
-            self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
 
     def test_atomic_block_change_with_rollback(self):
-        # fill redis so we can tell if invalidation happened.
-        with self.assertNumQueries(1):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         try:
             with atomic():
                 self.assertTrue(in_transaction())
-                with self.assertNumQueries(1):
-                    self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
                 self.assertEqual(
                     'Django',
                     return_from_other_thread(
@@ -1127,11 +1089,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                 obj = Category.objects.cache().get(pk=1)
                 obj.title = 'Changed'
                 obj.save()
-                with self.assertNumQueries(1):
-                    self.assertEqual(
-                        'Changed',
-                        Category.objects.cache().get(pk=1).title
-                    )
+                self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
                 self.assertEqual(
                     'Django',
                     return_from_other_thread(
@@ -1142,8 +1100,7 @@ class TransactionalInvalidationTests(BaseTestCase):
         except IntentionalRollback:
             pass
         self.assertFalse(in_transaction())
-        with self.assertNumQueries(0):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         self.assertEqual(
             'Django',
             return_from_other_thread(
@@ -1152,32 +1109,14 @@ class TransactionalInvalidationTests(BaseTestCase):
         )
 
     def test_nested_atomic_block_change_with_rollback(self):
-        # fill redis so we can tell if invalidation happened.
-        with self.assertNumQueries(1):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         with atomic():
             self.assertTrue(in_transaction())
             try:
                 with atomic():
-                    with self.assertNumQueries(1):
-                        self.assertEqual(
-                            'Django',
-                            Category.objects.cache().get(pk=1).title
-                        )
-                    self.assertEqual(
-                        'Django',
-                        return_from_other_thread(
-                            lambda: Category.objects.cache().get(pk=1).title
-                        )
-                    )
                     obj = Category.objects.cache().get(pk=1)
                     obj.title = 'Changed'
                     obj.save()
-                    with self.assertNumQueries(1):
-                        self.assertEqual(
-                            'Changed',
-                            Category.objects.cache().get(pk=1).title
-                        )
+                    self.assertEqual('Changed', Category.objects.cache().get(pk=1).title)
                     self.assertEqual(
                         'Django',
                         return_from_other_thread(
@@ -1187,8 +1126,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                     raise IntentionalRollback()
             except IntentionalRollback:
                 pass
-            with self.assertNumQueries(1):
-                self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
             self.assertEqual(
                 'Django',
                 return_from_other_thread(
@@ -1196,8 +1134,7 @@ class TransactionalInvalidationTests(BaseTestCase):
                 )
             )
         self.assertFalse(in_transaction())
-        with self.assertNumQueries(0):
-            self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
+        self.assertEqual('Django', Category.objects.cache().get(pk=1).title)
         self.assertEqual(
             'Django',
             return_from_other_thread(
