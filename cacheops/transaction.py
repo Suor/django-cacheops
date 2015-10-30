@@ -8,34 +8,23 @@ from .utils import monkey_mix
 __all__ = ('in_transaction', 'queue_when_in_transaction', 'install_cacheops_transaction_support')
 
 
-class TransactionQueue(threading.local):
-    """
-    `_queue` is a list of lists of of arbitrary depth. it represents a queue of items, grouped by
-     nested contexts. non-list elements at each level are items in the queue. list elements are
-     considered contexts. the latest context is the deepest list who's right most boundary is also
-     the right most boundary of the outer most context. `None` items are added to the list, in order
-     to make second latest contexts the new latest context (when an inner most context ends). These
-     `None` objects are not return on __iter__.
-
-     You probably want to sub class this class to override commit_transaction, or in alternate cases
-      rollback_transaction.
-    """
+class TransactionState(threading.local):
     def __init__(self, *args, **kwargs):
-        super(TransactionQueue, self).__init__(*args, **kwargs)
+        super(TransactionState, self).__init__(*args, **kwargs)
         self.in_transaction = False
-        self._queue = []
+        self._stack = []
 
     def begin(self):
-        self._queue.append([])
+        self._stack.append([])
         if not self.in_transaction:
             # transaction
             self.in_transaction = True
 
     def commit(self):
-        context = self._queue.pop()
-        if self._queue:
+        context = self._stack.pop()
+        if self._stack:
             # savepoint
-            self._queue[-1].extend(context)
+            self._stack[-1].extend(context)
         else:
             # transaction
             for func, args, kwargs in context:
@@ -43,26 +32,26 @@ class TransactionQueue(threading.local):
             self.in_transaction = False
 
     def rollback(self):
-        self._queue.pop()
-        if not self._queue:
+        self._stack.pop()
+        if not self._stack:
             # transaction
             self.in_transaction = False
 
     def append(self, item):
-        self._queue[-1].append(item)
+        self._stack[-1].append(item)
 
-_transaction_queue = TransactionQueue()
+_transaction_state = TransactionState()
 
 
 def in_transaction():
-    return _transaction_queue.in_transaction
+    return bool(_transaction_state.in_transaction)
 
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if _transaction_queue.in_transaction:
-            _transaction_queue.append((func, args, kwargs))
+        if _transaction_state.in_transaction:
+            _transaction_state.append((func, args, kwargs))
         else:
             func(*args, **kwargs)
     return wrapper
@@ -70,7 +59,7 @@ def queue_when_in_transaction(func):
 
 class AtomicMixIn(object):
     def __enter__(self):
-        _transaction_queue.begin()
+        _transaction_state.begin()
         self._no_monkey.__enter__(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -78,9 +67,9 @@ class AtomicMixIn(object):
         connection = get_connection(self.using)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
-            _transaction_queue.commit()
+            _transaction_state.commit()
         else:
-            _transaction_queue.rollback()
+            _transaction_state.rollback()
 
 
 @once
