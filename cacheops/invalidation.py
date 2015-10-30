@@ -36,7 +36,6 @@ def invalidate_obj(obj):
     model = non_proxy(obj.__class__)
     invalidate_dict(model, get_obj_dict(model, obj))
 
-
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_model(model):
