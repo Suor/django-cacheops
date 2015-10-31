@@ -128,6 +128,7 @@ Usage
 
 It's automatic you just need to set it up.
 
+
 | **Manual caching**
 
 You can force any queryset to use cache by calling it's ``.cache()`` method:
@@ -149,7 +150,7 @@ Here you can specify which ops should be cached for queryset, for example, this 
 will cache count call in ``Paginator`` but not later articles fetch.
 There are four possible actions - ``get``, ``fetch``, ``count`` and ``exists``. You can
 pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
-There is, however, a shortcut for it:
+There is, however, a shortcut for the latter:
 
 .. code:: python
 
@@ -167,8 +168,8 @@ or make queryset only write cache, but don't try to fetch it with ``.cache(write
 | **Function caching**
 
 You can cache and invalidate result of a function the same way as a queryset.
-Cache of the next function will be invalidated on any ``Article`` change, addition
-or deletion:
+Cached results of the next function will be invalidated on any ``Article`` change,
+addition or deletion:
 
 .. code:: python
 
@@ -216,6 +217,7 @@ Another possibility is to make function cache invalidate on changes to any one o
         return {...}
 
 As you can see, we can mix querysets and models here.
+
 
 | **View caching**
 
@@ -269,7 +271,7 @@ Don't use that if you share redis database for both cache and something else.
 
 | **Turning off and postponing invalidation**
 
-On the other hand, there is a way to turn off invalidation for a while:
+There is also a way to turn off invalidation for a while:
 
 .. code:: python
 
@@ -300,7 +302,7 @@ Combined with ``try ... finally`` it could be used to postpone invalidation:
         # ... or
         invalidate_model(...)
 
-Postponing invalidation can considerably speed up batch jobs.
+Postponing invalidation can speed up batch jobs.
 
 
 | **Mass updates**
@@ -325,7 +327,8 @@ Using memory limit
 
 If your cache never grows too large you may not bother. But if you do you have some options.
 Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will. For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
+so you can't just set ``maxmemory`` and let redis evict at its will.
+For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
 So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
 
 First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
@@ -567,21 +570,22 @@ CAVEATS
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
    One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
-4. Mass updates don't trigger invalidation.
-5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
-6. Doesn't work with RawQuerySet.
+4. Mass updates don't trigger invalidation by default.
+5. Sliced queries are invalidated as non-sliced ones.
+6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
 8. Doesn't work right with multi-table inheritance.
 9. Aggregates are not implemented yet.
 
-Here 1, 2, 3, 5 are part of design compromise, trying to solve them will make
+Here 1, 2, 3, 5 are part of the design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
-cache too much when update conditions are orthogonal to most queries conditions.
-6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
-and is more flexible. 8 and 9 are postponed until they will gain more interest
-or a champion willing to implement any one of them emerge.
+cache too much when update conditions are orthogonal to most queries conditions,
+see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
+more interest or a champion willing to implement any one of them emerge.
+
+All unsupported things could still be used easyly enough with the help of `@cached_as()`.
 
 
 Performance tips
