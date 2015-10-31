@@ -95,6 +95,12 @@ def stamp_fields(model):
 
 ### Cache keys calculation
 
+def obj_key(obj):
+    if isinstance(obj, models.Model):
+        return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
+    else:
+        return str(obj)
+
 def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
@@ -102,7 +108,7 @@ def func_cache_key(func, args, kwargs, extra=None):
     factors = [func.__module__, func.__name__, args, kwargs, extra]
     if hasattr(func, '__code__'):
         factors.append(func.__code__.co_firstlineno)
-    return md5hex(json.dumps(factors, sort_keys=True, default=str))
+    return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
 
 def debug_cache_key(func, args, kwargs, extra=None):
     """
@@ -110,7 +116,7 @@ def debug_cache_key(func, args, kwargs, extra=None):
     Handy to use when editing code.
     """
     factors = [func.__module__, func.__name__, args, kwargs, extra]
-    return md5hex(json.dumps(factors, sort_keys=True, default=str))
+    return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
 
 def view_cache_key(func, args, kwargs, extra=None):
     """
