@@ -338,6 +338,17 @@ class QuerySetMixin(object):
                 invalidate_obj(obj)
         return objs
 
+    def invalidated_update(self, **kwargs):
+        clone = self._clone().nocache()
+        clone._for_write = True  # affects routing
+
+        objects = list(clone.iterator())  # bypass queryset cache
+        rows = clone.update(**kwargs)
+        objects.extend(clone.iterator())
+        for obj in objects:
+            invalidate_obj(obj)
+        return rows
+
 
 def connect_first(signal, receiver, sender):
     old_receivers = signal.receivers
@@ -437,6 +448,9 @@ class ManagerMixin(object):
 
     def nocache(self):
         return self.get_queryset().nocache()
+
+    def invalidated_update(self, **kwargs):
+        return self.get_queryset().inplace().invalidated_update(**kwargs)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,

@@ -266,6 +266,9 @@ And the one that FLUSHES cacheops redis database::
 
 Don't use that if you share redis database for both cache and something else.
 
+
+| **Turning off and postponing invalidation**
+
 On the other hand, there is a way to turn off invalidation for a while:
 
 .. code:: python
@@ -298,6 +301,23 @@ Combined with ``try ... finally`` it could be used to postpone invalidation:
         invalidate_model(...)
 
 Postponing invalidation can considerably speed up batch jobs.
+
+
+| **Mass updates**
+
+Normally `qs.update(...)` doesn't emit any events and thus doesn't trigger invalidation.
+And there is no transparent and efficient way to do that: trying to act on conditions will
+invalidate too much if update conditions are orthogonal to many queries conditions,
+and to act on specific objects we will need to fetch all of them,
+which `QuerySet.update()` users generally try to avoid.
+
+In the case you actually want to perform the latter cacheops provides a shortcut:
+
+.. code:: python
+
+    qs.invalidated_update(...)
+
+Note that all the updated objects are fetched twice, prior and post the update.
 
 
 Using memory limit
