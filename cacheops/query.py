@@ -124,7 +124,7 @@ class QuerySetMixin(object):
                 'you can configure it with empty ops.'
                     % (self.model._meta.app_label, self.model._meta.model_name))
 
-    def _cache_key(self, extra=''): # FIXME: extra no longer needed
+    def _cache_key(self):
         """
         Compute a cache key for this queryset
         """
@@ -147,8 +147,6 @@ class QuerySetMixin(object):
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
-        if extra:
-            md.update(str(extra))
         # Thing only appeared in Django 1.9
         it_class = getattr(self, '_iterable_class', None)
         if it_class:
