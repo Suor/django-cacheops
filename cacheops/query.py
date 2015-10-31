@@ -59,7 +59,6 @@ def cached_as(*samples, **kwargs):
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
-    # TODO: think of better way doing this.
     if len(samples) == 1 and isinstance(samples[0], list):
         return lambda func: func
 
