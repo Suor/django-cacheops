@@ -90,8 +90,6 @@ else:
         }
     }
 
-CACHEOPS_FAKE = os.environ.get('CACHEOPS') == 'FAKE'
-
 CACHEOPS_REDIS = {
     'host': 'localhost',
     'port': 6379,
