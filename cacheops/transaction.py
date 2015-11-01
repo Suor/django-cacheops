@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import threading
-from django.db.transaction import get_connection, Atomic
 from funcy import wraps, once
+from django.db.transaction import get_connection, Atomic
 
 from .utils import monkey_mix
+
 
 __all__ = ('in_transaction', 'queue_when_in_transaction', 'install_cacheops_transaction_support')
 
@@ -32,18 +33,17 @@ class TransactionState(threading.local):
     def append(self, item):
         self._stack[-1].append(item)
 
-_transaction_state = TransactionState()
+transaction_state = TransactionState()
 
 
 def in_transaction():
-    return bool(_transaction_state._stack)
-
+    return bool(transaction_state._stack)
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if _transaction_state._stack:
-            _transaction_state.append((func, args, kwargs))
+        if in_transaction():
+            transaction_state.append((func, args, kwargs))
         else:
             func(*args, **kwargs)
     return wrapper
@@ -51,7 +51,7 @@ def queue_when_in_transaction(func):
 
 class AtomicMixIn(object):
     def __enter__(self):
-        _transaction_state.begin()
+        transaction_state.begin()
         self._no_monkey.__enter__(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -59,9 +59,9 @@ class AtomicMixIn(object):
         connection = get_connection(self.using)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
-            _transaction_state.commit()
+            transaction_state.commit()
         else:
-            _transaction_state.rollback()
+            transaction_state.rollback()
 
 
 @once

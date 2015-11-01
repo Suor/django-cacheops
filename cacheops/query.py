@@ -39,7 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    assert(not in_transaction())
+    assert not in_transaction()
     load_script('cache_thing', CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
