@@ -21,16 +21,15 @@ from .models import *
 
 class BaseTestCase(TestCase):
     def setUp(self):
-        # Emulate not being in transaction.
-        # TestCase wraps each test into one altering cacheops behavior.
+        # Emulate not being in transaction by tricking system to ignore its pretest level.
+        # TestCase wraps each test into 1 or 2 transaction(s) altering cacheops behavior.
         # The alternative is using TransactionTestCase, which is 10x slow.
-        assert len(transaction_state._stack) == 2
-        transaction_state._stack = []
+        transaction_state._stack, self._stack = [], transaction_state._stack
 
         invalidate_all()
 
     def tearDown(self):
-        transaction_state._stack = [[], []]
+        transaction_state._stack = self._stack
 
 
 class BasicTests(BaseTestCase):
