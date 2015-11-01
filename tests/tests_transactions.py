@@ -2,11 +2,11 @@
 from threading import Thread
 
 from django.db.transaction import atomic
+from django.test import TransactionTestCase
 from funcy import wraps
 import six
 
 from .models import Category
-from .tests import BaseTestCase
 
 
 class ThreadWithReturnValue(Thread):
@@ -60,7 +60,7 @@ class IntentionalRollback(Exception):
     pass
 
 
-class TransactionalInvalidationTests(BaseTestCase):
+class TransactionalInvalidationTests(TransactionTestCase):
     fixtures = ['basic']
 
     def test_atomic_block_change(self):
