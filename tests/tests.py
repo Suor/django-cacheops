@@ -576,6 +576,7 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.using('slave').filter(title='Python')
         list(Post.objects.using('slave').filter(category__in=categories).cache())
 
+    @unittest.skipIf(connection.vendor == 'mysql', 'MySQL fails with encodings')
     def test_161_non_ascii(self):
         # Non ascii text in non-unicode str literal
         list(Category.objects.filter(title='фыва').cache())
