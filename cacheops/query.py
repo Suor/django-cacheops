@@ -26,6 +26,7 @@ from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, fa
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
+from .transaction import in_transaction
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -38,6 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
+    assert(not in_transaction())
     load_script('cache_thing', CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
@@ -84,6 +86,9 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            if in_transaction():
+                return func(*args, **kwargs)
+
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
@@ -252,7 +257,10 @@ class QuerySetMixin(object):
     def iterator(self):
         # TODO: do not cache empty queries?
         superiter = self._no_monkey.iterator
-        cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops']
+        # ignore reads & writes while in transaction. redis isn't going to know what is happening
+        #  in the database transaction. no point in writing data that might be rolled back
+        cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops'] and \
+            not in_transaction()
 
         if cache_this:
             cache_key = self._cache_key()
@@ -404,7 +412,7 @@ class ManagerMixin(object):
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
         # <cache_on_save_field> is pk unless specified.
         # This sweet trick saves a db request and helps with slave lag.
-        cache_on_save = instance._cacheprofile.get('cache_on_save')
+        cache_on_save = instance._cacheprofile.get('cache_on_save') and not in_transaction()
         if cache_on_save:
             # HACK: We get this object "from field" so it can contain
             #       some undesirable attributes or other objects attached.

@@ -11,11 +11,13 @@ except ImportError:
 
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
+from .transaction import queue_when_in_transaction
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
+@queue_when_in_transaction
 @handle_connection_failure
 def invalidate_dict(model, obj_dict):
     if no_invalidation.active:
@@ -26,6 +28,7 @@ def invalidate_dict(model, obj_dict):
         json.dumps(obj_dict, default=str)
     ])
 
+
 def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
@@ -33,11 +36,12 @@ def invalidate_obj(obj):
     model = non_proxy(obj.__class__)
     invalidate_dict(model, get_obj_dict(model, obj))
 
+@queue_when_in_transaction
 @handle_connection_failure
 def invalidate_model(model):
     """
     Invalidates all caches for given model.
-    NOTE: This is a heavy artilery which uses redis KEYS request,
+    NOTE: This is a heavy artillery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
     if no_invalidation.active:
@@ -48,6 +52,8 @@ def invalidate_model(model):
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
+
+@queue_when_in_transaction
 @handle_connection_failure
 def invalidate_all():
     if no_invalidation.active:
@@ -58,6 +64,7 @@ def invalidate_all():
 class InvalidationState(threading.local):
     def __init__(self):
         self.depth = 0
+
 
 class _no_invalidation(ContextDecorator):
     state = InvalidationState()

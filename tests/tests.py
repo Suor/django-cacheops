@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-import os, re, copy
+import re, copy
 import unittest
 
 from django.db import connection, connections
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group
 from django.template import Context, Template
@@ -13,14 +13,24 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
+
 decorator_tag = register.decorator_tag
 from .models import *
 
 
-class BaseTestCase(TestCase):
+# django.test.TestCase wraps individual tests in atomic blocks. Old tests were not written to check
+#  the change in functionality cacheop's transaction support implements when in atomic blocks.
+#  Changing to django.test.TransactionTestCase fixes this issue. Tests are not in atomic blocks.
+#  This does make tests run slower then before, since tables are truncated and fixtures reapplied
+#  between tests.
+class BaseTestCase(TransactionTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         invalidate_all()
+        # For mysql, django will add the query 'SET SQL_AUTO_IS_NULL = 0' before the first query.
+        # See https://code.djangoproject.com/ticket/24675
+        # Run a query before our tests in order to trigger this, before we start counting queries.
+        Category.objects.nocache().exists()
 
 
 class BasicTests(BaseTestCase):
