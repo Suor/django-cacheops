@@ -73,8 +73,8 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': 'sqlite.db',
-            # make in memory sqlite test db work with threads for python prior to 3.4
-            # see https://code.djangoproject.com/ticket/12118
+            # Make in memory sqlite test db to work with threads
+            # See https://code.djangoproject.com/ticket/12118
             'TEST': {
                 'NAME': '/dev/shm/cacheops_sqlite.db'
             }
@@ -82,11 +82,6 @@ else:
         'slave': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': 'sqlite_slave.db',
-            # make in memory sqlite test db work with threads for python prior to 3.4
-            # see https://code.djangoproject.com/ticket/12118
-            'TEST': {
-                'NAME': '/dev/shm/cacheops_sqlite_slave.db'
-            }
         }
     }
 
