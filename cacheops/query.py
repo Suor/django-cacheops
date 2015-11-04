@@ -445,9 +445,6 @@ class ManagerMixin(object):
     def inplace(self):
         return self.get_queryset().inplace()
 
-    def get(self, *args, **kwargs):
-        return self.get_queryset().inplace().get(*args, **kwargs)
-
     def cache(self, *args, **kwargs):
         return self.get_queryset().cache(*args, **kwargs)
 
