@@ -228,6 +228,15 @@ caching, but only path of the request parameter is used to construct cache key:
 
 You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``.
 
+Class based views can also be cached:
+
+.. code:: python
+
+    class NewsIndex(ListView):
+        model = News
+
+    news_index = cached_view_as(News)(NewsIndex.as_view())
+
 
 Invalidation
 ------------
