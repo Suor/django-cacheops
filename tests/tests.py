@@ -573,6 +573,10 @@ class IssueTests(BaseTestCase):
         # Non ascii text in non-unicode str literal
         list(Category.objects.filter(title='фыва').cache())
 
+    def test_169(self):
+        c = Category.objects.prefetch_related('posts').get(pk=3)
+        c.posts.get(visible=1)  # this used to fail
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
