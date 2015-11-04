@@ -22,6 +22,12 @@ class ThreadWithReturnValue(Thread):
                 self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
         except Exception as e:
             self._exc = e
+        finally:
+            # Django does not drop postgres connections opened in new threads.
+            # This leads to postgres complaining about db accessed when we try to destory it.
+            # See https://code.djangoproject.com/ticket/22420#comment:18
+            from django.db import connection
+            connection.close()
 
     def join(self, *args, **kwargs):
         super(ThreadWithReturnValue, self).join(*args, **kwargs)
