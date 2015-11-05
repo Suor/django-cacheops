@@ -364,10 +364,6 @@ _old_objs = threading.local()
 class ManagerMixin(object):
     @once_per('cls')
     def _install_cacheops(self, cls):
-        # Django 1.7 migrations create lots of fake models, just skip them
-        if cls.__module__ == '__fake__':
-            return
-
         cls._cacheprofile = model_profile(cls)
 
         if family_has_profile(cls):
@@ -383,7 +379,11 @@ class ManagerMixin(object):
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
-        self._install_cacheops(cls)
+        # Django 1.7+ migrations create lots of fake models, just skip them
+        # NOTE: we make it here rather then inside _install_cacheops()
+        #       because we don't want @once_per() to hold refs to all of them.
+        if cls.__module__ != '__fake__':
+            self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
         if instance.pk is not None and not no_invalidation.active:
