@@ -251,9 +251,6 @@ class QuerySetMixin(object):
             clone._cloning = self._cloning - 1 if self._cloning else 0
             return clone
 
-    def all(self):
-        return self.clone()
-
     def iterator(self):
         # TODO: do not cache empty queries?
         superiter = self._no_monkey.iterator
