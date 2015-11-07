@@ -1,3 +1,7 @@
+2.4.3
+- fixed .get() on reverse fk related manager
+- fixed memory leak on migrations
+
 2.4.2
 - fixed .values() and .values_list() in Django 1.9
 - stopped sharing cache between proxies and base
