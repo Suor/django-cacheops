@@ -573,6 +573,7 @@ class IssueTests(BaseTestCase):
         # Non ascii text in non-unicode str literal
         list(Category.objects.filter(title='фыва').cache())
 
+    @unittest.skipUnless(django.VERSION >= (1, 4), "No .prefetch_related() in Django 1.3")
     def test_169(self):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
