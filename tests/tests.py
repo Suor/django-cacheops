@@ -5,7 +5,8 @@ import unittest
 from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.template import Context, Template
 from django.db.models import F
 
@@ -566,6 +567,19 @@ class IssueTests(BaseTestCase):
     def test_169(self):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
+
+    def test_173(self):
+        g = Group.objects.create()
+        content_type = ContentType.objects.get_for_model(User)
+        p = Permission.objects.create(codename='foobar',
+                                      content_type=content_type)
+        g.user_set.add(self.user)
+        self.user.get_all_permissions()
+        g.permissions.add(p)
+        g.save()
+
+        with self.assertNumQueries(1):
+            self.user.get_all_permissions()
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
