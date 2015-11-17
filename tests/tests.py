@@ -928,9 +928,11 @@ class GISTests(BaseTestCase):
 class SignalsTests(BaseTestCase):
     def setUp(self):
         super(SignalsTests, self).setUp()
-        self.signal_call = [None]
+
         def set_signal(signal=None, **kwargs):
             self.signal_call[0] = kwargs
+
+        self.signal_call = [None]
         cache_read.connect(set_signal, dispatch_uid=1, weak=False)
 
     def tearDown(self):
