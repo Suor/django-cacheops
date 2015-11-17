@@ -27,6 +27,7 @@ from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import in_transaction
+from .signals import cache_read
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
@@ -92,6 +93,7 @@ def cached_as(*samples, **kwargs):
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
             cache_data = redis_client.get(cache_key)
+            cache_read.send(sender=None, func=func, hit=cache_data is not None)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -267,7 +269,9 @@ class QuerySetMixin(object):
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:
+                        # Notify about cache hit
                         yield obj
+                    cache_read.send(sender=self.model, func=self.model, hit=True)
                     raise StopIteration
 
         # Cache miss - fallback to overriden implementation
@@ -279,6 +283,8 @@ class QuerySetMixin(object):
 
         if cache_this:
             self._cache_results(cache_key, results)
+        # Notify about not hitting cache
+        cache_read.send(sender=self.model, func=self.model, hit=False)
         raise StopIteration
 
     def count(self):

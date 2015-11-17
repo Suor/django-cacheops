@@ -263,6 +263,10 @@ class M2MWithCharId(models.Model):
     id = models.CharField(max_length=30, primary_key=True)
     name = models.CharField(max_length=30)
 
+# For signals tests
+class SignalTest(models.Model):
+    name = models.CharField(max_length=30)
+
 
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)
