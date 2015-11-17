@@ -36,16 +36,6 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached_call(self, key, func, timeout=None, args=(), kwargs={}):
-        cache_key = 'cc:%s' % key
-        try:
-            result = self.get(cache_key)
-        except CacheMiss:
-            result = func(*args, **kwargs)
-            self.set(cache_key, result, timeout)
-
-        return result
-
     def cached(self, timeout=None, extra=None, key_func=func_cache_key):
         """
         A decorator for caching function calls

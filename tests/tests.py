@@ -870,13 +870,6 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.key(2).set(42)
         self.assertEqual(get_calls(2), 42)
 
-    def test_cached_call(self):
-        from cacheops import cache
-
-        get_calls = _make_inc()
-        self.assertEqual(cache.cached_call('calls', get_calls), 1)
-        self.assertEqual(cache.cached_call('calls', get_calls), 1)
-
     def test_cached_view(self):
         calls = [0]
 
