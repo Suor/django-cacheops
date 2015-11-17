@@ -254,35 +254,24 @@ class QuerySetMixin(object):
             return clone
 
     def iterator(self):
-        # TODO: do not cache empty queries?
-        superiter = self._no_monkey.iterator
-        # ignore reads & writes while in transaction. redis isn't going to know what is happening
-        #  in the database transaction. no point in writing data that might be rolled back
-        cache_this = self._cacheprofile and 'fetch' in self._cacheconf['ops'] and \
-            not in_transaction()
+        # If cache is not enabled or in transaction just fall back
+        if not self._cacheprofile or 'fetch' not in self._cacheconf['ops'] \
+                or in_transaction():
+            return self._no_monkey.iterator(self)
 
-        if cache_this:
-            cache_key = self._cache_key()
-            if not self._cacheconf['write_only'] and not self._for_write:
-                # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
-                cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
-                if cache_data is not None:
-                    results = pickle.loads(cache_data)
-                    for obj in results:
-                        yield obj
-                    raise StopIteration
+        cache_key = self._cache_key()
+        if not self._cacheconf['write_only'] and not self._for_write:
+            # Trying get data from cache
+            cache_data = redis_client.get(cache_key)
+            cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
+            if cache_data is not None:
+                return iter(pickle.loads(cache_data))
 
-        # Cache miss - fallback to overriden implementation
-        results = []
-        for obj in superiter(self):
-            if cache_this:
-                results.append(obj)
-            yield obj
-
-        if cache_this:
-            self._cache_results(cache_key, results)
-        raise StopIteration
+        # Cache miss - fetch data from overriden implementation
+        # No point in playing lazy we gonna store it anyway
+        results = list(self._no_monkey.iterator(self))
+        self._cache_results(cache_key, results)
+        return iter(results)
 
     def count(self):
         if self._cacheprofile and 'count' in self._cacheconf['ops']:
