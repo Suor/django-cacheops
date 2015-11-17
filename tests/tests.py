@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import re, copy
 import unittest
-import mock
 
 from django.db import connection, connections
 from django.test import TestCase
@@ -15,6 +14,7 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 from cacheops.transaction import transaction_state
+from cacheops.signals import cache_read
 
 decorator_tag = register.decorator_tag
 from .models import *
@@ -208,18 +208,8 @@ class NoInvalidationTests(BaseTestCase):
 
 
 class DecoratorTests(BaseTestCase):
-    def _make_func(self, deco):
-        calls = [0]
-
-        @deco
-        def get_calls(_=None):
-            calls[0] += 1
-            return calls[0]
-
-        return get_calls
-
     def test_cached_as_model(self):
-        get_calls = self._make_func(cached_as(Category))
+        get_calls = _make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(), 1)      # miss
         self.assertEqual(get_calls(), 1)      # hit
@@ -227,7 +217,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_cond(self):
-        get_calls = self._make_func(cached_as(Category.objects.filter(title='test')))
+        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
@@ -237,7 +227,7 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_as_obj(self):
         c = Category.objects.create(title='test')
-        get_calls = self._make_func(cached_as(c))
+        get_calls = _make_inc(cached_as(c))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
@@ -247,14 +237,14 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_depends_on_args(self):
-        get_calls = self._make_func(cached_as(Category))
+        get_calls = _make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(1), 1)      # cache
         self.assertEqual(get_calls(1), 1)      # hit
         self.assertEqual(get_calls(2), 2)      # miss
 
     def test_cached_as_depends_on_two_models(self):
-        get_calls = self._make_func(cached_as(Category, Post))
+        get_calls = _make_inc(cached_as(Category, Post))
         c = Category.objects.create(title='miss')
         p = Post.objects.create(title='New Post', category=c)
 
@@ -267,7 +257,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
     def test_cached_view_as(self):
-        get_calls = self._make_func(cached_view_as(Category))
+        get_calls = _make_inc(cached_view_as(Category))
 
         factory = RequestFactory()
         r1 = factory.get('/hi')
@@ -359,21 +349,13 @@ class ArrayTests(BaseTestCase):
 
 
 class TemplateTests(BaseTestCase):
-    def get_inc(self):
-        count = [0]
-
-        def inc():
-            count[0] += 1
-            return count[0]
-        return inc
-
     def assertRendersTo(self, template, context, result):
         s = template.render(Context(context))
         self.assertEqual(re.sub(r'\s+', '', s), result)
 
     def test_cached(self):
-        inc_a = self.get_inc()
-        inc_b = self.get_inc()
+        inc_a = _make_inc()
+        inc_b = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.a{{ a }}{% endcached %}
@@ -385,7 +367,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'a': inc_a, 'b': inc_b}, '.a1.a1.a2.b1')
 
     def test_invalidate_fragment(self):
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.{{ inc }}{% endcached %}
@@ -397,7 +379,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'inc': inc}, '.2')
 
     def test_cached_as(self):
-        inc = self.get_inc()
+        inc = _make_inc()
         qs = Post.objects.all()
         t = Template("""
             {% load cacheops %}
@@ -421,7 +403,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(flag):
             return cached(timeout=60) if flag else lambda x: x
 
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
@@ -437,7 +419,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(context):
             return cached(timeout=60) if context['flag'] else lambda x: x
 
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached %}.{{ inc }}{% endmy_cached %}
@@ -889,14 +871,9 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 42)
 
     def test_cached_call(self):
-        calls = [0]
-
-        def get_calls():
-            calls[0] += 1
-            return calls[0]
-
         from cacheops import cache
 
+        get_calls = _make_inc()
         self.assertEqual(cache.cached_call('calls', get_calls), 1)
         self.assertEqual(cache.cached_call('calls', get_calls), 1)
 
@@ -956,107 +933,48 @@ class GISTests(BaseTestCase):
 
 
 class SignalsTests(BaseTestCase):
-    def _make_func(self, deco):
-        calls = [0]
+    def setUp(self):
+        super(SignalsTests, self).setUp()
+        self.signal_call = [None]
+        def set_signal(signal=None, **kwargs):
+            self.signal_call[0] = kwargs
+        cache_read.connect(set_signal, dispatch_uid=1, weak=False)
 
-        @deco
-        def get_calls(_=None):
-            calls[0] += 1
-            return calls[0]
+    def tearDown(self):
+        super(SignalsTests, self).tearDown()
+        cache_read.disconnect(dispatch_uid=1)
 
-        return get_calls
-
-    @mock.patch('cacheops.signals.cache_read.send')
-    def test_cacheops_signal_post_queryset_with_get(self, mock_cache_read_send):
-        self.assertFalse(mock_cache_read_send.called)
-
+    def test_queryset(self):
+        # Miss
         test_model = SignalTest.objects.create(name="foo")
-        SignalTest.objects.get(id=test_model.id) # miss
-        mock_cache_read_send.assert_called_once_with(
-            sender=SignalTest,
-            func=SignalTest,
-            hit=False
-        )
+        SignalTest.objects.get(id=test_model.id)
+        self.assertEqual(self.signal_call[0], {'sender': SignalTest, 'func': None, 'hit': False})
 
-        # Reset mock and try again, this time it should hit cache
-        mock_cache_read_send.reset_mock()
+        # Hit
         SignalTest.objects.get(id=test_model.id) # hit
-        mock_cache_read_send.assert_called_once_with(
-            sender=SignalTest,
-            func=SignalTest,
-            hit=True
-        )
+        self.assertEqual(self.signal_call[0], {'sender': SignalTest, 'func': None, 'hit': True})
 
-        # Test that it is called again on every cache hit
-        mock_cache_read_send.reset_mock()
-        SignalTest.objects.get(id=test_model.id) # hit
-        mock_cache_read_send.assert_called_once_with(
-            sender=SignalTest,
-            func=SignalTest,
-            hit=True
-        )
+    def test_cached_as(self):
+        get_calls = _make_inc(cached_as(SignalTest.objects.filter(name='test')))
+        func = get_calls.__wrapped__
 
-    @mock.patch('cacheops.signals.cache_read.send')
-    def test_cacheops_signal_post_queryset_with_filter(self, mock_cache_read_send):
-        self.assertFalse(mock_cache_read_send.called)
+        # Miss
+        self.assertEqual(get_calls(), 1)
+        self.assertEqual(self.signal_call[0], {'sender': None, 'func': func, 'hit': False})
 
-        # Create some data
-        SignalTest.objects.create(name="foo")
-        SignalTest.objects.create(name="bar")
+        # Hit
+        self.assertEqual(get_calls(), 1)
+        self.assertEqual(self.signal_call[0], {'sender': None, 'func': func, 'hit': True})
 
-        # Force to evaluate queryset
-        list(SignalTest.objects.filter()) # miss
-        # make sure we got miss signal only once
-        mock_cache_read_send.assert_called_once_with(
-            sender=SignalTest,
-            func=SignalTest,
-            hit=False
-        )
 
-        # Reset mock and try again, this time it should hit cache
-        mock_cache_read_send.reset_mock()
+# Utilities
 
-        list(SignalTest.objects.filter()) # hit
-        # make sure we got hit signal only once
-        mock_cache_read_send.assert_called_once_with(
-            sender=SignalTest,
-            func=SignalTest,
-            hit=True
-        )
+def _make_inc(deco=lambda x: x):
+    calls = [0]
 
-        # Test that it is called again on every cache hit
-        mock_cache_read_send.reset_mock()
+    @deco
+    def get_calls(_=None):
+        calls[0] += 1
+        return calls[0]
 
-        list(SignalTest.objects.filter()) # hit
-        # make sure we got miss signal only once
-
-    @mock.patch('cacheops.signals.cache_read.send')
-    def test_cacheops_signal_works_with_cached_as(self, mock_cache_read_send):
-        get_calls = self._make_func(cached_as(SignalTest.objects.filter(name='test')))
-
-        self.assertEqual(get_calls(), 1)      # cache
-
-        _, kwargs = mock_cache_read_send.call_args
-        self.assertIsNone(kwargs['sender'])
-        self.assertEqual(kwargs['func'].__name__, 'get_calls')
-        self.assertFalse(kwargs['hit'])
-
-        mock_cache_read_send.reset_mock()
-
-        SignalTest.objects.create(name='miss') # don't invalidate
-        self.assertEqual(get_calls(), 1)      # hit
-
-        _, kwargs = mock_cache_read_send.call_args
-        self.assertIsNone(kwargs['sender'])
-        self.assertEqual(kwargs['func'].__name__, 'get_calls')
-        self.assertTrue(kwargs['hit'])
-
-        mock_cache_read_send.reset_mock()
-
-        SignalTest.objects.create(name='test') # invalidate
-        self.assertEqual(get_calls(), 2)      # miss
-
-        _, kwargs = mock_cache_read_send.call_args
-        self.assertIsNone(kwargs['sender'])
-        self.assertEqual(kwargs['func'].__name__, 'get_calls')
-        self.assertFalse(kwargs['hit'])
+    return get_calls

@@ -266,12 +266,11 @@ class QuerySetMixin(object):
             if not self._cacheconf['write_only'] and not self._for_write:
                 # Trying get data from cache
                 cache_data = redis_client.get(cache_key)
+                cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
                 if cache_data is not None:
                     results = pickle.loads(cache_data)
                     for obj in results:
-                        # Notify about cache hit
                         yield obj
-                    cache_read.send(sender=self.model, func=self.model, hit=True)
                     raise StopIteration
 
         # Cache miss - fallback to overriden implementation
@@ -283,8 +282,6 @@ class QuerySetMixin(object):
 
         if cache_this:
             self._cache_results(cache_key, results)
-        # Notify about not hitting cache
-        cache_read.send(sender=self.model, func=self.model, hit=False)
         raise StopIteration
 
     def count(self):
