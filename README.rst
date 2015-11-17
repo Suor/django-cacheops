@@ -564,6 +564,26 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Keeping stats
+-------------
+
+Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
+``func`` - decorated function and ``hit`` - fetch success as boolean value.
+
+Here is simple stats implementation:
+
+.. code:: python
+
+    from cacheops.signals import cache_read
+    from statsd.defaults.django import statsd
+
+    def stats_collector(sender, func, hit, **kwargs):
+        event = 'hit' if hit else 'miss'
+        statsd.incr('cacheops.%s' % event)
+
+    cache_read.connect(stats_collector)
+
+
 CAVEATS
 -------
 
