@@ -581,7 +581,7 @@ class IssueTests(BaseTestCase):
         g.permissions.add(p)
 
         with self.assertNumQueries(1):
-            # but permission still using cache
+            # cache for permission should be invalidated after group changes
             list(Permission.objects.filter(group__user=self.user).cache())
 
 
