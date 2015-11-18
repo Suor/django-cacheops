@@ -104,6 +104,7 @@ CACHEOPS = {
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
+    'auth.*': {'ops': 'get'}
 }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))

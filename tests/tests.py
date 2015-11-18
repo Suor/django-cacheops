@@ -570,16 +570,19 @@ class IssueTests(BaseTestCase):
 
     def test_173(self):
         g = Group.objects.create()
+        g.user_set.add(self.user)
         content_type = ContentType.objects.get_for_model(User)
         p = Permission.objects.create(codename='foobar',
                                       content_type=content_type)
-        g.user_set.add(self.user)
-        self.user.get_all_permissions()
+        # query will be put into cache. It's ok
+        list(Permission.objects.filter(group__user=self.user).cache())
+
+        # then we add permission to group. m2m_changed will be emited
         g.permissions.add(p)
-        g.save()
 
         with self.assertNumQueries(1):
-            self.user.get_all_permissions()
+            # but permission still using cache
+            list(Permission.objects.filter(group__user=self.user).cache())
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
