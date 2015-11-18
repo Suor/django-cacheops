@@ -930,9 +930,9 @@ class SignalsTests(BaseTestCase):
         super(SignalsTests, self).setUp()
 
         def set_signal(signal=None, **kwargs):
-            self.signal_call[0] = kwargs
+            self.signal_calls.append(kwargs)
 
-        self.signal_call = [None]
+        self.signal_calls = []
         cache_read.connect(set_signal, dispatch_uid=1, weak=False)
 
     def tearDown(self):
@@ -941,25 +941,27 @@ class SignalsTests(BaseTestCase):
 
     def test_queryset(self):
         # Miss
-        test_model = SignalTest.objects.create(name="foo")
-        SignalTest.objects.get(id=test_model.id)
-        self.assertEqual(self.signal_call[0], {'sender': SignalTest, 'func': None, 'hit': False})
+        test_model = Category.objects.create(title="foo")
+        Category.objects.cache().get(id=test_model.id)
+        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
 
         # Hit
-        SignalTest.objects.get(id=test_model.id) # hit
-        self.assertEqual(self.signal_call[0], {'sender': SignalTest, 'func': None, 'hit': True})
+        self.signal_calls = []
+        Category.objects.cache().get(id=test_model.id) # hit
+        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': True}])
 
     def test_cached_as(self):
-        get_calls = _make_inc(cached_as(SignalTest.objects.filter(name='test')))
+        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
         func = get_calls.__wrapped__
 
         # Miss
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_call[0], {'sender': None, 'func': func, 'hit': False})
+        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': False}])
 
         # Hit
+        self.signal_calls = []
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_call[0], {'sender': None, 'func': func, 'hit': True})
+        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
 
 
 # Utilities

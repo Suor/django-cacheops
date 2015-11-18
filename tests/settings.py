@@ -100,7 +100,6 @@ CACHEOPS = {
     'tests.dbbinded': {'db_agnostic': False},
     'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
     'tests.all': {'ops': 'all'},
-    'tests.signaltest': {'ops': 'all'},
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
