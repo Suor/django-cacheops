@@ -5,7 +5,8 @@ import unittest
 from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.template import Context, Template
 from django.db.models import F
 
@@ -566,6 +567,22 @@ class IssueTests(BaseTestCase):
     def test_169(self):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
+
+    def test_173(self):
+        g = Group.objects.create()
+        g.user_set.add(self.user)
+        content_type = ContentType.objects.get_for_model(User)
+        p = Permission.objects.create(codename='foobar',
+                                      content_type=content_type)
+        # query will be put into cache. It's ok
+        list(Permission.objects.filter(group__user=self.user).cache())
+
+        # then we add permission to group. m2m_changed will be emited
+        g.permissions.add(p)
+
+        with self.assertNumQueries(1):
+            # cache for permission should be invalidated after group changes
+            list(Permission.objects.filter(group__user=self.user).cache())
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
