@@ -51,7 +51,8 @@ class IntentionalRollback(Exception):
 
 
 class TransactionSupportTests(TransactionTestCase):
-    fixtures = ['basic']
+    def setUp(self):
+        Category.objects.create(pk=1, title='Django')
 
     def test_atomic(self):
         with atomic():
