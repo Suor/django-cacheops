@@ -5,8 +5,7 @@ import unittest
 from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User, Group, Permission
-from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth.models import User, Group
 from django.template import Context, Template
 from django.db.models import F
 
@@ -567,25 +566,6 @@ class IssueTests(BaseTestCase):
     def test_169(self):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
-
-    @unittest.expectedFailure
-    def test_173(self):
-        g = Group.objects.create(name='gr')
-        g.user_set.add(self.user)
-        content_type = ContentType.objects.get_for_model(User)
-        p = Permission.objects.create(name='foobar',
-                                      content_type=content_type)
-
-        # Cache it
-        list(Permission.objects.filter(group__user=self.user).cache())
-
-        # Add permission to group. m2m_changed will be emited
-        g.permissions.add(p)
-
-        # Note that we don't query per group nor permission here,
-        # this is why this cache won't be invalidated.
-        perms = list(Permission.objects.filter(group__user=self.user).cache())
-        self.assertEqual(perms, [p])
 
     @unittest.expectedFailure
     def test_173_simple(self):
