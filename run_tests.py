@@ -8,7 +8,7 @@ from django.core.management import call_command
 names = next((a for a in sys.argv[1:] if not a.startswith('-')), None)
 if not names:
     names = 'tests'
-elif re.search(r'^\d+$', names):
+elif re.search(r'^\d+', names):
     names = 'tests.tests.IssueTests.test_' + names
 elif not names.startswith('tests.'):
     names = 'tests.tests.' + names

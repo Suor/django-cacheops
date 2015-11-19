@@ -568,21 +568,39 @@ class IssueTests(BaseTestCase):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
 
+    @unittest.expectedFailure
     def test_173(self):
-        g = Group.objects.create()
+        g = Group.objects.create(name='gr')
         g.user_set.add(self.user)
         content_type = ContentType.objects.get_for_model(User)
-        p = Permission.objects.create(codename='foobar',
+        p = Permission.objects.create(name='foobar',
                                       content_type=content_type)
-        # query will be put into cache. It's ok
+
+        # Cache it
         list(Permission.objects.filter(group__user=self.user).cache())
 
-        # then we add permission to group. m2m_changed will be emited
+        # Add permission to group. m2m_changed will be emited
         g.permissions.add(p)
 
-        with self.assertNumQueries(1):
-            # cache for permission should be invalidated after group changes
-            list(Permission.objects.filter(group__user=self.user).cache())
+        # Note that we don't query per group nor permission here,
+        # this is why this cache won't be invalidated.
+        perms = list(Permission.objects.filter(group__user=self.user).cache())
+        self.assertEqual(perms, [p])
+
+    @unittest.expectedFailure
+    def test_173_simple(self):
+        extra = Extra.objects.get(pk=1)
+        title = extra.post.category.title
+
+        # Cache
+        list(Extra.objects.filter(post__category__title=title).cache())
+
+        # Break the link
+        extra.post.category_id = 2
+        extra.post.save()
+
+        # Fail because neither Extra nor Catehory changed, but something in between
+        self.assertEqual([], list(Extra.objects.filter(post__category__title=title).cache()))
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
