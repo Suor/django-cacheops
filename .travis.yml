@@ -6,6 +6,11 @@ services:
   - redis-server
 addons:
   postgresql: "9.3"
+  apt:
+    sources:
+      - deadsnakes
+    packages:
+      - python3.5
 env:
   - TOXENV=lint
   - TOXENV=py27-dj17
@@ -16,6 +21,9 @@ env:
   - TOXENV=py34-dj17
   - TOXENV=py34-dj18
   - TOXENV=py34-djmaster
+  - TOXENV=py35-dj17
+  - TOXENV=py35-dj18
+  - TOXENV=py35-djmaster
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
