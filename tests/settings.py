@@ -2,8 +2,8 @@ import os
 
 INSTALLED_APPS = [
     'cacheops',
-    'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.admin',
     'tests',
 ]
