@@ -563,6 +563,7 @@ class IssueTests(BaseTestCase):
     def test_161_non_ascii(self):
         # Non ascii text in non-unicode str literal
         list(Category.objects.filter(title='фыва').cache())
+        list(Category.objects.filter(title='фыва', title__startswith='фыва').cache())
 
     def test_169(self):
         c = Category.objects.prefetch_related('posts').get(pk=3)
