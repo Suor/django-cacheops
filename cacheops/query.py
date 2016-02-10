@@ -51,6 +51,27 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     )
 
 
+def get_cache_data(cache_key, timeout, sender=None, func=None):
+
+    if settings.CACHEOPS_SEND_AGE:
+        cache_data, ttl = redis_client.get_with_ttl(cache_key)
+    else:
+        cache_data = redis_client.get(cache_key)
+
+    send_kwargs = dict(
+        sender=sender,
+        func=func,
+        hit=cache_data is not None,
+    )
+
+    if settings.CACHEOPS_SEND_AGE:
+        send_kwargs['age'] = timeout - ttl
+
+    cache_read.send(**send_kwargs)
+
+    return cache_data
+
+
 def cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset.
@@ -91,9 +112,7 @@ def cached_as(*samples, **kwargs):
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
-
-            cache_data = redis_client.get(cache_key)
-            cache_read.send(sender=None, func=func, hit=cache_data is not None)
+            cache_data = get_cache_data(cache_key, timeout, func=func)
             if cache_data is not None:
                 return pickle.loads(cache_data)
 
@@ -261,9 +280,8 @@ class QuerySetMixin(object):
 
         cache_key = self._cache_key()
         if not self._cacheconf['write_only'] and not self._for_write:
-            # Trying get data from cache
-            cache_data = redis_client.get(cache_key)
-            cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
+
+            cache_data = get_cache_data(cache_key, model_profile(self.model)['timeout'], sender=self.model)
             if cache_data is not None:
                 return iter(pickle.loads(cache_data))
 

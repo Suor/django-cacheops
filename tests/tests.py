@@ -13,6 +13,7 @@ from django.db.models import F
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
+from cacheops.conf import settings
 from cacheops.templatetags.cacheops import register
 from cacheops.transaction import transaction_state
 from cacheops.signals import cache_read
@@ -993,12 +994,22 @@ class SignalsTests(BaseTestCase):
         # Miss
         test_model = Category.objects.create(title="foo")
         Category.objects.cache().get(id=test_model.id)
-        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
+
+        data = {'sender': Category, 'func': None, 'hit': False}
+        if settings.CACHEOPS_SEND_AGE:
+            data['age'] = 3602
+
+        self.assertEqual(self.signal_calls, [data])
 
         # Hit
         self.signal_calls = []
         Category.objects.cache().get(id=test_model.id) # hit
-        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': True}])
+
+        data = {'sender': Category, 'func': None, 'hit': True}
+        if settings.CACHEOPS_SEND_AGE:
+            data['age'] = 0
+
+        self.assertEqual(self.signal_calls, [data])
 
     def test_cached_as(self):
         get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
@@ -1006,12 +1017,22 @@ class SignalsTests(BaseTestCase):
 
         # Miss
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': False}])
+
+        data = {'sender': None, 'func': func, 'hit': False}
+        if settings.CACHEOPS_SEND_AGE:
+            data['age'] = 3602
+
+        self.assertEqual(self.signal_calls, [data])
 
         # Hit
         self.signal_calls = []
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
+
+        data = {'sender': None, 'func': func, 'hit': True}
+        if settings.CACHEOPS_SEND_AGE:
+            data['age'] = 0
+
+        self.assertEqual(self.signal_calls, [data])
 
 
 # Utilities

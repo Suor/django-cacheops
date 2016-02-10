@@ -568,7 +568,9 @@ Keeping stats
 -------------
 
 Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
-``func`` - decorated function and ``hit`` - fetch success as boolean value.
+``func`` - decorated function
+``hit`` - fetch success as boolean value.
+``age`` - The age of the object if CACHEOPS_SEND_AGE is True.
 
 Here is simple stats implementation:
 

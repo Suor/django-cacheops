@@ -24,13 +24,23 @@ else:
 class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
+    def get_with_ttl(self, name):
+        txn = redis_client.pipeline()
+        cache_data = redis_client.get(name)
+        ttl = redis_client.ttl(name)
+        txn.execute()
+        return cache_data, ttl
+
 
 class LazyRedis(object):
     def _setup(self):
         if not settings.CACHEOPS_REDIS:
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-        Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
+        Redis = SafeRedis if (
+            settings.CACHEOPS_DEGRADE_ON_FAILURE or
+            settings.CACHEOPS_SEND_AGE
+        ) else redis.StrictRedis
         client = Redis(**settings.CACHEOPS_REDIS)
 
         object.__setattr__(self, '__class__', client.__class__)
