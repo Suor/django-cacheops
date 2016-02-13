@@ -42,6 +42,26 @@ def model_family(model):
     return class_tree(non_proxy(model))
 
 
+def get_related_classes(cls, parent_classes=False):
+    """Get all non abstract django model classes (ie exist as tables in database)
+    """
+    result = []
+    if parent_classes:
+        list_set = cls.__bases__
+    else:
+        list_set = cls.__subclasses__()
+
+    for item in list_set:
+        try:
+            include = not item._meta.abstract
+            if include:
+                result.append(item)
+            result.extend(get_related_classes(item, parent_classes))
+        except AttributeError:
+            pass
+    return list(set(result))
+
+
 @memoize
 def family_has_profile(cls):
     return any(model_profile, model_family(cls))

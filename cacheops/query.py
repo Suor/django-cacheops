@@ -22,7 +22,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, CACHEOPS_LRU, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, get_related_classes
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -381,6 +381,16 @@ class ManagerMixin(object):
         if instance.pk is not None and not no_invalidation.active:
             try:
                 _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
+
+                # Get all concrete parent and child classes, and mark those for invalidation too
+                related_types = (get_related_classes(sender, parent_classes=True) +
+                                 get_related_classes(sender, parent_classes=False))
+                for related_type in related_types:
+                    try:
+                        _old_objs[related_type, instance.pk] = related_type.objects.get(pk=instance.pk)
+                    except related_type.DoesNotExist:
+                        pass
+
             except sender.DoesNotExist:
                 pass
 
@@ -390,6 +400,19 @@ class ManagerMixin(object):
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
+
+        # Get all concrete parent and child classes, and mark those for invalidation too
+        related_types = (get_related_classes(sender, parent_classes=True) +
+                         get_related_classes(sender, parent_classes=False))
+        for related_type in related_types:
+            related_old = _old_objs.pop((related_type, instance.pk), None)
+            if old:
+                invalidate_obj(related_old)
+            try:
+                related_instance = related_type.objects.get(pk=instance.pk)
+                invalidate_obj(related_instance)
+            except related_type.DoesNotExist:
+                pass
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
         #       but its base having one. Or vice versa.
