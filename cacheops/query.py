@@ -387,7 +387,7 @@ class ManagerMixin(object):
                                  get_related_classes(sender, parent_classes=False))
                 for related_type in related_types:
                     try:
-                        _old_objs[related_type, instance.pk] = related_type.objects.get(pk=instance.pk)
+                        _old_objs.__dict__[related_type, instance.pk] = related_type.objects.get(pk=instance.pk)
                     except related_type.DoesNotExist:
                         pass
 
@@ -405,8 +405,8 @@ class ManagerMixin(object):
         related_types = (get_related_classes(sender, parent_classes=True) +
                          get_related_classes(sender, parent_classes=False))
         for related_type in related_types:
-            related_old = _old_objs.pop((related_type, instance.pk), None)
-            if old:
+            related_old = _old_objs.__dict__.pop((related_type, instance.pk), None)
+            if related_old:
                 invalidate_obj(related_old)
             try:
                 related_instance = related_type.objects.get(pk=instance.pk)
