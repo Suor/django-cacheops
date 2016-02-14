@@ -22,7 +22,8 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, CACHEOPS_LRU, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, get_related_classes
+from .utils import (monkey_mix, stamp_fields, func_cache_key, cached_view_fab,
+                    family_has_profile, get_related_classes)
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -387,7 +388,8 @@ class ManagerMixin(object):
                                  get_related_classes(sender, parent_classes=False))
                 for related_type in related_types:
                     try:
-                        _old_objs.__dict__[related_type, instance.pk] = related_type.objects.get(pk=instance.pk)
+                        related_object = related_type.objects.get(pk=instance.pk)
+                        _old_objs.__dict__[related_type, instance.pk] = related_object
                     except related_type.DoesNotExist:
                         pass
 
