@@ -133,10 +133,9 @@ def dnfs(qs):
     main_alias = model._meta.db_table
 
     dnf = _dnf(where)
-    aliases = {alias for conj in dnf
-                     for alias, _, _, _ in conj
-                     if alias}
-    aliases.add(main_alias)
+    # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
+    aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
+            | {main_alias} - {'django_content_type'}
     return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
 
 

@@ -569,7 +569,6 @@ class IssueTests(BaseTestCase):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
 
-    @unittest.expectedFailure
     def test_173(self):
         g = Group.objects.create(name='gr')
         g.user_set.add(self.user)
@@ -588,7 +587,6 @@ class IssueTests(BaseTestCase):
         perms = list(Permission.objects.filter(group__user=self.user).cache())
         self.assertEqual(perms, [p])
 
-    @unittest.expectedFailure
     def test_173_simple(self):
         extra = Extra.objects.get(pk=1)
         title = extra.post.category.title
