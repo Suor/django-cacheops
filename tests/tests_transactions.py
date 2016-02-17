@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from threading import Thread
 import six
+import unittest
 
+import django
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
 
@@ -50,6 +52,7 @@ class IntentionalRollback(Exception):
     pass
 
 
+@unittest.skipUnless(django.VERSION >= (1, 7), "transactions supported only in Django 1.7+")
 class TransactionSupportTests(TransactionTestCase):
     fixtures = ['basic']
 

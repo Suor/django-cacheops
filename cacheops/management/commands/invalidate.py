@@ -1,6 +1,33 @@
 # -*- coding: utf-8 -*-
 from django.core.management.base import LabelCommand, CommandError
-from django.apps import apps
+try:
+    from django.apps import apps
+except ImportError:
+    # Django 1.7 like shim for older ones
+    from django.db.models import get_app, get_model, get_models
+    from django.core.exceptions import ImproperlyConfigured
+
+    class AppConfig(object):
+        def __init__(self, label, app):
+            self.label, self.app = label, app
+
+        def get_model(self, model_name):
+            model = get_model(self.label, model_name)
+            if not model:
+                raise LookupError(
+                    "App '%s' doesn't have a '%s' model." % (self.label, model_name))
+            return model
+
+        def get_models(self, include_auto_created=False):
+            return get_models(self.app, include_auto_created=include_auto_created)
+
+    class Apps(object):
+        def get_app_config(self, app_label):
+            try:
+                return AppConfig(app_label, get_app(app_label))
+            except ImproperlyConfigured as e:
+                raise LookupError(*e.args)
+    apps = Apps()
 
 from cacheops.invalidation import *
 

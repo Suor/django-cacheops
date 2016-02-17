@@ -18,7 +18,7 @@ And there is more to it:
 Requirements
 ------------
 
-| Python 2.7 or 3.3+, Django 1.7+ and Redis 2.6+.
+Python 2.7+ or 3.3+, Django 1.6+ and Redis 2.6+.
 | **Note:** use cacheops 2.4.3 for older Djangos and Python.
 
 
@@ -467,7 +467,7 @@ you'll need to call this from crontab for that to work::
 Django templates integration
 ----------------------------
 
-Cacheops provides tags to cache template fragments. They mimic ``@cached_as``
+Cacheops provides tags to cache template fragments for Django 1.4+. They mimic ``@cached_as``
 and ``@cached`` decorators, however, they require explicit naming of each fragment:
 
 .. code:: django
@@ -625,11 +625,14 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
    Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
 
-3. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
+3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
+   which sometimes makes queryset cloning very slow. You can use any patch from this ticket to fix it.
 
-4. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/commands/save>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
+4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
 
-5. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
+5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/commands/save>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
+
+6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
