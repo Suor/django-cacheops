@@ -2,7 +2,7 @@ VERSION = (2, 4, 2)
 __version__ = '.'.join(map(str, VERSION if VERSION[-1] else VERSION[:2]))
 
 
-from django.apps import AppConfig
+import django
 
 from .simple import *
 from .query import *
@@ -10,12 +10,18 @@ from .invalidation import *
 from .templatetags.cacheops import *
 from .transaction import install_cacheops_transaction_support
 
+# Use app config for initialization in Django 1.7+
 
-class CacheopsConfig(AppConfig):
-    name = 'cacheops'
+if django.VERSION >= (1, 7):
+    from django.apps import AppConfig
 
-    def ready(self):
-        install_cacheops()
-        install_cacheops_transaction_support()
+    class CacheopsConfig(AppConfig):
+        name = 'cacheops'
 
-default_app_config = 'cacheops.CacheopsConfig'
+        def ready(self):
+            install_cacheops()
+            install_cacheops_transaction_support()
+
+    default_app_config = 'cacheops.CacheopsConfig'
+else:
+    install_cacheops()

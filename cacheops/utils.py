@@ -7,6 +7,7 @@ from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
 from .cross import md5hex
 
+import django
 from django.db import models
 from django.http import HttpRequest
 
@@ -18,8 +19,9 @@ from .conf import model_profile
 NOT_SERIALIZED_FIELDS = (
     models.FileField,
     models.TextField, # One should not filter by long text equality
-    models.BinaryField,
 )
+if hasattr(models, 'BinaryField'):
+    NOT_SERIALIZED_FIELDS += (models.BinaryField,)
 
 
 @memoize
@@ -45,6 +47,14 @@ def model_family(model):
 @memoize
 def family_has_profile(cls):
     return any(model_profile, model_family(cls))
+
+
+if django.VERSION < (1, 6):
+    def get_model_name(model):
+        return model._meta.module_name
+else:
+    def get_model_name(model):
+        return model._meta.model_name
 
 
 class MonkeyProxy(object):
