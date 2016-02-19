@@ -601,6 +601,11 @@ class IssueTests(BaseTestCase):
         # Fail because neither Extra nor Catehory changed, but something in between
         self.assertEqual([], list(Extra.objects.filter(post__category__title=title).cache()))
 
+    def test_177(self):
+        c = Category.objects.get(pk=1)
+        c.posts_copy = c.posts.cache()
+        bool(c.posts_copy)
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):
