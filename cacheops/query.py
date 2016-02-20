@@ -269,11 +269,12 @@ class QuerySetMixin(object):
 
         # Cache miss - fetch data from overriden implementation
         def iterate():
-            results = []
+            # NOTE: we are using self._result_cache to avoid fetching-while-fetching bug #177
+            self._result_cache = []
             for obj in self._no_monkey.iterator(self):
-                results.append(obj)
+                self._result_cache.append(obj)
                 yield obj
-            self._cache_results(cache_key, results)
+            self._cache_results(cache_key, self._result_cache)
 
         return iterate()
 
