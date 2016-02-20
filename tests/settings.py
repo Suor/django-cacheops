@@ -4,7 +4,6 @@ INSTALLED_APPS = [
     'cacheops',
     'django.contrib.contenttypes',
     'django.contrib.auth',
-    'django.contrib.admin',
     'tests',
 ]
 
