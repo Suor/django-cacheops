@@ -66,6 +66,17 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
+    def test_lazy(self):
+        inc = _make_inc()
+
+        from django.db.models.signals import post_init
+        post_init.connect(inc, sender=Category)
+
+        qs = Category.objects.cache()
+        for c in qs.iterator():
+            break
+        self.assertEqual(inc.get(), 1)
+
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
         post.title += ' changed'
@@ -1009,8 +1020,9 @@ def _make_inc(deco=lambda x: x):
     calls = [0]
 
     @deco
-    def get_calls(_=None):
+    def inc(_=None, **kw):
         calls[0] += 1
         return calls[0]
 
-    return get_calls
+    inc.get = lambda: calls[0]
+    return inc

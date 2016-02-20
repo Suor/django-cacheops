@@ -268,10 +268,14 @@ class QuerySetMixin(object):
                 return iter(pickle.loads(cache_data))
 
         # Cache miss - fetch data from overriden implementation
-        # No point in playing lazy we gonna store it anyway
-        results = list(self._no_monkey.iterator(self))
-        self._cache_results(cache_key, results)
-        return iter(results)
+        def iterate():
+            results = []
+            for obj in self._no_monkey.iterator(self):
+                results.append(obj)
+                yield obj
+            self._cache_results(cache_key, results)
+
+        return iterate()
 
     def count(self):
         if self._cacheprofile and 'count' in self._cacheconf['ops']:
