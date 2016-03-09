@@ -98,7 +98,7 @@ CACHEOPS = {
     'tests.cacheonsavemodel': {'cache_on_save': True},
     'tests.dbbinded': {'db_agnostic': False},
     'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
-    'tests.all': {'ops': 'all'},
+    'tests.All': {'ops': 'all'},
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,

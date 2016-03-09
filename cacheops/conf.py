@@ -33,10 +33,10 @@ def prepare_profiles():
     model_profiles = {}
     for app_model, profile in CACHEOPS.items():
         if profile is None:
-            model_profiles[app_model] = None
+            model_profiles[app_model.lower()] = None
             continue
 
-        model_profiles[app_model] = mp = merge(profile_defaults, profile)
+        model_profiles[app_model.lower()] = mp = merge(profile_defaults, profile)
         if mp['ops'] == 'all':
             mp['ops'] = ALL_OPS
         # People will do that anyway :)
