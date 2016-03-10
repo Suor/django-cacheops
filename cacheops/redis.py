@@ -28,9 +28,10 @@ class SafeRedis(redis.StrictRedis):
 class LazyRedis(object):
     def _setup(self):
         if not settings.CACHEOPS_REDIS:
-            raise ImproperlyConfigured('You must specify settings.CACHEOPS_REDIS setting to use cacheops')
+            raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-        client = (SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis)(**settings.CACHEOPS_REDIS)
+        Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
+        client = Redis(**settings.CACHEOPS_REDIS)
 
         object.__setattr__(self, '__class__', client.__class__)
         object.__setattr__(self, '__dict__', client.__dict__)
