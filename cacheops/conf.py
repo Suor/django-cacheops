@@ -2,20 +2,28 @@
 import six
 from funcy import memoize, merge
 
-from django.conf import settings
+from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 
 
-CACHEOPS_REDIS = getattr(settings, 'CACHEOPS_REDIS', None)
-CACHEOPS_DEFAULTS = getattr(settings, 'CACHEOPS_DEFAULTS', {})
-CACHEOPS = getattr(settings, 'CACHEOPS', {})
-CACHEOPS_LRU = getattr(settings, 'CACHEOPS_LRU', False)
-CACHEOPS_DEGRADE_ON_FAILURE = getattr(settings, 'CACHEOPS_DEGRADE_ON_FAILURE', False)
-
-FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
-FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
-
 ALL_OPS = {'get', 'fetch', 'count', 'exists'}
+
+
+class Settings(object):
+    CACHEOPS_REDIS = None
+    CACHEOPS_DEFAULTS = {}
+    CACHEOPS = {}
+    CACHEOPS_LRU = False
+    CACHEOPS_DEGRADE_ON_FAILURE = False
+    FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
+    FILE_CACHE_TIMEOUT = 60*60*24*30
+
+    def __getattribute__(self, name):
+        if hasattr(base_settings, name):
+            return getattr(base_settings, name)
+        return object.__getattribute__(self, name)
+
+settings = Settings()
 
 
 @memoize
@@ -28,10 +36,10 @@ def prepare_profiles():
         'local_get': False,
         'db_agnostic': True,
     }
-    profile_defaults.update(CACHEOPS_DEFAULTS)
+    profile_defaults.update(settings.CACHEOPS_DEFAULTS)
 
     model_profiles = {}
-    for app_model, profile in CACHEOPS.items():
+    for app_model, profile in settings.CACHEOPS.items():
         if profile is None:
             model_profiles[app_model.lower()] = None
             continue

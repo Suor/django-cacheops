@@ -4,7 +4,7 @@ from .cross import pickle, md5hex
 
 from funcy import wraps
 
-from .conf import FILE_CACHE_DIR, FILE_CACHE_TIMEOUT
+from .conf import settings
 from .utils import func_cache_key, cached_view_fab
 from .redis import redis_client, handle_connection_failure
 
@@ -106,7 +106,7 @@ class FileCache(BaseCache):
     Uses mtimes in the future to designate expire time. This makes unnecessary
     reading stale files.
     """
-    def __init__(self, path, timeout=FILE_CACHE_TIMEOUT):
+    def __init__(self, path, timeout=settings.FILE_CACHE_TIMEOUT):
         self._dir = path
         self._default_timeout = timeout
 
@@ -162,4 +162,4 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-file_cache = FileCache(FILE_CACHE_DIR)
+file_cache = FileCache(settings.FILE_CACHE_DIR)

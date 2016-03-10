@@ -21,7 +21,7 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, CACHEOPS_LRU, ALL_OPS
+from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
@@ -41,7 +41,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     Writes data to cache and creates appropriate invalidators.
     """
     assert not in_transaction()
-    load_script('cache_thing', CACHEOPS_LRU)(
+    load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
             pickle.dumps(data, -1),
