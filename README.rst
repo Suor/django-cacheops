@@ -56,6 +56,9 @@ Setup redis connection and enable caching for desired models:
         'unix_socket_path': '' # replaces host and port
     }
 
+    # Alternatively the redis connection can be defined using a URL:
+    # CACHEOPS_REDIS = "redis://localhost:6379/1"
+
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This includes request.user or post.author access,
