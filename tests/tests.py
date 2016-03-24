@@ -617,6 +617,11 @@ class IssueTests(BaseTestCase):
         c.posts_copy = c.posts.cache()
         bool(c.posts_copy)
 
+    @unittest.skipIf(not bool(os.environ.get('CACHEOPS_MULTIDB', False)))
+    def test_184(self):
+        categories = Category.objects.filter(title='Python')
+        list(Post.objects.filter(category__in=categories).cache())
+
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
 class LongTests(BaseTestCase):

@@ -84,6 +84,12 @@ else:
         }
     }
 
+
+if bool(os.environ.get('CACHEOPS_MULTIDB', False)):
+    DATABASE_ROUTERS = ('multidb.MasterSlaveRouter',)
+    SLAVE_DATABASES = ['slave']
+
+
 CACHEOPS_REDIS = {
     'host': 'localhost',
     'port': 6379,
