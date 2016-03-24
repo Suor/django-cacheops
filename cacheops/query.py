@@ -281,7 +281,8 @@ class QuerySetMixin(object):
         cache_key = self._cache_key()
         if not self._cacheconf['write_only'] and not self._for_write:
 
-            cache_data = get_cache_data(cache_key, model_profile(self.model)['timeout'], sender=self.model)
+            cache_data = get_cache_data(
+                cache_key, model_profile(self.model)['timeout'], sender=self.model)
             if cache_data is not None:
                 return iter(pickle.loads(cache_data))
 
