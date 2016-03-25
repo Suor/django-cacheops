@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import warnings
+import six
 
 from funcy import decorator, identity, memoize
 import redis
@@ -31,7 +32,11 @@ class LazyRedis(object):
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
         Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
-        client = Redis(**settings.CACHEOPS_REDIS)
+        # Allow client connection settings to be specified by a URL.
+        if isinstance(settings.CACHEOPS_REDIS, six.string_types):
+            client = Redis.from_url(settings.CACHEOPS_REDIS)
+        else:
+            client = Redis(**settings.CACHEOPS_REDIS)
 
         object.__setattr__(self, '__class__', client.__class__)
         object.__setattr__(self, '__dict__', client.__dict__)
