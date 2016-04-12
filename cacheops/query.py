@@ -21,7 +21,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, get_user_defined_key
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -90,6 +90,10 @@ def cached_as(*samples, **kwargs):
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+
+            user_key = get_user_defined_key()
+            if user_key is not None:
+                cache_key = '%s%s' % (user_key, cache_key)
 
             cache_data = redis_client.get(cache_key)
             cache_read.send(sender=None, func=func, hit=cache_data is not None)
@@ -160,7 +164,12 @@ class QuerySetMixin(object):
         if hasattr(self, 'flat'):
             md.update(str(self.flat))
 
-        return 'q:%s' % md.hexdigest()
+        user_key = get_user_defined_key()
+        if user_key is not None:
+            generated_key = '%sq:%s'%(user_key,md.hexdigest())
+        else :
+            generated_key = 'q:%s' % md.hexdigest()
+        return generated_key
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)

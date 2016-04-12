@@ -9,6 +9,7 @@ from .cross import md5hex
 
 from django.db import models
 from django.http import HttpRequest
+from django.conf import settings
 
 from .conf import model_profile
 
@@ -169,3 +170,16 @@ def carefully_strip_whitespace(text):
     text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
     text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
     return text
+
+
+def get_user_defined_key():
+    prefix_key = None
+    CACHE_OPS_KEY = getattr(settings, 'CACHE_OPS_KEY', None)
+    if CACHE_OPS_KEY is not None:
+        if callable(CACHE_OPS_KEY):
+            # its a function with no arguments
+            prefix_key = CACHE_OPS_KEY()
+        else:
+            # its a string
+            prefix_key = CACHE_OPS_KEY
+    return prefix_key
