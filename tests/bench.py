@@ -1,6 +1,7 @@
 from cacheops import invalidate_obj, invalidate_model
 from cacheops.redis import redis_client
 from cacheops.cross import pickle
+from cacheops.tree import dnfs
 
 from .models import Category, Post, Extra
 
@@ -71,6 +72,9 @@ common_qs = do_common_construct()
 def do_common_cache_key():
     common_qs._cache_key()
 
+def do_common_dnfs():
+    dnfs(common_qs)
+
 
 def prepare_obj():
     return Category.objects.cache().get(pk=1)
@@ -97,7 +101,10 @@ def do_complex_inplace():
 
 complex_qs = do_complex_construct()
 def do_complex_cache_key():
-    return complex_qs._cache_key()
+    complex_qs._cache_key()
+
+def do_complex_dnfs():
+    dnfs(complex_qs)
 
 
 ### More invalidation
@@ -156,6 +163,7 @@ TESTS = [
     ('common_construct', {'run': do_common_construct}),
     ('common_inplace', {'run': do_common_inplace}),
     ('common_cache_key', {'run': do_common_cache_key}),
+    ('common_dnfs', {'run': do_common_dnfs}),
 
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),
     ('save_obj', {'prepare': prepare_obj, 'run': do_save_obj}),
@@ -163,6 +171,7 @@ TESTS = [
     ('complex_construct', {'run': do_complex_construct}),
     ('complex_inplace', {'run': do_complex_inplace}),
     ('complex_cache_key', {'run': do_complex_cache_key}),
+    ('complex_dnfs', {'run': do_complex_dnfs}),
 
     ('big_invalidate', {'prepare': prepare_cache, 'run': do_invalidate_obj}),
     ('model_invalidate', {'prepare': prepare_cache, 'run': do_invalidate_model}),
