@@ -21,7 +21,7 @@ if settings.CACHEOPS_DEGRADE_ON_FAILURE:
         except redis.TimeoutError as e:
             warnings.warn("The cacheops cache timed out! Error: %s" % e, RuntimeWarning)
         except Exception as e:
-            warnings.warn(traceback.format_exception(*sys.exc_info()))
+            warnings.warn("".join(traceback.format_exception(*sys.exc_info())))
 else:
     handle_connection_failure = identity
 
