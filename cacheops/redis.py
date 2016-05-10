@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 import warnings
 import six
+import sys
+import traceback
 
 from funcy import decorator, identity, memoize
 import redis
@@ -18,6 +20,8 @@ if settings.CACHEOPS_DEGRADE_ON_FAILURE:
             warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
         except redis.TimeoutError as e:
             warnings.warn("The cacheops cache timed out! Error: %s" % e, RuntimeWarning)
+        except Exception as e:
+            warnings.warn(traceback.format_exception(*sys.exc_info()))
 else:
     handle_connection_failure = identity
 
@@ -25,6 +29,18 @@ else:
 class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
+    """ Handles failover of AWS elasticache
+    """
+    def execute_command(self, *args, **options):
+        try:
+            return super(SafeRedis, self).execute_command(*args, **options)
+        except redis.ResponseError as e:
+            if "READONLY" not in e.message:
+                raise
+            connection = self.connection_pool.get_connection(args[0], **options)
+            connection.disconnect()
+            warnings.warn("Primary probably failed over, reconnecting")
+            return super(SafeRedis, self).execute_command(*args, **options)
 
 class LazyRedis(object):
     def _setup(self):
