@@ -29,6 +29,18 @@ else:
 class SafeRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
+    """ Handles failover of AWS elasticache
+    """
+    def execute_command(self, *args, **options):
+        try:
+            return super(SafeRedis, self).execute_command(*args, **options)
+        except redis.ResponseError as e:
+            if "READONLY" not in e.message:
+                raise
+            connection = self.connection_pool.get_connection(args[0], **options)
+            connection.disconnect()
+            warnings.warn("Primary probably failed over, reconnecting")
+            return super(SafeRedis, self).execute_command(*args, **options)
 
 class LazyRedis(object):
     def _setup(self):
