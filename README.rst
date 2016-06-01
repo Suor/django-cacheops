@@ -120,6 +120,17 @@ Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 
     CACHEOPS_DEGRADE_ON_FAILURE = True
 
+There is also a possibility to make all cacheops methods and decorators no-op, e.g. for testing:
+
+.. code:: python
+
+    from django.test import override_settings
+
+    @override_settings(CACHEOPS_ENABLED=False)
+    def test_something():
+        # ...
+        assert cond
+
 
 Usage
 -----

@@ -86,7 +86,7 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if in_transaction():
+            if in_transaction() or not settings.CACHEOPS_ENABLED:
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
@@ -255,7 +255,7 @@ class QuerySetMixin(object):
     def iterator(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheconf['ops'] \
-                or in_transaction():
+                or in_transaction() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
@@ -398,7 +398,7 @@ class ManagerMixin(object):
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
         #       but its base having one. Or vice versa.
         #       We still need to invalidate in this case, but cache on save better be skipped.
-        if not instance._cacheprofile or in_transaction():
+        if not instance._cacheprofile or in_transaction() or not settings.CACHEOPS_ENABLED:
             return
 
         # Enabled cache_on_save makes us write saved object to cache.

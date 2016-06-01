@@ -9,6 +9,7 @@ try:
 except ImportError:
     from django.db.models.expressions import Expression
 
+from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
 from .transaction import queue_when_in_transaction
@@ -20,7 +21,7 @@ __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidat
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_dict(model, obj_dict):
-    if no_invalidation.active:
+    if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
     load_script('invalidate')(args=[
@@ -45,7 +46,7 @@ def invalidate_model(model):
     NOTE: This is a heavy artillery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    if no_invalidation.active:
+    if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
     conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
@@ -57,7 +58,7 @@ def invalidate_model(model):
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_all():
-    if no_invalidation.active:
+    if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     redis_client.flushdb()
 

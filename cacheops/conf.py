@@ -10,6 +10,7 @@ ALL_OPS = {'get', 'fetch', 'count', 'exists'}
 
 
 class Settings(object):
+    CACHEOPS_ENABLED = True
     CACHEOPS_REDIS = None
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
