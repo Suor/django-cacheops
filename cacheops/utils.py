@@ -8,15 +8,15 @@ from .cross import md5hex
 
 from django.db import models
 from django.http import HttpRequest
+from django.conf import settings
 
 from .conf import model_profile
-
 
 # NOTE: we don't serialize this fields since their values could be very long
 #       and one should not filter by their equality anyway.
 NOT_SERIALIZED_FIELDS = (
     models.FileField,
-    models.TextField, # One should not filter by long text equality
+    models.TextField,  # One should not filter by long text equality
     models.BinaryField,
 )
 
@@ -26,13 +26,15 @@ def non_proxy(model):
     while model._meta.proxy:
         # Every proxy model has exactly one non abstract parent model
         model = next(b for b in model.__bases__
-                       if issubclass(b, models.Model) and not b._meta.abstract)
+                     if issubclass(b, models.Model) and not b._meta.abstract)
     return model
+
 
 def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
     """
+
     def class_tree(cls):
         return [cls] + mapcat(class_tree, cls.__subclasses__())
 
@@ -96,6 +98,7 @@ def obj_key(obj):
     else:
         return str(obj)
 
+
 def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
@@ -105,6 +108,7 @@ def func_cache_key(func, args, kwargs, extra=None):
         factors.append(func.__code__.co_firstlineno)
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
 
+
 def debug_cache_key(func, args, kwargs, extra=None):
     """
     Same as func_cache_key(), but doesn't take into account function line.
@@ -112,6 +116,7 @@ def debug_cache_key(func, args, kwargs, extra=None):
     """
     factors = [func.__module__, func.__name__, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
+
 
 def view_cache_key(func, args, kwargs, extra=None):
     """
@@ -122,7 +127,11 @@ def view_cache_key(func, args, kwargs, extra=None):
         uri = args[0].build_absolute_uri()
     else:
         uri = args[0]
-    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+
+    default_key = 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+    cache_key = get_user_defined_key(default_key=default_key) or default_key
+    return cache_key
+
 
 def cached_view_fab(_cached):
     def force_render(response):
@@ -137,8 +146,8 @@ def cached_view_fab(_cached):
 
             @wraps(func)
             def wrapper(request, *args, **kwargs):
-                assert isinstance(request, HttpRequest),                            \
-                       "A view should be passed with HttpRequest as first argument"
+                assert isinstance(request, HttpRequest), \
+                    "A view should be passed with HttpRequest as first argument"
                 if request.method not in ('GET', 'HEAD'):
                     return func(request, *args, **kwargs)
 
@@ -149,7 +158,9 @@ def cached_view_fab(_cached):
                 wrapper.key = cached_func.key
 
             return wrapper
+
         return decorator
+
     return cached_view
 
 
@@ -160,7 +171,21 @@ from django.utils.safestring import mark_safe
 NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
 SPACE_BETWEEN_TAGS = mark_safe('> <')
 
+
 def carefully_strip_whitespace(text):
     text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
     text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
     return text
+
+
+def get_user_defined_key(default_key=None):
+    if default_key is None:
+        return None
+    prefix_key = None
+    CACHE_OPS_KEY = getattr(settings, 'CACHE_OPS_KEY', None)
+    if CACHE_OPS_KEY is not None:
+        if callable(CACHE_OPS_KEY):
+            prefix_key = CACHE_OPS_KEY(default_key)
+        elif type(CACHE_OPS_KEY) == str:
+            prefix_key = '{0}{1}'.format(CACHE_OPS_KEY, default_key)
+    return prefix_key

@@ -14,6 +14,7 @@ from django.db.models import Manager, Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
+
 # This thing was removed in Django 1.8
 try:
     from django.db.models.query import MAX_GET_RESULTS
@@ -21,13 +22,13 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, \
+    get_user_defined_key
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import in_transaction
 from .signals import cache_read
-
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
@@ -89,7 +90,8 @@ def cached_as(*samples, **kwargs):
             if in_transaction() or not settings.CACHEOPS_ENABLED:
                 return func(*args, **kwargs)
 
-            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+            default_key = 'as:' + key_func(func, args, kwargs, key_extra)
+            cache_key = get_user_defined_key(default_key=default_key) or default_key
 
             cache_data = redis_client.get(cache_key)
             cache_read.send(sender=None, func=func, hit=cache_data is not None)
@@ -101,6 +103,7 @@ def cached_as(*samples, **kwargs):
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -124,7 +127,7 @@ class QuerySetMixin(object):
                 'Cacheops is not enabled for %s.%s model.\n'
                 'If you don\'t want to cache anything by default '
                 'you can configure it with empty ops.'
-                    % (self.model._meta.app_label, self.model._meta.model_name))
+                % (self.model._meta.app_label, self.model._meta.model_name))
 
     def _cache_key(self):
         """
@@ -156,8 +159,9 @@ class QuerySetMixin(object):
         # 'flat' attribute changes results formatting for values_list() in Django 1.8 and earlier
         if hasattr(self, 'flat'):
             md.update(str(self.flat))
-
-        return 'q:%s' % md.hexdigest()
+        default_key = 'q:%s' % md.hexdigest()
+        cache_key = get_user_defined_key(default_key=default_key) or default_key
+        return cache_key
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
@@ -234,6 +238,7 @@ class QuerySetMixin(object):
                 def query_clone():
                     self.query.clone = original_query_clone
                     return self.query
+
                 self.query.clone = query_clone
                 return self.clone(klass, setup, **kwargs)
             else:
@@ -291,8 +296,8 @@ class QuerySetMixin(object):
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
-            if self._cacheprofile['local_get']        \
-                    and not args                      \
+            if self._cacheprofile['local_get'] \
+                    and not args \
                     and not self.query.select_related \
                     and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
@@ -350,8 +355,10 @@ def connect_first(signal, receiver, sender):
     signal.connect(receiver, sender=sender)
     signal.receivers += old_receivers
 
+
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = threading.local()
+
 
 class ManagerMixin(object):
     @once_per('cls')
@@ -457,7 +464,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         return
 
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
-                   if m2m.rel.through == sender)
+               if m2m.rel.through == sender)
 
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':

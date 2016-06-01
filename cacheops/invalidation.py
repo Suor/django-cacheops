@@ -3,6 +3,7 @@ import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import F
+
 # Since Django 1.8, `ExpressionNode` is `Expression`
 try:
     from django.db.models.expressions import ExpressionNode as Expression
@@ -13,7 +14,6 @@ from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
 from .transaction import queue_when_in_transaction
-
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
@@ -67,6 +67,7 @@ class InvalidationState(threading.local):
     def __init__(self):
         self.depth = 0
 
+
 class _no_invalidation(ContextDecorator):
     state = InvalidationState()
 
@@ -80,6 +81,7 @@ class _no_invalidation(ContextDecorator):
     def active(self):
         return self.state.depth
 
+
 no_invalidation = _no_invalidation()
 
 
@@ -88,7 +90,8 @@ no_invalidation = _no_invalidation()
 @memoize
 def serializable_fields(model):
     return tuple(f for f in model._meta.fields
-                   if not isinstance(f, NOT_SERIALIZED_FIELDS))
+                 if not isinstance(f, NOT_SERIALIZED_FIELDS))
+
 
 @post_processing(dict)
 def get_obj_dict(model, obj):
