@@ -36,6 +36,7 @@ def prepare_profiles():
         'ops': (),
         'local_get': False,
         'db_agnostic': True,
+        'write_only': False,
     }
     profile_defaults.update(settings.CACHEOPS_DEFAULTS)
 

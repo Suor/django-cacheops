@@ -81,7 +81,7 @@ def cached_as(*samples, **kwargs):
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
     if not timeout:
-        timeout = min(qs._cacheconf['timeout'] for qs in querysets)
+        timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
 
     def decorator(func):
         @wraps(func)
@@ -112,10 +112,7 @@ class QuerySetMixin(object):
     @cached_property
     def _cacheprofile(self):
         profile = model_profile(self.model)
-        if profile:
-            self._cacheconf = profile.copy()
-            self._cacheconf['write_only'] = False
-        return profile
+        return profile.copy() if profile else None
 
     @cached_property
     def _cloning(self):
@@ -164,7 +161,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -183,12 +180,12 @@ class QuerySetMixin(object):
             ops = ALL_OPS
         if isinstance(ops, str):
             ops = {ops}
-        self._cacheconf['ops'] = set(ops)
+        self._cacheprofile['ops'] = set(ops)
 
         if timeout is not None:
-            self._cacheconf['timeout'] = timeout
+            self._cacheprofile['timeout'] = timeout
         if write_only is not None:
-            self._cacheconf['write_only'] = write_only
+            self._cacheprofile['write_only'] = write_only
 
         return self
 
@@ -218,9 +215,9 @@ class QuerySetMixin(object):
                 return self
 
         def clone(self, **kwargs):
-            kwargs.setdefault('_cacheprofile', self._cacheprofile)
-            if hasattr(self, '_cacheconf'):
-                kwargs.setdefault('_cacheconf', self._cacheconf)
+            # NOTE: need to copy profile so that clone changes won't affect this queryset
+            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
+                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
 
             clone = self._no_monkey._clone(self, **kwargs)
             clone._cloning = self._cloning - 1 if self._cloning else 0
@@ -244,9 +241,8 @@ class QuerySetMixin(object):
                 return self
 
         def clone(self, klass=None, setup=False, **kwargs):
-            kwargs.setdefault('_cacheprofile', self._cacheprofile)
-            if hasattr(self, '_cacheconf'):
-                kwargs.setdefault('_cacheconf', self._cacheconf)
+            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
+                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
 
             clone = self._no_monkey._clone(self, klass, setup, **kwargs)
             clone._cloning = self._cloning - 1 if self._cloning else 0
@@ -254,12 +250,12 @@ class QuerySetMixin(object):
 
     def iterator(self):
         # If cache is not enabled or in transaction just fall back
-        if not self._cacheprofile or 'fetch' not in self._cacheconf['ops'] \
+        if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
                 or in_transaction() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
-        if not self._cacheconf['write_only'] and not self._for_write:
+        if not self._cacheprofile['write_only'] and not self._for_write:
             # Trying get data from cache
             cache_data = redis_client.get(cache_key)
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
@@ -278,7 +274,7 @@ class QuerySetMixin(object):
         return iterate()
 
     def count(self):
-        if self._cacheprofile and 'count' in self._cacheconf['ops']:
+        if self._cacheprofile and 'count' in self._cacheprofile['ops']:
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
@@ -290,7 +286,7 @@ class QuerySetMixin(object):
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile and 'get' in self._cacheconf['ops']:
+        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
@@ -312,7 +308,7 @@ class QuerySetMixin(object):
                     # we just skip local cache in that case
                     pass
 
-            if 'fetch' in self._cacheconf['ops']:
+            if 'fetch' in self._cacheprofile['ops']:
                 qs = self
             else:
                 qs = self._clone().cache()
@@ -322,7 +318,7 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
     def exists(self):
-        if self._cacheprofile and 'exists' in self._cacheconf['ops']:
+        if self._cacheprofile and 'exists' in self._cacheprofile['ops']:
             if self._result_cache is not None:
                 return bool(self._result_cache)
             return cached_as(self)(lambda: self._no_monkey.exists(self))()
