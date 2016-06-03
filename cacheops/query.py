@@ -518,7 +518,7 @@ def install_cacheops():
     # Make buffers/memoryviews pickleable to serialize binary field data
     if six.PY2:
         import copy_reg
-        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
+        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))  # noqa
     if six.PY3:
         import copyreg
         copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
