@@ -144,5 +144,12 @@ def model_profile(model):
         return None
 
 
+try:
+    from south.orm import NoDryRunManager
+except ImportError:
+    NoDryRunManager = None
+
 def model_is_fake(model):
-    return model.__module__ == '__fake__'
+    # Either Django 1.7 migration fake or south migration fake
+    return model.__module__ == '__fake__' \
+        or NoDryRunManager and isinstance(model.objects, NoDryRunManager)
