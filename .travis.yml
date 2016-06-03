@@ -1,5 +1,5 @@
 language: python
-python: 2.7
+python: 3.5
 sudo: false
 cache: pip
 services:
@@ -18,15 +18,15 @@ env:
   - TOXENV=py34-dj18
   - TOXENV=py34-dj19
   - TOXENV=py34-djmaster
-  # - TOXENV=py35-dj17
-  # - TOXENV=py35-dj18
-  # - TOXENV=py35-dj19
-  # - TOXENV=py35-djmaster
+  - TOXENV=py35-dj17
+  - TOXENV=py35-dj18
+  - TOXENV=py35-dj19
+  - TOXENV=py35-djmaster
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
     - env: "TOXENV=py34-djmaster"
-    # - env: "TOXENV=py35-djmaster"
+    - env: "TOXENV=py35-djmaster"
 install:
   - pip install tox
 before_script:
