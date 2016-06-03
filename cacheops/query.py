@@ -435,19 +435,14 @@ class ManagerMixin(object):
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance)
 
-    # Django 1.5- compatability
-    if not hasattr(Manager, 'get_queryset'):
-        def get_queryset(self):
-            return self.get_query_set()
-
     def inplace(self):
-        return self.get_queryset().inplace()
+        return self.all().inplace()
 
     def cache(self, *args, **kwargs):
-        return self.get_queryset().cache(*args, **kwargs)
+        return self.all().cache(*args, **kwargs)
 
     def nocache(self):
-        return self.get_queryset().nocache()
+        return self.all().nocache()
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
