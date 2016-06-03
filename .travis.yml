@@ -21,6 +21,9 @@ env:
   - TOXENV=py35-dj18
   - TOXENV=py35-dj19
   - TOXENV=py35-djmaster
+  - TOXENV=pypy-dj17
+  - TOXENV=pypy-dj18
+  - TOXENV=pypy-dj19
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
