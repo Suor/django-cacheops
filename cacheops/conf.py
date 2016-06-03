@@ -123,11 +123,14 @@ def prepare_profiles():
 
     return model_profiles
 
-@memoize
+
 def model_profile(model):
     """
     Returns cacheops profile for a model
     """
+    if model_is_fake(model):
+        return None
+
     model_profiles = prepare_profiles()
 
     app = model._meta.app_label
@@ -139,3 +142,7 @@ def model_profile(model):
             return model_profiles[guess]
     else:
         return None
+
+
+def model_is_fake(model):
+    return model.__module__ == '__fake__'
