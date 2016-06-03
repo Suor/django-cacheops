@@ -355,8 +355,6 @@ _old_objs = {}
 class ManagerMixin(object):
     @once_per('cls')
     def _install_cacheops(self, cls):
-        cls._cacheprofile = model_profile(cls)
-
         if family_has_profile(cls):
             # Set up signals
             connect_first(pre_save, self._pre_save, sender=cls)
@@ -393,14 +391,15 @@ class ManagerMixin(object):
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
         #       but its base having one. Or vice versa.
         #       We still need to invalidate in this case, but cache on save better be skipped.
-        if not instance._cacheprofile:
+        cacheprofile = model_profile(instance.__class__)
+        if not cacheprofile:
             return
 
         # Enabled cache_on_save makes us write saved object to cache.
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
         # <cache_on_save_field> is pk unless specified.
         # This sweet trick saves a db request and helps with slave lag.
-        cache_on_save = instance._cacheprofile.get('cache_on_save')
+        cache_on_save = cacheprofile.get('cache_on_save')
         if cache_on_save:
             # HACK: We get this object "from field" so it can contain
             #       some undesirable attributes or other objects attached.
