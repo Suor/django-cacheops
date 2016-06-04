@@ -1,3 +1,7 @@
+2.4.4
+- disabled cacheops for south and new django migration models
+- fixed possible .get_queryset() rename bug
+
 2.4.3
 - fixed .get() on reverse fk related manager
 - fixed memory leak on migrations
