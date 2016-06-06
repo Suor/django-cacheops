@@ -152,4 +152,5 @@ except ImportError:
 def model_is_fake(model):
     # Either Django 1.7 migration fake or south migration fake
     return model.__module__ == '__fake__' \
-        or NoDryRunManager and isinstance(model.objects, NoDryRunManager)
+        or NoDryRunManager \
+            and hasattr(model, 'objects') and isinstance(model.objects, NoDryRunManager)
