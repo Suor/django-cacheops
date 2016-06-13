@@ -68,11 +68,14 @@ class LazyRedis(object):
 
 
 #redis_client = LazyRedis()
+
+CacheopsRedis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
 try:
-    CacheopsRedis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
     redis_replica_conf = settings.CACHEOPS_REDIS_REPLICA
     redis_replica = redis.StrictRedis(**redis_replica_conf)
-
+except AttributeError as err:
+    redis_client = LazyRedis()
+else:
     class ReplicaProxyRedis(CacheopsRedis):
         """ Proxy `get` calls to redis replica.
         """
@@ -83,8 +86,6 @@ try:
                 return super(ReplicaProxyRedis, self).get(*args, **kwargs)
 
     redis_client = ReplicaProxyRedis(**settings.CACHEOPS_REDIS)
-except AttributeError:
-    redis_client = LazyRedis()
 
 ### Lua script loader
 
