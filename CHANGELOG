@@ -1,4 +1,4 @@
-2.4.4
+2.4.5
 - disabled cacheops for south and new django migration models
 - fixed possible .get_queryset() rename bug
 
