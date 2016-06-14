@@ -67,16 +67,11 @@ class LazyRedis(object):
         return setattr(self, name, value)
 
 
-#redis_client = LazyRedis()
-
 CacheopsRedis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
 try:
     # the conf would look like: "redis://cache-001:6379/1,redis://cache-002:6379/2"
     redis_replica_conf = settings.CACHEOPS_REDIS_REPLICA
-    redis_replica_servers = redis_replica_conf.split(',')
-    redis_replicas = []
-    for idx in xrange(len(redis_replica_servers)):
-        redis_replicas[idx] = redis.StrictRedis.from_url(redis_replica_servers[idx])
+    redis_replicas = map(redis.StrictRedis.from_url, redis_replica_conf.split(','))
 except AttributeError as err:
     redis_client = LazyRedis()
 else:
@@ -85,8 +80,7 @@ else:
         """
         def get(self, *args, **kwargs):
             try:
-                next_replica_index = random.randint(0, len(redis_replicas))
-                redis_replica = redis_replicas[next_replica_index]
+                redis_replica = random.choice(redis_replicas)
                 return redis_replica.get(*args, **kwargs)
             except redis.ConnectionError:
                 return super(ReplicaProxyRedis, self).get(*args, **kwargs)
