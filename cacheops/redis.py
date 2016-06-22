@@ -48,6 +48,7 @@ class LazyRedis(object):
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
         Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
+
         # Allow client connection settings to be specified by a URL.
         if isinstance(settings.CACHEOPS_REDIS, six.string_types):
             client = Redis.from_url(settings.CACHEOPS_REDIS)
@@ -65,8 +66,26 @@ class LazyRedis(object):
         self._setup()
         return setattr(self, name, value)
 
-redis_client = LazyRedis()
 
+CacheopsRedis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
+try:
+    # the conf would look like: "redis://cache-001:6379/1,redis://cache-002:6379/2"
+    redis_replica_conf = settings.CACHEOPS_REDIS_REPLICA
+    redis_replicas = map(redis.StrictRedis.from_url, redis_replica_conf.split(','))
+except AttributeError as err:
+    redis_client = LazyRedis()
+else:
+    class ReplicaProxyRedis(CacheopsRedis):
+        """ Proxy `get` calls to redis replica.
+        """
+        def get(self, *args, **kwargs):
+            try:
+                redis_replica = random.choice(redis_replicas)
+                return redis_replica.get(*args, **kwargs)
+            except redis.ConnectionError:
+                return super(ReplicaProxyRedis, self).get(*args, **kwargs)
+
+    redis_client = ReplicaProxyRedis(**settings.CACHEOPS_REDIS)
 
 ### Lua script loader
 
