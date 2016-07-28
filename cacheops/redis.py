@@ -3,11 +3,11 @@ import warnings
 import six
 import sys
 import traceback
-
+import logging
 from funcy import decorator, identity, memoize
 import redis
 from django.core.exceptions import ImproperlyConfigured
-
+import random
 from .conf import settings
 
 
@@ -69,9 +69,14 @@ class LazyRedis(object):
 
 CacheopsRedis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
 try:
-    # the conf would look like: "redis://cache-001:6379/1,redis://cache-002:6379/2"
+    # the conf could be a list of string
+    # list would look like: ["redis://cache-001:6379/1", "redis://cache-002:6379/2"]
+    # string would be: "redis://cache-001:6379/1,redis://cache-002:6379/2"
     redis_replica_conf = settings.CACHEOPS_REDIS_REPLICA
-    redis_replicas = map(redis.StrictRedis.from_url, redis_replica_conf.split(','))
+    if isinstance(settings.CACHEOPS_REDIS, six.string_types):
+        redis_replicas = map(redis.StrictRedis.from_url, redis_replica_conf.split(','))
+    else:
+        redis_replicas = map(redis.StrictRedis.from_url, redis_replica_conf)
 except AttributeError as err:
     redis_client = LazyRedis()
 else:
