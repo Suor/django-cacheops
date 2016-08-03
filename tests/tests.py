@@ -8,7 +8,7 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.template import Context, Template
-from django.db.models import F
+from django.db.models import F, Count
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
@@ -681,6 +681,51 @@ class RelatedTests(BaseTestCase):
         self._template(
             Category.objects.filter(posts__title=title).filter(posts__visible=False),
             lambda: Post.objects.get(title=title, visible=True).save(),
+        )
+
+
+class AnnotationTests(BaseTestCase):
+    fixtures = ['basic']
+
+    def _template(self, qs_or_action, change, should_invalidate=True):
+        if hasattr(qs_or_action, 'cache'):
+            action = lambda: list(qs_or_action.cache())
+        else:
+            action = qs_or_action
+
+        action()
+        change()
+        with self.assertNumQueries(1 if should_invalidate else 0):
+            action()
+
+    def test_fetch_annotate_count_invalidation(self):
+        self._template(
+            Category.objects.annotate(posts_count=Count('posts')),
+            lambda: Post.objects.create(title='Django', category=Category.objects.all()[0])
+        )
+
+    def test_fetch_annotate_count(self):
+        self._template(
+            Category.objects.annotate(posts_count=Count('posts')),
+            lambda: Post.objects.all(),
+            should_invalidate=False
+        )
+
+    def test_get_annotate_count_invalidation(self):
+        post = Post.objects.all()[0]
+        category = Category.objects.get(pk=post.category_id)
+        self._template(
+            lambda: Category.objects.annotate(posts_count=Count('posts')).cache().get(pk=category.pk),
+            lambda: Post.objects.create(title='Django', category=category)
+        )
+
+    def test_get_annotate_count(self):
+        post = Post.objects.all()[0]
+        category = Category.objects.get(pk=post.category_id)
+        self._template(
+            lambda: Category.objects.annotate(posts_count=Count('posts')).cache().get(pk=category.pk),
+            lambda: Post.objects.all(),
+            should_invalidate=False
         )
 
 
