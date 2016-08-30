@@ -12,12 +12,13 @@ except ImportError:
 from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
-from .transaction import queue_when_in_transaction
+from .transaction import queue_when_in_transaction, mark_transaction_dirty
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
+@mark_transaction_dirty
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_dict(model, obj_dict):
@@ -30,6 +31,7 @@ def invalidate_dict(model, obj_dict):
     ])
 
 
+@mark_transaction_dirty
 def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
@@ -38,6 +40,7 @@ def invalidate_obj(obj):
     invalidate_dict(model, get_obj_dict(model, obj))
 
 
+@mark_transaction_dirty
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_model(model):
@@ -55,6 +58,7 @@ def invalidate_model(model):
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
 
+@mark_transaction_dirty
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_all():
