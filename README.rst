@@ -1,5 +1,5 @@
-Cacheops |Build Status| |Gitter|
-========
+Cacheops |Build Status| |Code Health| |Gitter|
+==============================================
 
 A slick app that supports automatic or manual queryset caching and automatic
 granular event-driven invalidation.
@@ -684,6 +684,10 @@ TODO
 - cache a string directly (no pickle) for direct serving (custom key function?)
 
 
+.. |Build Status| image:: https://travis-ci.org/whyflyru/django-cacheops.svg?branch=master
+   :target: https://travis-ci.org/whyflyru/django-cacheops
+.. |Code Health| image:: https://landscape.io/github/whyflyru/django-cacheops/master/landscape.svg?style=flat
+   :target: https://landscape.io/github/whyflyru/django-cacheops/master
 .. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
    :target: https://travis-ci.org/Suor/django-cacheops
 

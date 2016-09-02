@@ -27,6 +27,11 @@ except ImportError:
     class Join(object):
         pass
 
+try:
+    from bitfield.types import Bit
+except ImportError:
+    Bit = None
+
 from .utils import NOT_SERIALIZED_FIELDS
 
 

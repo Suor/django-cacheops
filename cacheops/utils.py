@@ -11,7 +11,6 @@ from django.http import HttpRequest
 
 from .conf import model_profile
 
-
 # NOTE: we don't serialize this fields since their values could be very long
 #       and one should not filter by their equality anyway.
 NOT_SERIALIZED_FIELDS = (
