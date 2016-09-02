@@ -1,7 +1,39 @@
+3.0
+- support PyPy
+- support Python 3.5
+- support Django 1.9
+- added transparent transaction handling (Joel Hillacre)
+- added .invalidated_update()
+- added cache_read signal (Joona Pääkkönen)
+- added CACHEOPS_ENABLED setting
+- invalidate on intermediate tables in long joins
+- support settings override
+- made CACHEOPS keys case insensitive
+- allow redis connection settings to be specified by a URL (Tim Savage)
+- fixed router support
+- fixed clone cache settings affecting original queryset
+- more fixes for non-ascii in str params
+- calc func cache keys smarter
+- no_invalidation optimizations
+Backwards incompatible changes:
+- Django 1.6 and earlier no longer supported
+- dropped old CACHEOPS setting format
+- removed CACHEOPS_FAKE setting
+- removed .cached_call() from basic and file caches
+- disabled cacheops for fake migration models
+
+2.4.3
+- fixed .get() on reverse fk related manager
+- fixed memory leak on migrations
+
+2.4.2
+- fixed .values() and .values_list() in Django 1.9
+- stopped sharing cache between proxies and base
+
 2.4.1
 - export FileCache and RedisCache from cacheops
 - allow non-ascii in str params
-- fixed subqueries with diffrent db
+- fixed subqueries with different db
 
 2.4
 - added @decorator_tag to easily create cached template tags

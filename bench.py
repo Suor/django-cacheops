@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import os, time, gc, sys
+from funcy import re_tester
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
 verbosity = 1
@@ -61,8 +62,7 @@ import django
 from django.db import connection
 from django.core.management import call_command
 
-if hasattr(django, 'setup'):
-    django.setup()
+django.setup()
 
 # Create a test database.
 db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)
@@ -73,7 +73,7 @@ call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
 args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
 selector = args[0] if args else ''
-select = selector[1:].__eq__ if selector.startswith('=') else lambda s: selector in s
+select = selector[1:].__eq__ if selector.startswith('=') else re_tester(selector)
 
 if 'p' in flags:
     from profilehooks import profile

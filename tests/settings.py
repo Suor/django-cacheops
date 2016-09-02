@@ -2,11 +2,12 @@ import os
 
 INSTALLED_APPS = [
     'cacheops',
-    'django.contrib.auth',
     'django.contrib.contenttypes',
-    'django.contrib.admin',
+    'django.contrib.auth',
     'tests',
 ]
+
+ROOT_URLCONF = 'tests.urls'
 
 MIDDLEWARE_CLASSES = []
 
@@ -70,15 +71,18 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'sqlite.db'
+            'NAME': 'sqlite.db',
+            # Make in memory sqlite test db to work with threads
+            # See https://code.djangoproject.com/ticket/12118
+            'TEST': {
+                'NAME': '/dev/shm/cacheops_sqlite.db'
+            }
         },
         'slave': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'sqlite_slave.db'
+            'NAME': 'sqlite_slave.db',
         }
     }
-
-CACHEOPS_FAKE = os.environ.get('CACHEOPS') == 'FAKE'
 
 CACHEOPS_REDIS = {
     'host': 'localhost',
@@ -86,30 +90,20 @@ CACHEOPS_REDIS = {
     'db': 13,
     'socket_timeout': 3,
 }
-if os.environ.get('CACHEOPS_CONF') == 'old':
-    CACHEOPS = {
-        'tests.local': ('just_enable', 60*60, {'local_get': True}),
-        'tests.cacheonsavemodel': ('just_enable', 60*60, {'cache_on_save': True}),
-        'tests.dbbinded': ('just_enable', 60*60, {'db_agnostic': False}),
-        'tests.genericcontainer': ('all', 60*60),
-        'tests.all': ('all', 60*60),
-        'tests.*': ('just_enable', 60*60),
-        'tests.noncachedvideoproxy': None,
-    }
-else:
-    CACHEOPS_DEFAULTS = {
-        'timeout': 60*60
-    }
-    CACHEOPS = {
-        'tests.local': {'local_get': True},
-        'tests.cacheonsavemodel': {'cache_on_save': True},
-        'tests.dbbinded': {'db_agnostic': False},
-        'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
-        'tests.all': {'ops': 'all'},
-        'tests.*': {},
-        'tests.noncachedvideoproxy': None,
-        'tests.noncachedmedia': None,
-    }
+CACHEOPS_DEFAULTS = {
+    'timeout': 60*60
+}
+CACHEOPS = {
+    'tests.local': {'local_get': True},
+    'tests.cacheonsavemodel': {'cache_on_save': True},
+    'tests.dbbinded': {'db_agnostic': False},
+    'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
+    'tests.All': {'ops': 'all'},
+    'tests.*': {},
+    'tests.noncachedvideoproxy': None,
+    'tests.noncachedmedia': None,
+    'auth.*': {}
+}
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
 CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE'))

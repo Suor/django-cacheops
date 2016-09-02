@@ -2,11 +2,11 @@
 import os, time
 from .cross import pickle, md5hex
 
-from django.conf import settings
 from funcy import wraps
 
-from .conf import redis_client, handle_connection_failure
+from .conf import settings
 from .utils import func_cache_key, cached_view_fab
+from .redis import redis_client, handle_connection_failure
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
@@ -36,16 +36,6 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached_call(self, key, func, timeout=None, args=(), kwargs={}):
-        cache_key = 'cc:%s' % key
-        try:
-            result = self.get(cache_key)
-        except CacheMiss:
-            result = func(*args, **kwargs)
-            self.set(cache_key, result, timeout)
-
-        return result
-
     def cached(self, timeout=None, extra=None, key_func=func_cache_key):
         """
         A decorator for caching function calls
@@ -57,6 +47,9 @@ class BaseCache(object):
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
+                if not settings.CACHEOPS_ENABLED:
+                    return func(*args, **kwargs)
+
                 cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
@@ -110,16 +103,13 @@ cached = cache.cached
 cached_view = cache.cached_view
 
 
-FILE_CACHE_DIR = getattr(settings, 'FILE_CACHE_DIR', '/tmp/cacheops_file_cache')
-FILE_CACHE_TIMEOUT = getattr(settings, 'FILE_CACHE_TIMEOUT', 60*60*24*30)
-
 class FileCache(BaseCache):
     """
     A file cache which fixes bugs and misdesign in django default one.
     Uses mtimes in the future to designate expire time. This makes unnecessary
     reading stale files.
     """
-    def __init__(self, path, timeout=FILE_CACHE_TIMEOUT):
+    def __init__(self, path, timeout=settings.FILE_CACHE_TIMEOUT):
         self._dir = path
         self._default_timeout = timeout
 
@@ -175,4 +165,4 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-file_cache = FileCache(FILE_CACHE_DIR)
+file_cache = FileCache(settings.FILE_CACHE_DIR)

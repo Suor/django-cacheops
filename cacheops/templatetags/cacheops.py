@@ -7,6 +7,7 @@ try:
     from django.template.library import TagHelperNode, parse_bits
 except ImportError:
     from django.template.base import TagHelperNode as _TagHelperNode, parse_bits
+
     class TagHelperNode(_TagHelperNode):
         def __init__(self, func, takes_context, args, kwargs):
             _TagHelperNode.__init__(self, takes_context, args, kwargs)

@@ -6,7 +6,8 @@ from funcy.py2 import map, cat
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
-from django.db.models.sql.where import NothingNode
+from django.db.models.sql.where import NothingNode, SubqueryConstraint
+from django.db.models.lookups import Lookup, Exact, In, IsNull
 # This thing existed in Django 1.8 and earlier
 try:
     from django.db.models.sql.where import EverythingNode
@@ -18,18 +19,6 @@ try:
     from django.db.models.sql.expressions import SQLEvaluator
 except ImportError:
     class SQLEvaluator(object):
-        pass
-# A new thing in Django 1.6
-try:
-    from django.db.models.sql.where import SubqueryConstraint
-except ImportError:
-    class SubqueryConstraint(object):
-        pass
-# A new things in Django 1.7
-try:
-    from django.db.models.lookups import Lookup, Exact, In, IsNull
-except ImportError:
-    class Lookup(object):
         pass
 # A new thing in Django 1.8
 try:
@@ -73,7 +62,6 @@ def dnfs(qs):
 
         Any conditions other then eq are dropped.
         """
-        # Lookups appeared in Django 1.7
         if isinstance(where, Lookup):
             # If where.lhs don't refer to a field then don't bother
             if not hasattr(where.lhs, 'target'):
@@ -92,28 +80,6 @@ def dnfs(qs):
                 return [[(where.lhs.alias, attname, None, where.rhs)]]
             elif isinstance(where, In) and len(where.rhs) < LONG_DISJUNCTION:
                 return [[(where.lhs.alias, attname, v, True)] for v in where.rhs]
-            else:
-                return SOME_TREE
-        # Django 1.6 and earlier used tuples to encode conditions
-        elif isinstance(where, tuple):
-            constraint, lookup, annotation, value = where
-            value_types_to_skip = (QuerySet, Query, SQLEvaluator)
-            if Bit:
-                value_types_to_skip += (Bit,)
-            # Don't bother with complex right hand side
-            if isinstance(value, value_types_to_skip):
-                return SOME_TREE
-            # Skip conditions on non-serialized fields
-            if isinstance(constraint.field, NOT_SERIALIZED_FIELDS):
-                return SOME_TREE
-
-            attname = attname_of(model, constraint.col)
-            if lookup == 'isnull':
-                return [[(constraint.alias, attname, None, value)]]
-            elif lookup == 'exact':
-                return [[(constraint.alias, attname, value, True)]]
-            elif lookup == 'in' and len(value) < LONG_DISJUNCTION:
-                return [[(constraint.alias, attname, v, True)] for v in value]
             else:
                 return SOME_TREE
         elif isinstance(where, EverythingNode):
@@ -172,14 +138,13 @@ def dnfs(qs):
     main_alias = model._meta.db_table
 
     dnf = _dnf(where)
-    aliases = set(alias for conj in dnf
-                        for alias, _, _, _ in conj
-                        if alias)
-    aliases.add(main_alias)
+    # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
+    aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
+            | {main_alias} - {'django_content_type'}
     return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
 
 
 def attname_of(model, col, cache={}):
     if model not in cache:
-        cache[model] = dict((f.db_column, f.attname) for f in model._meta.fields)
+        cache[model] = {f.db_column: f.attname for f in model._meta.fields}
     return cache[model].get(col, col)

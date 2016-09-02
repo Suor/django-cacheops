@@ -1,5 +1,5 @@
 language: python
-python: 2.7
+python: 3.5
 sudo: false
 cache: pip
 services:
@@ -7,31 +7,32 @@ services:
 addons:
   postgresql: "9.3"
 env:
-  - TOXENV=flakes
-  - TOXENV=py26-dj13
-  - TOXENV=py26-dj14
-  - TOXENV=py26-dj15
-  - TOXENV=py26-dj16
-  - TOXENV=py27-dj13
-  - TOXENV=py27-dj14
-  - TOXENV=py27-dj15
-  - TOXENV=py27-dj16
+  - TOXENV=lint
   - TOXENV=py27-dj17
   - TOXENV=py27-dj18
+  - TOXENV=py27-dj19
+  - TOXENV=py27-dj110
   - TOXENV=py27-djmaster
-  - TOXENV=py33-dj15
-  - TOXENV=py33-dj16
   - TOXENV=py33-dj17
   - TOXENV=py33-dj18
-  - TOXENV=py34-dj15
-  - TOXENV=py34-dj16
   - TOXENV=py34-dj17
   - TOXENV=py34-dj18
+  - TOXENV=py34-dj19
+  - TOXENV=py34-dj110
   - TOXENV=py34-djmaster
+  - TOXENV=py35-dj18
+  - TOXENV=py35-dj19
+  - TOXENV=py35-dj110
+  - TOXENV=py35-djmaster
+  - TOXENV=pypy-dj17
+  - TOXENV=pypy-dj18
+  - TOXENV=pypy-dj19
+  - TOXENV=pypy-dj110
 matrix:
   allow_failures:
     - env: "TOXENV=py27-djmaster"
     - env: "TOXENV=py34-djmaster"
+    - env: "TOXENV=py35-djmaster"
 install:
   - pip install tox
 before_script:

@@ -1,31 +1,37 @@
 # -*- coding: utf-8 -*-
-import os, re, copy
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
+import re, copy
+import unittest
 
-import django
-from django.db import models, connection, connections
+from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.template import Context, Template
 from django.db.models import F
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
-if django.VERSION >= (1, 4):
-    from cacheops import invalidate_fragment
-    from cacheops.templatetags.cacheops import register
-    decorator_tag = register.decorator_tag
+from cacheops import invalidate_fragment
+from cacheops.templatetags.cacheops import register
+from cacheops.transaction import transaction_state
+from cacheops.signals import cache_read
+
+decorator_tag = register.decorator_tag
 from .models import *
 
 
 class BaseTestCase(TestCase):
     def setUp(self):
-        super(BaseTestCase, self).setUp()
+        # Emulate not being in transaction by tricking system to ignore its pretest level.
+        # TestCase wraps each test into 1 or 2 transaction(s) altering cacheops behavior.
+        # The alternative is using TransactionTestCase, which is 10x slow.
+        transaction_state._stack, self._stack = [], transaction_state._stack
+
         invalidate_all()
+
+    def tearDown(self):
+        transaction_state._stack = self._stack
 
 
 class BasicTests(BaseTestCase):
@@ -46,7 +52,6 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(Category.objects.filter(pk__exact=1).cache())
 
-    @unittest.skipUnless(django.VERSION >= (1, 6), ".exists() only cached in Django 1.6+")
     def test_exists(self):
         with self.assertNumQueries(1):
             Category.objects.cache(ops='exists').exists()
@@ -60,6 +65,17 @@ class BasicTests(BaseTestCase):
         c.save()
         with self.assertNumQueries(1):
             list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
+
+    def test_lazy(self):
+        inc = _make_inc()
+
+        from django.db.models.signals import post_init
+        post_init.connect(inc, sender=Category)
+
+        qs = Category.objects.cache()
+        for c in qs.iterator():
+            break
+        self.assertEqual(inc.get(), 1)
 
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
@@ -97,7 +113,6 @@ class BasicTests(BaseTestCase):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
 
-    @unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
     def test_bulk_create(self):
         cnt = Category.objects.cache().count()
         Category.objects.bulk_create([Category(title='hi'), Category(title='there')])
@@ -205,18 +220,8 @@ class NoInvalidationTests(BaseTestCase):
 
 
 class DecoratorTests(BaseTestCase):
-    def _make_func(self, deco):
-        calls = [0]
-
-        @deco
-        def get_calls(_=None):
-            calls[0] += 1
-            return calls[0]
-
-        return get_calls
-
     def test_cached_as_model(self):
-        get_calls = self._make_func(cached_as(Category))
+        get_calls = _make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(), 1)      # miss
         self.assertEqual(get_calls(), 1)      # hit
@@ -224,7 +229,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_cond(self):
-        get_calls = self._make_func(cached_as(Category.objects.filter(title='test')))
+        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
@@ -234,34 +239,37 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_as_obj(self):
         c = Category.objects.create(title='test')
-        get_calls = self._make_func(cached_as(c))
+        get_calls = _make_inc(cached_as(c))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
         self.assertEqual(get_calls(), 1)      # hit
-        c.title = 'new'; c.save()             # invalidate
+        c.title = 'new'
+        c.save()                              # invalidate
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_depends_on_args(self):
-        get_calls = self._make_func(cached_as(Category))
+        get_calls = _make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(1), 1)      # cache
         self.assertEqual(get_calls(1), 1)      # hit
         self.assertEqual(get_calls(2), 2)      # miss
 
     def test_cached_as_depends_on_two_models(self):
-        get_calls = self._make_func(cached_as(Category, Post))
+        get_calls = _make_inc(cached_as(Category, Post))
         c = Category.objects.create(title='miss')
         p = Post.objects.create(title='New Post', category=c)
 
         self.assertEqual(get_calls(1), 1)      # cache
-        c.title = 'new title'; c.save()        # invalidate by Category
+        c.title = 'new title'
+        c.save()                               # invalidate by Category
         self.assertEqual(get_calls(1), 2)      # miss and cache
-        p.title = 'new title'; p.save()        # invalidate by Post
+        p.title = 'new title'
+        p.save()                               # invalidate by Post
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
     def test_cached_view_as(self):
-        get_calls = self._make_func(cached_view_as(Category))
+        get_calls = _make_inc(cached_view_as(Category))
 
         factory = RequestFactory()
         r1 = factory.get('/hi')
@@ -294,21 +302,23 @@ class DecoratorTests(BaseTestCase):
 from datetime import date, datetime, time
 
 class WeirdTests(BaseTestCase):
-    def _template(self, field, value, invalidation=True):
+    def _template(self, field, value):
         qs = Weird.objects.cache().filter(**{field: value})
         count = qs.count()
 
-        Weird.objects.create(**{field: value})
+        obj = Weird.objects.create(**{field: value})
 
-        if invalidation:
-            with self.assertNumQueries(1):
-                self.assertEqual(qs.count(), count + 1)
+        with self.assertNumQueries(2):
+            self.assertEqual(qs.count(), count + 1)
+            new_obj = qs.get(pk=obj.pk)
+            self.assertEqual(getattr(new_obj, field), value)
 
     def test_date(self):
         self._template('date_field', date.today())
 
     def test_datetime(self):
-        self._template('datetime_field', datetime.now())
+        # NOTE: some databases (mysql) don't store microseconds
+        self._template('datetime_field', datetime.now().replace(microsecond=0))
 
     def test_time(self):
         self._template('time_field', time(10, 30))
@@ -316,7 +326,6 @@ class WeirdTests(BaseTestCase):
     def test_list(self):
         self._template('list_field', [1, 2])
 
-    @unittest.skipUnless(hasattr(models, 'BinaryField'), "No BinaryField")
     def test_binary(self):
         obj = Weird.objects.create(binary_field=b'12345')
         Weird.objects.cache().get(pk=obj.pk)
@@ -334,6 +343,8 @@ class WeirdTests(BaseTestCase):
     def test_custom_query(self):
         list(Weird.customs.cache())
 
+
+# First appeared in Django 1.8
 try:
     from django.contrib.postgres.fields import ArrayField
 except ImportError:
@@ -349,22 +360,14 @@ class ArrayTests(BaseTestCase):
         list(TaggedPost.objects.filter(tags__len=42).cache())
 
 
-@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class TemplateTests(BaseTestCase):
-    def get_inc(self):
-        count = [0]
-        def inc():
-            count[0] += 1
-            return count[0]
-        return inc
-
     def assertRendersTo(self, template, context, result):
         s = template.render(Context(context))
         self.assertEqual(re.sub(r'\s+', '', s), result)
 
     def test_cached(self):
-        inc_a = self.get_inc()
-        inc_b = self.get_inc()
+        inc_a = _make_inc()
+        inc_b = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.a{{ a }}{% endcached %}
@@ -376,7 +379,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'a': inc_a, 'b': inc_b}, '.a1.a1.a2.b1')
 
     def test_invalidate_fragment(self):
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.{{ inc }}{% endcached %}
@@ -388,7 +391,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'inc': inc}, '.2')
 
     def test_cached_as(self):
-        inc = self.get_inc()
+        inc = _make_inc()
         qs = Post.objects.all()
         t = Template("""
             {% load cacheops %}
@@ -412,7 +415,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(flag):
             return cached(timeout=60) if flag else lambda x: x
 
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
@@ -428,7 +431,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(context):
             return cached(timeout=60) if context['flag'] else lambda x: x
 
-        inc = self.get_inc()
+        inc = _make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached %}.{{ inc }}{% endmy_cached %}
@@ -567,9 +570,52 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.using('slave').filter(title='Python')
         list(Post.objects.using('slave').filter(category__in=categories).cache())
 
+    @unittest.skipIf(connection.vendor == 'mysql', 'MySQL fails with encodings')
     def test_161_non_ascii(self):
         # Non ascii text in non-unicode str literal
         list(Category.objects.filter(title='фыва').cache())
+        list(Category.objects.filter(title='фыва', title__startswith='фыва').cache())
+
+    def test_169(self):
+        c = Category.objects.prefetch_related('posts').get(pk=3)
+        c.posts.get(visible=1)  # this used to fail
+
+    def test_173(self):
+        g = Group.objects.create(name='gr')
+        g.user_set.add(self.user)
+        content_type = ContentType.objects.get_for_model(User)
+        p = Permission.objects.create(name='foobar',
+                                      content_type=content_type)
+
+        # Cache it
+        list(Permission.objects.filter(group__user=self.user).cache())
+
+        # Add permission to group. m2m_changed will be emited
+        g.permissions.add(p)
+
+        # Note that we don't query per group nor permission here,
+        # this is why this cache won't be invalidated.
+        perms = list(Permission.objects.filter(group__user=self.user).cache())
+        self.assertEqual(perms, [p])
+
+    def test_173_simple(self):
+        extra = Extra.objects.get(pk=1)
+        title = extra.post.category.title
+
+        # Cache
+        list(Extra.objects.filter(post__category__title=title).cache())
+
+        # Break the link
+        extra.post.category_id = 2
+        extra.post.save()
+
+        # Fail because neither Extra nor Catehory changed, but something in between
+        self.assertEqual([], list(Extra.objects.filter(post__category__title=title).cache()))
+
+    def test_177(self):
+        c = Category.objects.get(pk=1)
+        c.posts_copy = c.posts.cache()
+        bool(c.posts_copy)
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
@@ -793,6 +839,7 @@ class ProxyTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Video.objects.cache())
 
+    @unittest.expectedFailure
     def test_interchange(self):
         list(Video.objects.cache())
 
@@ -807,7 +854,6 @@ class ProxyTests(BaseTestCase):
         with self.assertRaises(Video.DoesNotExist):
             Video.objects.cache().get(title=video.title)
 
-    @unittest.skipUnless(django.VERSION >= (1, 7), "Really hard to make this work in older Djangos")
     def test_148_reverse(self):
         media = NonCachedMedia.objects.create(title='Pulp Fiction')
         MediaProxy.objects.cache().get(title=media.title)
@@ -815,6 +861,20 @@ class ProxyTests(BaseTestCase):
 
         with self.assertRaises(NonCachedMedia.DoesNotExist):
             MediaProxy.objects.cache().get(title=media.title)
+
+    def test_proxy_caching(self):
+        video = Video.objects.create(title='Pulp Fiction')
+        self.assertEqual(type(Video.objects.cache().get(pk=video.pk)),
+                         Video)
+        self.assertEqual(type(VideoProxy.objects.cache().get(pk=video.pk)),
+                         VideoProxy)
+
+    def test_proxy_caching_reversed(self):
+        video = Video.objects.create(title='Pulp Fiction')
+        self.assertEqual(type(VideoProxy.objects.cache().get(pk=video.pk)),
+                         VideoProxy)
+        self.assertEqual(type(Video.objects.cache().get(pk=video.pk)),
+                         Video)
 
 
 class MultitableInheritanceTests(BaseTestCase):
@@ -860,18 +920,6 @@ class SimpleCacheTests(BaseTestCase):
         get_calls.key(2).set(42)
         self.assertEqual(get_calls(2), 42)
 
-    def test_cached_call(self):
-        calls = [0]
-
-        def get_calls():
-            calls[0] += 1
-            return calls[0]
-
-        from cacheops import cache
-
-        self.assertEqual(cache.cached_call('calls', get_calls), 1)
-        self.assertEqual(cache.cached_call('calls', get_calls), 1)
-
     def test_cached_view(self):
         calls = [0]
 
@@ -899,7 +947,6 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(r1), 4) # miss
 
 
-@unittest.skipUnless(django.VERSION >= (1, 4), "Only for Django 1.4+")
 class DbAgnosticTests(BaseTestCase):
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
@@ -926,3 +973,56 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class SignalsTests(BaseTestCase):
+    def setUp(self):
+        super(SignalsTests, self).setUp()
+
+        def set_signal(signal=None, **kwargs):
+            self.signal_calls.append(kwargs)
+
+        self.signal_calls = []
+        cache_read.connect(set_signal, dispatch_uid=1, weak=False)
+
+    def tearDown(self):
+        super(SignalsTests, self).tearDown()
+        cache_read.disconnect(dispatch_uid=1)
+
+    def test_queryset(self):
+        # Miss
+        test_model = Category.objects.create(title="foo")
+        Category.objects.cache().get(id=test_model.id)
+        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
+
+        # Hit
+        self.signal_calls = []
+        Category.objects.cache().get(id=test_model.id) # hit
+        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': True}])
+
+    def test_cached_as(self):
+        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
+        func = get_calls.__wrapped__
+
+        # Miss
+        self.assertEqual(get_calls(), 1)
+        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': False}])
+
+        # Hit
+        self.signal_calls = []
+        self.assertEqual(get_calls(), 1)
+        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
+
+
+# Utilities
+
+def _make_inc(deco=lambda x: x):
+    calls = [0]
+
+    @deco
+    def inc(_=None, **kw):
+        calls[0] += 1
+        return calls[0]
+
+    inc.get = lambda: calls[0]
+    return inc

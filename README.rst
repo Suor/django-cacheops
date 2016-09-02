@@ -18,7 +18,8 @@ And there is more to it:
 Requirements
 ------------
 
-Python 2.6+ or 3.3+, Django 1.3+ and Redis 2.6+.
+| Python 2.7 or 3.3+, Django 1.7+ and Redis 2.6+.
+| **Note:** use cacheops 2.4.3 for older Djangos and Python.
 
 
 Installation
@@ -37,10 +38,6 @@ Or you can get latest one from github::
 Setup
 -----
 
-**Note:** settings format has changed in cacheops 2.2,
-for old style settings see `2.1.1 README <https://github.com/Suor/django-cacheops/blob/2.1.1/README.rst#setup>`_.
-Old format is still supported in cacheops 2.2+, but considered deprecated.
-
 Add ``cacheops`` to your ``INSTALLED_APPS``.
 
 Setup redis connection and enable caching for desired models:
@@ -58,6 +55,13 @@ Setup redis connection and enable caching for desired models:
         'password': '...',     # optional
         'unix_socket_path': '' # replaces host and port
     }
+
+    # Alternatively the redis connection can be defined using a URL:
+    CACHEOPS_REDIS = "redis://localhost:6379/1"
+    # or
+    CACHEOPS_REDIS = "unix://path/to/socket?db=1"
+    # or with password (note a colon)
+    CACHEOPS_REDIS = "redis://:password@localhost:6379/1"
 
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
@@ -100,14 +104,15 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
 
 Besides ``ops`` and ``timeout`` options you can also use:
 
-``local_get: True`` to cache simple gets for this model in process local memory.
-This is very fast, but is not invalidated in any way until process is restarted.
-Still could be useful for extremely rarely changed things.
+``local_get: True``
+    To cache simple gets for this model in process local memory.
+    This is very fast, but is not invalidated in any way until process is restarted.
+    Still could be useful for extremely rarely changed things.
 
-``cache_on_save=True | 'field_name'`` will write an instance to cache upon save.
-Cached instance will be retrieved on ``.get(field_name=...)`` request.
-Setting to ``True`` causes caching by primary key.
-
+``cache_on_save=True | 'field_name'``
+    To write an instance to cache upon save.
+    Cached instance will be retrieved on ``.get(field_name=...)`` request.
+    Setting to ``True`` causes caching by primary key.
 
 Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 
@@ -119,17 +124,23 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 
 .. code:: python
 
-    CACHEOPS_FAKE = True
+    from django.test import override_settings
+
+    @override_settings(CACHEOPS_ENABLED=False)
+    def test_something():
+        # ...
+        assert cond
 
 
 Usage
 -----
 
-| **Automatic caching.**
+| **Automatic caching**
 
 It's automatic you just need to set it up.
 
-| **Manual caching.**
+
+| **Manual caching**
 
 You can force any queryset to use cache by calling it's ``.cache()`` method:
 
@@ -150,7 +161,7 @@ Here you can specify which ops should be cached for queryset, for example, this 
 will cache count call in ``Paginator`` but not later articles fetch.
 There are four possible actions - ``get``, ``fetch``, ``count`` and ``exists``. You can
 pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
-There is, however, a shortcut for it:
+There is, however, a shortcut for the latter:
 
 .. code:: python
 
@@ -165,11 +176,11 @@ You can also override default timeout for particular queryset with ``.cache(time
 or make queryset only write cache, but don't try to fetch it with ``.cache(write_only=True)``.
 
 
-| **Function caching.**
+| **Function caching**
 
 You can cache and invalidate result of a function the same way as a queryset.
-Cache of the next function will be invalidated on any ``Article`` change, addition
-or deletion:
+Cached results of the next function will be invalidated on any ``Article`` change,
+addition or deletion:
 
 .. code:: python
 
@@ -178,8 +189,8 @@ or deletion:
     @cached_as(Article, timeout=120)
     def article_stats():
         return {
-            'tags': list( Article.objects.values('tag').annotate(count=Count('id')) )
-            'categories': list( Article.objects.values('category').annotate(count=Count('id')) )
+            'tags': list(Article.objects.values('tag').annotate(Count('id')))
+            'categories': list(Article.objects.values('category').annotate(Count('id')))
         }
 
 
@@ -192,19 +203,16 @@ e.g. to make invalidation more granular, you can use a local function:
 .. code:: python
 
     def articles_block(category, count=5):
+        qs = Article.objects.filter(category=category)
 
-        @cached_as(Article.objects.filter(category=category), extra=count)
+        @cached_as(qs, extra=count)
         def _articles_block():
-            qs = Article.objects.filter(category=category)
             articles = list(qs.filter(photo=True)[:count])
-
             if len(articles) < count:
-                articles += list(qs[:count-len(articles)])
-
+                articles += list(qs.filter(photo=False)[:count-len(articles)])
             return articles
 
         return _articles_block()
-
 
 We added ``extra`` here to make different keys for calls with same ``category`` but different
 ``count``. Cache key will also depend on function arguments, so we could just pass ``count`` as
@@ -221,7 +229,8 @@ Another possibility is to make function cache invalidate on changes to any one o
 
 As you can see, we can mix querysets and models here.
 
-| **View caching.**
+
+| **View caching**
 
 You can also cache and invalidate a view as a queryset. This works mostly the same way as function
 caching, but only path of the request parameter is used to construct cache key:
@@ -236,6 +245,15 @@ caching, but only path of the request parameter is used to construct cache key:
         return HttpResponse(...)
 
 You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``.
+
+Class based views can also be cached:
+
+.. code:: python
+
+    class NewsIndex(ListView):
+        model = News
+
+    news_index = cached_view_as(News)(NewsIndex.as_view())
 
 
 Invalidation
@@ -270,7 +288,10 @@ And the one that FLUSHES cacheops redis database::
 
 Don't use that if you share redis database for both cache and something else.
 
-On the other hand, there is a way to turn off invalidation for a while:
+
+| **Turning off and postponing invalidation**
+
+There is also a way to turn off invalidation for a while:
 
 .. code:: python
 
@@ -301,7 +322,24 @@ Combined with ``try ... finally`` it could be used to postpone invalidation:
         # ... or
         invalidate_model(...)
 
-Postponing invalidation can considerably speed up batch jobs.
+Postponing invalidation can speed up batch jobs.
+
+
+| **Mass updates**
+
+Normally `qs.update(...)` doesn't emit any events and thus doesn't trigger invalidation.
+And there is no transparent and efficient way to do that: trying to act on conditions will
+invalidate too much if update conditions are orthogonal to many queries conditions,
+and to act on specific objects we will need to fetch all of them,
+which `QuerySet.update()` users generally try to avoid.
+
+In the case you actually want to perform the latter cacheops provides a shortcut:
+
+.. code:: python
+
+    qs.invalidated_update(...)
+
+Note that all the updated objects are fetched twice, prior and post the update.
 
 
 Using memory limit
@@ -309,7 +347,8 @@ Using memory limit
 
 If your cache never grows too large you may not bother. But if you do you have some options.
 Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will. For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
+so you can't just set ``maxmemory`` and let redis evict at its will.
+For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
 So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
 
 First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
@@ -446,7 +485,7 @@ you'll need to call this from crontab for that to work::
 Django templates integration
 ----------------------------
 
-Cacheops provides tags to cache template fragments for Django 1.4+. They mimic ``@cached_as``
+Cacheops provides tags to cache template fragments. They mimic ``@cached_as``
 and ``@cached`` decorators, however, they require explicit naming of each fragment:
 
 .. code:: django
@@ -543,6 +582,26 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Keeping stats
+-------------
+
+Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
+``func`` - decorated function and ``hit`` - fetch success as boolean value.
+
+Here is simple stats implementation:
+
+.. code:: python
+
+    from cacheops.signals import cache_read
+    from statsd.defaults.django import statsd
+
+    def stats_collector(sender, func, hit, **kwargs):
+        event = 'hit' if hit else 'miss'
+        statsd.incr('cacheops.%s' % event)
+
+    cache_read.connect(stats_collector)
+
+
 CAVEATS
 -------
 
@@ -551,21 +610,22 @@ CAVEATS
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
    One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
-4. Mass updates don't trigger invalidation.
-5. ORDER BY and LIMIT/OFFSET don't affect invalidation.
-6. Doesn't work with RawQuerySet.
+4. Mass updates don't trigger invalidation by default.
+5. Sliced queries are invalidated as non-sliced ones.
+6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
 8. Doesn't work right with multi-table inheritance.
 9. Aggregates are not implemented yet.
 
-Here 1, 2, 3, 5 are part of design compromise, trying to solve them will make
+Here 1, 2, 3, 5 are part of the design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
-cache too much when update conditions are orthogonal to most queries conditions.
-6 can be cached as ``SomeModel.objects.all()`` but ``@cached_as()`` someway covers that
-and is more flexible. 8 and 9 are postponed until they will gain more interest
-or a champion willing to implement any one of them emerge.
+cache too much when update conditions are orthogonal to most queries conditions,
+see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
+more interest or a champion willing to implement any one of them emerge.
+
+All unsupported things could still be used easyly enough with the help of `@cached_as()`.
 
 
 Performance tips
@@ -583,14 +643,11 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
    Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
 
-3. More to 2, there is a `bug in django 1.4- <https://code.djangoproject.com/ticket/16759>`_,
-   which sometimes makes queryset cloning very slow. You can use any patch from this ticket to fix it.
+3. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
 
-4. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
+4. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/commands/save>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
 
-5. Run separate redis instance for cache with disabled `persistence <http://redis.io/topics/persistence>`_. You can manually call `SAVE <http://redis.io/commands/save>`_ or `BGSAVE <http://redis.io/commands/bgsave>`_ to stay hot upon server restart.
-
-6. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
+5. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
@@ -614,11 +671,9 @@ Here is how you do that. I suppose you have some application code causing it.
 TODO
 ----
 
-- better support transactions
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
-- integrate with prefetch_related()
+- integrate previous one with prefetch_related()
 - shard cache between multiple redises
-- add local cache (cleared at the and of request?)
 - respect subqueries?
 - respect headers in @cached_view*?
 - group invalidate_obj() calls?
