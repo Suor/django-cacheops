@@ -10,7 +10,6 @@ from .cross import pickle, md5
 import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
-from django.db import DEFAULT_DB_ALIAS
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
@@ -21,9 +20,10 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, CACHEOPS_LRU, ALL_OPS
-from .utils import (monkey_mix, stamp_fields, func_cache_key, cached_view_fab,
-                    family_has_profile, get_related_classes)
+from .utils import (get_related_classes)
+
+from .conf import model_profile, model_is_fake, settings, ALL_OPS
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -42,7 +42,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     Writes data to cache and creates appropriate invalidators.
     """
     assert not in_transaction()
-    load_script('cache_thing', CACHEOPS_LRU)(
+    load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
             pickle.dumps(data, -1),
@@ -83,12 +83,12 @@ def cached_as(*samples, **kwargs):
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
     if not timeout:
-        timeout = min(qs._cacheconf['timeout'] for qs in querysets)
+        timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if in_transaction():
+            if in_transaction() or not settings.CACHEOPS_ENABLED:
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
@@ -114,10 +114,7 @@ class QuerySetMixin(object):
     @cached_property
     def _cacheprofile(self):
         profile = model_profile(self.model)
-        if profile:
-            self._cacheconf = profile.copy()
-            self._cacheconf['write_only'] = False
-        return profile
+        return profile.copy() if profile else None
 
     @cached_property
     def _cloning(self):
@@ -143,7 +140,7 @@ class QuerySetMixin(object):
         md.update(stamp_fields(self.model))
         # Use query SQL as part of a key
         try:
-            sql, params = self.query.get_compiler(self._db or DEFAULT_DB_ALIAS).as_sql()
+            sql, params = self.query.get_compiler(self.db).as_sql()
             try:
                 sql_str = sql % params
             except UnicodeDecodeError:
@@ -166,7 +163,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheconf['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'])
 
     def cache(self, ops=None, timeout=None, write_only=None):
         """
@@ -185,12 +182,12 @@ class QuerySetMixin(object):
             ops = ALL_OPS
         if isinstance(ops, str):
             ops = {ops}
-        self._cacheconf['ops'] = set(ops)
+        self._cacheprofile['ops'] = set(ops)
 
         if timeout is not None:
-            self._cacheconf['timeout'] = timeout
+            self._cacheprofile['timeout'] = timeout
         if write_only is not None:
-            self._cacheconf['write_only'] = write_only
+            self._cacheprofile['write_only'] = write_only
 
         return self
 
@@ -220,9 +217,9 @@ class QuerySetMixin(object):
                 return self
 
         def clone(self, **kwargs):
-            kwargs.setdefault('_cacheprofile', self._cacheprofile)
-            if hasattr(self, '_cacheconf'):
-                kwargs.setdefault('_cacheconf', self._cacheconf)
+            # NOTE: need to copy profile so that clone changes won't affect this queryset
+            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
+                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
 
             clone = self._no_monkey._clone(self, **kwargs)
             clone._cloning = self._cloning - 1 if self._cloning else 0
@@ -246,9 +243,8 @@ class QuerySetMixin(object):
                 return self
 
         def clone(self, klass=None, setup=False, **kwargs):
-            kwargs.setdefault('_cacheprofile', self._cacheprofile)
-            if hasattr(self, '_cacheconf'):
-                kwargs.setdefault('_cacheconf', self._cacheconf)
+            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
+                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
 
             clone = self._no_monkey._clone(self, klass, setup, **kwargs)
             clone._cloning = self._cloning - 1 if self._cloning else 0
@@ -256,12 +252,12 @@ class QuerySetMixin(object):
 
     def iterator(self):
         # If cache is not enabled or in transaction just fall back
-        if not self._cacheprofile or 'fetch' not in self._cacheconf['ops'] \
-                or in_transaction():
+        if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
+                or in_transaction() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
-        if not self._cacheconf['write_only'] and not self._for_write:
+        if not self._cacheprofile['write_only'] and not self._for_write:
             # Trying get data from cache
             cache_data = redis_client.get(cache_key)
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
@@ -269,13 +265,18 @@ class QuerySetMixin(object):
                 return iter(pickle.loads(cache_data))
 
         # Cache miss - fetch data from overriden implementation
-        # No point in playing lazy we gonna store it anyway
-        results = list(self._no_monkey.iterator(self))
-        self._cache_results(cache_key, results)
-        return iter(results)
+        def iterate():
+            # NOTE: we are using self._result_cache to avoid fetching-while-fetching bug #177
+            self._result_cache = []
+            for obj in self._no_monkey.iterator(self):
+                self._result_cache.append(obj)
+                yield obj
+            self._cache_results(cache_key, self._result_cache)
+
+        return iterate()
 
     def count(self):
-        if self._cacheprofile and 'count' in self._cacheconf['ops']:
+        if self._cacheprofile and 'count' in self._cacheprofile['ops']:
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
@@ -287,7 +288,7 @@ class QuerySetMixin(object):
     def get(self, *args, **kwargs):
         # .get() uses the same .iterator() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile and 'get' in self._cacheconf['ops']:
+        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
@@ -309,7 +310,7 @@ class QuerySetMixin(object):
                     # we just skip local cache in that case
                     pass
 
-            if 'fetch' in self._cacheconf['ops']:
+            if 'fetch' in self._cacheprofile['ops']:
                 qs = self
             else:
                 qs = self._clone().cache()
@@ -319,7 +320,7 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
     def exists(self):
-        if self._cacheprofile and 'exists' in self._cacheconf['ops']:
+        if self._cacheprofile and 'exists' in self._cacheprofile['ops']:
             if self._result_cache is not None:
                 return bool(self._result_cache)
             return cached_as(self)(lambda: self._no_monkey.exists(self))()
@@ -357,8 +358,6 @@ _old_objs = threading.local()
 class ManagerMixin(object):
     @once_per('cls')
     def _install_cacheops(self, cls):
-        cls._cacheprofile = model_profile(cls)
-
         if family_has_profile(cls):
             # Set up signals
             connect_first(pre_save, self._pre_save, sender=cls)
@@ -375,7 +374,7 @@ class ManagerMixin(object):
         # Django 1.7+ migrations create lots of fake models, just skip them
         # NOTE: we make it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
-        if cls.__module__ != '__fake__':
+        if not model_is_fake(cls):
             self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
@@ -403,6 +402,9 @@ class ManagerMixin(object):
             invalidate_obj(old)
         invalidate_obj(instance)
 
+        if in_transaction() or not settings.CACHEOPS_ENABLED:
+            return
+
         # Get all concrete parent and child classes, and mark those for invalidation too
         related_types = (get_related_classes(sender, parent_classes=True) +
                          get_related_classes(sender, parent_classes=False))
@@ -419,14 +421,15 @@ class ManagerMixin(object):
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
         #       but its base having one. Or vice versa.
         #       We still need to invalidate in this case, but cache on save better be skipped.
-        if not instance._cacheprofile:
+        cacheprofile = model_profile(instance.__class__)
+        if not cacheprofile:
             return
 
         # Enabled cache_on_save makes us write saved object to cache.
         # Later it can be retrieved with .get(<cache_on_save_field>=<value>)
         # <cache_on_save_field> is pk unless specified.
         # This sweet trick saves a db request and helps with slave lag.
-        cache_on_save = instance._cacheprofile.get('cache_on_save') and not in_transaction()
+        cache_on_save = cacheprofile.get('cache_on_save')
         if cache_on_save:
             # HACK: We get this object "from field" so it can contain
             #       some undesirable attributes or other objects attached.
@@ -543,7 +546,7 @@ def install_cacheops():
     # Make buffers/memoryviews pickleable to serialize binary field data
     if six.PY2:
         import copy_reg
-        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))
+        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))  # noqa
     if six.PY3:
         import copyreg
         copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))

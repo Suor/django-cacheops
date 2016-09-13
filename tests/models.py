@@ -2,15 +2,16 @@ import os
 import six
 from datetime import date, datetime, time
 
+import django
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 # Deprecated this thing in Django 1.8 and removed in 1.10
-try:
+if django.VERSION < (1, 8):
     from django.db.models import SubfieldBase
-except ImportError:
+else:
     class SubfieldBase(type):
         pass
 

@@ -2,9 +2,23 @@
 import os, sys, re, shutil
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
+
+# Use psycopg2cffi for PyPy
+try:
+    import psycopg2  # noqa
+except ImportError:
+    # Fall back to psycopg2cffi
+    from psycopg2cffi import compat
+    compat.register()
+
+
+# Set up Django
 import django
 from django.core.management import call_command
+django.setup()
 
+
+# Derive test names
 names = next((a for a in sys.argv[1:] if not a.startswith('-')), None)
 if not names:
     names = 'tests'
@@ -12,9 +26,6 @@ elif re.search(r'^\d+', names):
     names = 'tests.tests.IssueTests.test_' + names
 elif not names.startswith('tests.'):
     names = 'tests.tests.' + names
-
-
-django.setup()
 
 
 # NOTE: we create migrations each time  since they depend on type of database,

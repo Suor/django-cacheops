@@ -1,14 +1,15 @@
 from __future__ import absolute_import
 import warnings
+import six
 
 from funcy import decorator, identity, memoize
 import redis
 from django.core.exceptions import ImproperlyConfigured
 
-from .conf import CACHEOPS_REDIS, CACHEOPS_DEGRADE_ON_FAILURE
+from .conf import settings
 
 
-if CACHEOPS_DEGRADE_ON_FAILURE:
+if settings.CACHEOPS_DEGRADE_ON_FAILURE:
     @decorator
     def handle_connection_failure(call):
         try:
@@ -27,10 +28,15 @@ class SafeRedis(redis.StrictRedis):
 
 class LazyRedis(object):
     def _setup(self):
-        if not CACHEOPS_REDIS:
+        if not settings.CACHEOPS_REDIS:
             raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
 
-        client = (SafeRedis if CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis)(**CACHEOPS_REDIS)
+        Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
+        # Allow client connection settings to be specified by a URL.
+        if isinstance(settings.CACHEOPS_REDIS, six.string_types):
+            client = Redis.from_url(settings.CACHEOPS_REDIS)
+        else:
+            client = Redis(**settings.CACHEOPS_REDIS)
 
         object.__setattr__(self, '__class__', client.__class__)
         object.__setattr__(self, '__dict__', client.__dict__)

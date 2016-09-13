@@ -2,7 +2,6 @@
 import re
 import json
 import inspect
-import six
 from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
 from .cross import md5hex
@@ -90,18 +89,14 @@ def monkey_mix(cls, mixin, methods=None):
     cls._no_monkey = MonkeyProxy(cls)
 
     if methods is None:
-        # NOTE: there no such thing as unbound method in Python 3, it uses naked functions,
-        #       so we use some six based altering here
-        isboundmethod = inspect.isfunction if six.PY3 else inspect.ismethod
-        methods = inspect.getmembers(mixin, isboundmethod)
+        methods = [(name, m) for name, m in mixin.__dict__.items() if inspect.isfunction(m)]
     else:
-        methods = [(m, getattr(mixin, m)) for m in methods]
+        methods = [(m, mixin.__dict__[m]) for m in methods]
 
     for name, method in methods:
         if hasattr(cls, name):
             setattr(cls._no_monkey, name, getattr(cls, name))
-        # NOTE: remember, there is no bound methods in Python 3
-        setattr(cls, name, six.get_unbound_function(method))
+        setattr(cls, name, method)
 
 
 @memoize

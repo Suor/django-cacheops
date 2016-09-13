@@ -56,6 +56,13 @@ Setup redis connection and enable caching for desired models:
         'unix_socket_path': '' # replaces host and port
     }
 
+    # Alternatively the redis connection can be defined using a URL:
+    CACHEOPS_REDIS = "redis://localhost:6379/1"
+    # or
+    CACHEOPS_REDIS = "unix://path/to/socket?db=1"
+    # or with password (note a colon)
+    CACHEOPS_REDIS = "redis://:password@localhost:6379/1"
+
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This includes request.user or post.author access,
@@ -112,6 +119,17 @@ Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 .. code:: python
 
     CACHEOPS_DEGRADE_ON_FAILURE = True
+
+There is also a possibility to make all cacheops methods and decorators no-op, e.g. for testing:
+
+.. code:: python
+
+    from django.test import override_settings
+
+    @override_settings(CACHEOPS_ENABLED=False)
+    def test_something():
+        # ...
+        assert cond
 
 
 Usage
@@ -653,11 +671,9 @@ Here is how you do that. I suppose you have some application code causing it.
 TODO
 ----
 
-- better support transactions
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
-- integrate with prefetch_related()
+- integrate previous one with prefetch_related()
 - shard cache between multiple redises
-- add local cache (cleared at the and of request?)
 - respect subqueries?
 - respect headers in @cached_view*?
 - group invalidate_obj() calls?

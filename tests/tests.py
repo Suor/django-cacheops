@@ -66,6 +66,17 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
+    def test_lazy(self):
+        inc = _make_inc()
+
+        from django.db.models.signals import post_init
+        post_init.connect(inc, sender=Category)
+
+        qs = Category.objects.cache()
+        for c in qs.iterator():
+            break
+        self.assertEqual(inc.get(), 1)
+
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
         post.title += ' changed'
@@ -569,7 +580,6 @@ class IssueTests(BaseTestCase):
         c = Category.objects.prefetch_related('posts').get(pk=3)
         c.posts.get(visible=1)  # this used to fail
 
-    @unittest.expectedFailure
     def test_173(self):
         g = Group.objects.create(name='gr')
         g.user_set.add(self.user)
@@ -588,7 +598,6 @@ class IssueTests(BaseTestCase):
         perms = list(Permission.objects.filter(group__user=self.user).cache())
         self.assertEqual(perms, [p])
 
-    @unittest.expectedFailure
     def test_173_simple(self):
         extra = Extra.objects.get(pk=1)
         title = extra.post.category.title
@@ -602,6 +611,11 @@ class IssueTests(BaseTestCase):
 
         # Fail because neither Extra nor Catehory changed, but something in between
         self.assertEqual([], list(Extra.objects.filter(post__category__title=title).cache()))
+
+    def test_177(self):
+        c = Category.objects.get(pk=1)
+        c.posts_copy = c.posts.cache()
+        bool(c.posts_copy)
 
 
 @unittest.skipUnless(os.environ.get('LONG'), "Too long")
@@ -1006,8 +1020,9 @@ def _make_inc(deco=lambda x: x):
     calls = [0]
 
     @deco
-    def get_calls(_=None):
+    def inc(_=None, **kw):
         calls[0] += 1
         return calls[0]
 
-    return get_calls
+    inc.get = lambda: calls[0]
+    return inc
