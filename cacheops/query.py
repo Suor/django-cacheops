@@ -402,9 +402,6 @@ class ManagerMixin(object):
             invalidate_obj(old)
         invalidate_obj(instance)
 
-        if in_transaction() or not settings.CACHEOPS_ENABLED:
-            return
-
         # Get all concrete parent and child classes, and mark those for invalidation too
         related_types = (get_related_classes(sender, parent_classes=True) +
                          get_related_classes(sender, parent_classes=False))
@@ -417,6 +414,9 @@ class ManagerMixin(object):
                 invalidate_obj(related_instance)
             except related_type.DoesNotExist:
                 pass
+
+        if in_transaction() or not settings.CACHEOPS_ENABLED:
+            return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
         #       but its base having one. Or vice versa.
