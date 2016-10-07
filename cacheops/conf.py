@@ -11,7 +11,7 @@ ALL_OPS = {'get', 'fetch', 'count', 'exists'}
 
 class Settings(object):
     CACHEOPS_ENABLED = True
-    CACHEOPS_REDIS = None
+    CACHEOPS_REDIS = {}
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
     CACHEOPS_LRU = False

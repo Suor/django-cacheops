@@ -28,9 +28,6 @@ class SafeRedis(redis.StrictRedis):
 
 class LazyRedis(object):
     def _setup(self):
-        if not settings.CACHEOPS_REDIS:
-            raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
-
         Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
         # Allow client connection settings to be specified by a URL.
         if isinstance(settings.CACHEOPS_REDIS, six.string_types):
