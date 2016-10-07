@@ -4,7 +4,6 @@ import six
 
 from funcy import decorator, identity, memoize
 import redis
-from django.core.exceptions import ImproperlyConfigured
 
 from .conf import settings
 
