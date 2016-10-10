@@ -77,7 +77,6 @@ class CacheopsRedis(redis.StrictRedis):
         self._unlock(keys=[key, signal_key])
 
 
-
 class LazyRedis(object):
     def _setup(self):
         # Allow client connection settings to be specified by a URL.
