@@ -249,6 +249,7 @@ class QuerySetMixin(object):
             return clone
 
     def iterator(self):
+        # TODO: drop this in next major release
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
                 or in_transaction() or not settings.CACHEOPS_ENABLED:
@@ -272,6 +273,26 @@ class QuerySetMixin(object):
             self._cache_results(cache_key, self._result_cache)
 
         return iterate()
+
+    def _fetch_all(self):
+        # If cache is not enabled or in transaction just fall back
+        if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
+                or in_transaction() or not settings.CACHEOPS_ENABLED:
+            return self._no_monkey._fetch_all(self)
+
+        if self._result_cache is None:
+            cache_key = self._cache_key()
+            if not self._cacheprofile['write_only'] and not self._for_write:
+                # Trying get data from cache
+                cache_data = redis_client.get(cache_key)
+                cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
+                if cache_data is not None:
+                    self._result_cache = pickle.loads(cache_data)
+                else:
+                    self._result_cache = list(self._no_monkey.iterator(self))
+                    self._cache_results(cache_key, self._result_cache)
+
+        self._no_monkey._fetch_all(self)
 
     def count(self):
         if self._cacheprofile and 'count' in self._cacheprofile['ops']:
