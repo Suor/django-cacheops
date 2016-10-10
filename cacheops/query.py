@@ -58,6 +58,7 @@ def cached_as(*samples, **kwargs):
     timeout = kwargs.get('timeout')
     extra = kwargs.get('extra')
     key_func = kwargs.get('key_func', func_cache_key)
+    lock = kwargs.get('lock')
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -82,6 +83,8 @@ def cached_as(*samples, **kwargs):
     key_extra.append(extra)
     if not timeout:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
+    if lock is None:
+        lock = any(qs._cacheprofile['lock'] for qs in querysets)
 
     def decorator(func):
         @wraps(func)
@@ -91,14 +94,14 @@ def cached_as(*samples, **kwargs):
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
 
-            cache_data = redis_client.get(cache_key)
-            cache_read.send(sender=None, func=func, hit=cache_data is not None)
-            if cache_data is not None:
-                return pickle.loads(cache_data)
-
-            result = func(*args, **kwargs)
-            cache_thing(cache_key, result, cond_dnfs, timeout)
-            return result
+            with redis_client.getting(cache_key, lock=lock) as cache_data:
+                cache_read.send(sender=None, func=func, hit=cache_data is not None)
+                if cache_data is not None:
+                    return pickle.loads(cache_data)
+                else:
+                    result = func(*args, **kwargs)
+                    cache_thing(cache_key, result, cond_dnfs, timeout)
+                    return result
 
         return wrapper
     return decorator
@@ -163,13 +166,14 @@ class QuerySetMixin(object):
         cond_dnfs = dnfs(self)
         cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'])
 
-    def cache(self, ops=None, timeout=None, write_only=None):
+    def cache(self, ops=None, timeout=None, write_only=None, lock=None):
         """
         Enables caching for given ops
             ops        - a subset of {'get', 'fetch', 'count', 'exists'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
             write_only - don't try fetching from cache, still write result there
+            lock       - use lock to prevent dog-pile effect
 
         NOTE: you actually can disable caching by omiting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
@@ -186,6 +190,8 @@ class QuerySetMixin(object):
             self._cacheprofile['timeout'] = timeout
         if write_only is not None:
             self._cacheprofile['write_only'] = write_only
+        if lock is not None:
+            self._cacheprofile['lock'] = lock
 
         return self
 
@@ -282,15 +288,19 @@ class QuerySetMixin(object):
 
         if self._result_cache is None:
             cache_key = self._cache_key()
-            if not self._cacheprofile['write_only'] and not self._for_write:
-                # Trying get data from cache
-                cache_data = redis_client.get(cache_key)
-                cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
-                if cache_data is not None:
-                    self._result_cache = pickle.loads(cache_data)
-                else:
-                    self._result_cache = list(self._no_monkey.iterator(self))
-                    self._cache_results(cache_key, self._result_cache)
+            lock = self._cacheprofile['lock']
+
+            if self._cacheprofile['write_only'] or self._for_write:
+                self._result_cache = list(self._no_monkey.iterator(self))
+                self._cache_results(cache_key, self._result_cache)
+            else:
+                with redis_client.getting(cache_key, lock=lock) as cache_data:
+                    cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
+                    if cache_data is not None:
+                        self._result_cache = pickle.loads(cache_data)
+                    else:
+                        self._result_cache = list(self._no_monkey.iterator(self))
+                        self._cache_results(cache_key, self._result_cache)
 
         self._no_monkey._fetch_all(self)
 
