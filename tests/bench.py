@@ -92,12 +92,16 @@ from django.db.models import Q
 
 def do_complex_construct():
     return Post.objects.filter(id__gt=1, title='Hi').exclude(category__in=[10, 20]) \
-                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))
+                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))   \
+                       .select_related('category').prefetch_related('category')     \
+                       .order_by('title')[:10]
 
 def do_complex_inplace():
     return Post.objects.inplace()                                                   \
                        .filter(id__gt=1, title='Hi').exclude(category__in=[10, 20]) \
-                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))
+                       .filter(Q(id__range=(10, 20)) | ~Q(title__contains='abc'))   \
+                       .select_related('category').prefetch_related('category')     \
+                       .order_by('title')[:10]
 
 complex_qs = do_complex_construct()
 def do_complex_cache_key():
