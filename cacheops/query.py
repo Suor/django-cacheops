@@ -25,7 +25,7 @@ from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, fa
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
-from .transaction import uncommited_changes
+from .transaction import transaction_state
 from .signals import cache_read
 
 
@@ -39,7 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    assert not uncommited_changes()
+    assert not transaction_state.is_dirty()
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
@@ -86,7 +86,7 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if uncommited_changes() or not settings.CACHEOPS_ENABLED:
+            if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
@@ -251,7 +251,7 @@ class QuerySetMixin(object):
     def iterator(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or uncommited_changes() or not settings.CACHEOPS_ENABLED:
+                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
@@ -389,7 +389,7 @@ class ManagerMixin(object):
             invalidate_obj(old)
         invalidate_obj(instance)
 
-        if uncommited_changes() or not settings.CACHEOPS_ENABLED:
+        if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,

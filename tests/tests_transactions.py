@@ -6,7 +6,7 @@ from django.db.transaction import atomic
 from django.test import TransactionTestCase
 
 from .models import Category
-from cacheops.transaction import uncommited_changes
+from cacheops.transaction import transaction_state
 
 
 class ThreadWithReturnValue(Thread):
@@ -56,12 +56,12 @@ class TransactionSupportTests(TransactionTestCase):
 
     def test_atomic(self):
         with atomic():
-            self.assertFalse(uncommited_changes())
+            self.assertFalse(transaction_state.is_dirty())
             obj = get_category()
-            self.assertFalse(uncommited_changes())
+            self.assertFalse(transaction_state.is_dirty())
             obj.title = 'Changed'
             obj.save()
-            self.assertTrue(uncommited_changes())
+            self.assertTrue(transaction_state.is_dirty())
             self.assertEqual('Changed', get_category().title)
             self.assertEqual('Django', run_in_thread(get_category).title)
         self.assertEqual('Changed', run_in_thread(get_category).title)
