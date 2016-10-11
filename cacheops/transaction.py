@@ -6,7 +6,7 @@ from django.db.transaction import get_connection, Atomic
 from .utils import monkey_mix
 
 
-__all__ = ('uncommited_changes', 'mark_transaction_dirty',
+__all__ = ('mark_transaction_dirty',
            'queue_when_in_transaction', 'install_cacheops_transaction_support')
 
 
