@@ -137,9 +137,3 @@ def dnfs(qs):
     aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
             | {main_alias} - {'django_content_type'}
     return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
-
-
-def attname_of(model, col, cache={}):
-    if model not in cache:
-        cache[model] = {f.db_column: f.attname for f in model._meta.fields}
-    return cache[model].get(col, col)
