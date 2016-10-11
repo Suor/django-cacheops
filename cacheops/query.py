@@ -283,7 +283,7 @@ class QuerySetMixin(object):
     def _fetch_all(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or in_transaction() or not settings.CACHEOPS_ENABLED:
+                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey._fetch_all(self)
 
         if self._result_cache is None:
