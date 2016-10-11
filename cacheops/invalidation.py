@@ -31,7 +31,6 @@ def invalidate_dict(model, obj_dict):
     ])
 
 
-@mark_transaction_dirty
 def invalidate_obj(obj):
     """
     Invalidates caches that can possibly be influenced by object
