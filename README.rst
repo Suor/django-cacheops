@@ -625,7 +625,7 @@ cache too much when update conditions are orthogonal to most queries conditions,
 see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
 more interest or a champion willing to implement any one of them emerge.
 
-All unsupported things could still be used easyly enough with the help of `@cached_as()`.
+All unsupported things could still be used easily enough with the help of `@cached_as()`.
 
 
 Performance tips
