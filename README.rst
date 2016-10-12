@@ -11,7 +11,8 @@ And there is more to it:
 
 - decorators to cache any user function or view as a queryset or by time
 - extensions for django and jinja2 templates to cache template fragments as querysets or by time
-- concurrent file cache with a decorator
+- transparent transaction support
+- dog-pile prevention mechanism
 - a couple of hacks to make django faster
 
 
