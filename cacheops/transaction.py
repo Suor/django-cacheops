@@ -6,8 +6,7 @@ from django.db.transaction import get_connection, Atomic
 from .utils import monkey_mix
 
 
-__all__ = ('mark_transaction_dirty',
-           'queue_when_in_transaction', 'install_cacheops_transaction_support')
+__all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support')
 
 
 class TransactionState(threading.local):
@@ -16,57 +15,40 @@ class TransactionState(threading.local):
         self._stack = []
 
     def begin(self):
-        parent_dirty = self.is_dirty()
-        self._stack.append({'success_cbs': [], 'dirty': parent_dirty})
+        self._stack.append([])
 
     def commit(self):
         context = self._stack.pop()
         if self._stack:
             # savepoint
-            self._stack[-1]['success_cbs'].extend(context['success_cbs'])
-            if context['dirty']:
-                self.mark_dirty()
+            self._stack[-1].extend(context)
         else:
             # transaction
-            for func, args, kwargs in context['success_cbs']:
+            for func, args, kwargs in context:
                 func(*args, **kwargs)
 
     def rollback(self):
         self._stack.pop()
 
-    def add_success_callback(self, func, args, kwargs):
-        self._stack[-1]['success_cbs'].append((func, args, kwargs))
-
-    def mark_dirty(self):
-        self._stack[-1]['dirty'] = True
-
-    def is_dirty(self):
-        return self.in_transaction() and self._stack[-1]['dirty']
+    def append(self, item):
+        self._stack[-1].append(item)
 
     def in_transaction(self):
-        return bool(transaction_state._stack)
+        return bool(self._stack)
+
+    def is_dirty(self):
+        return bool(self._stack and self._stack[-1])
 
 transaction_state = TransactionState()
 
-def in_transaction():
-    return transaction_state.in_transaction()
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if in_transaction():
-            transaction_state.add_success_callback(func, args, kwargs)
+        if transaction_state.in_transaction():
+            transaction_state.append((func, args, kwargs))
         else:
             func(*args, **kwargs)
-    return wrapper
-
-
-def mark_transaction_dirty(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if in_transaction():
-            transaction_state.mark_dirty()
-        return func(*args, **kwargs)
     return wrapper
 
 
