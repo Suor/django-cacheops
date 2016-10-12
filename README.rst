@@ -32,7 +32,7 @@ Using pip::
 Or you can get latest one from github::
 
     $ git clone git://github.com/Suor/django-cacheops.git
-    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/path/
+    $ pip install -e django-cacheops
 
 
 Setup
