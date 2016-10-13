@@ -9,6 +9,7 @@ from .query import *
 from .invalidation import *
 from .templatetags.cacheops import *
 from .transaction import install_cacheops_transaction_support
+from .utils import debug_cache_key  # noqa
 
 
 class CacheopsConfig(AppConfig):
