@@ -121,3 +121,4 @@ class TransactionSupportTests(TransactionTestCase):
             self.assertTrue(transaction_state.is_dirty())
             with atomic():
                 self.assertTrue(transaction_state.is_dirty())
+        self.assertTrue(transaction_state.is_dirty())
