@@ -7,7 +7,8 @@ from .conf import settings
 from .utils import monkey_mix
 
 
-__all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support')
+__all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support',
+           'transaction_state')
 
 
 class TransactionState(threading.local):
