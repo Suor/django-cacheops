@@ -110,3 +110,14 @@ class TransactionSupportTests(TransactionTestCase):
             self.assertEqual('Django', run_in_thread(get_category).title)
         self.assertEqual('Django', get_category().title)
         self.assertEqual('Django', run_in_thread(get_category).title)
+
+    def test_dirtiness_with_nested_transaction(self):
+        obj = get_category()
+        self.assertFalse(transaction_state.is_dirty())
+        with atomic():
+            self.assertFalse(transaction_state.is_dirty())
+            obj.title += ' changed'
+            obj.save()
+            self.assertTrue(transaction_state.is_dirty())
+            with atomic():
+                self.assertTrue(transaction_state.is_dirty())
