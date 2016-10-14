@@ -2,7 +2,7 @@
 import re, copy
 import unittest
 
-from django.db import connection, connections, transaction
+from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User, Group, Permission
@@ -170,17 +170,6 @@ class BasicTests(BaseTestCase):
 
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
-
-    def test_dirtiness_with_nested_transaction(self):
-        post = Post.objects.get(pk=1)
-        self.assertFalse(transaction_state.is_dirty())
-        with transaction.atomic():
-            self.assertFalse(transaction_state.is_dirty())
-            post.title += ' changed'
-            post.save()
-            self.assertTrue(transaction_state.is_dirty())
-            with transaction.atomic():
-                self.assertTrue(transaction_state.is_dirty())
 
 
 class ValuesTests(BaseTestCase):
