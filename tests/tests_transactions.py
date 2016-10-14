@@ -111,14 +111,25 @@ class TransactionSupportTests(TransactionTestCase):
         self.assertEqual('Django', get_category().title)
         self.assertEqual('Django', run_in_thread(get_category).title)
 
-    def test_dirtiness_with_nested_transaction(self):
-        obj = get_category()
-        self.assertFalse(transaction_state.is_dirty())
+    def test_use_cache_inside_transactions(self):
         with atomic():
-            self.assertFalse(transaction_state.is_dirty())
+            with self.assertNumQueries(1):
+                get_category()
+            with self.assertNumQueries(0):
+                get_category()
+            with atomic():
+                with self.assertNumQueries(0):
+                    get_category()
+
+            obj = get_category()
             obj.title += ' changed'
             obj.save()
-            self.assertTrue(transaction_state.is_dirty())
-            with atomic():
-                self.assertTrue(transaction_state.is_dirty())
-        self.assertTrue(transaction_state.is_dirty())
+
+            with self.assertNumQueries(1):
+                get_category()
+            with self.assertNumQueries(1):
+                get_category()
+        with self.assertNumQueries(1):
+            get_category()
+        with self.assertNumQueries(0):
+            get_category()
