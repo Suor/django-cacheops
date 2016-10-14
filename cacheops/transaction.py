@@ -37,7 +37,7 @@ class TransactionState(threading.local):
         return bool(self._stack)
 
     def is_dirty(self):
-        return bool(self._stack and self._stack[-1])
+        return any(self._stack)
 
 transaction_state = TransactionState()
 
