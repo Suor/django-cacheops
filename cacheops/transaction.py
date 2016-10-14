@@ -3,6 +3,7 @@ import threading
 from funcy import wraps, once
 from django.db.transaction import get_connection, Atomic
 
+from .conf import settings
 from .utils import monkey_mix
 
 
@@ -38,6 +39,12 @@ class TransactionState(threading.local):
 
     def is_dirty(self):
         return any(self._stack)
+
+    def allows_caching(self):
+        if settings.CACHEOPS_TRANSACTION_SUPPORT:
+            return self.is_dirty()
+        else:
+            return self.in_transaction()
 
 transaction_state = TransactionState()
 

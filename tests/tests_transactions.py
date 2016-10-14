@@ -3,7 +3,7 @@ from threading import Thread
 import six
 
 from django.db.transaction import atomic
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 
 from .models import Category
 
@@ -107,7 +107,8 @@ class TransactionSupportTests(TransactionTestCase):
         self.assertEqual('Django', get_category().title)
         self.assertEqual('Django', run_in_thread(get_category).title)
 
-    def test_use_cache_inside_transactions(self):
+    @override_settings(CACHEOPS_TRANSACTION_SUPPORT=True)
+    def test_transaction_support(self):
         with atomic():
             with self.assertNumQueries(1):
                 get_category()
@@ -129,3 +130,11 @@ class TransactionSupportTests(TransactionTestCase):
             get_category()
         with self.assertNumQueries(0):
             get_category()
+
+    @override_settings(CACHEOPS_TRANSACTION_SUPPORT=False)
+    def test_disabled_transaction_support(self):
+        with atomic():
+            with self.assertNumQueries(1):
+                get_category()
+            with self.assertNumQueries(1):
+                get_category()
