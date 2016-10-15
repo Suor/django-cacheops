@@ -65,6 +65,7 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
+    # TODO: remove this test when .iterator() is removed
     def test_lazy(self):
         inc = _make_inc()
 
@@ -75,6 +76,8 @@ class BasicTests(BaseTestCase):
         for c in qs.iterator():
             break
         self.assertEqual(inc.get(), 1)
+
+        post_init.disconnect(inc)
 
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
