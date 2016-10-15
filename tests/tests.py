@@ -521,18 +521,6 @@ class IssueTests(BaseTestCase):
         bool(c.posts_copy)
 
 
-@unittest.skipUnless(os.environ.get('LONG'), "Too long")
-class LongTests(BaseTestCase):
-    fixtures = ['basic']
-
-    def test_big_invalidation(self):
-        for x in range(8000):
-            list(Category.objects.cache().exclude(pk=x))
-
-        c = Category.objects.get(pk=1)
-        invalidate_obj(c) # lua unpack() fails with 8000 keys, workaround works
-
-
 class LocalGetTests(BaseTestCase):
     def setUp(self):
         Local.objects.create(pk=1)
