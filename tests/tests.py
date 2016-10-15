@@ -669,20 +669,9 @@ class M2MTests(BaseTestCase):
             lambda: self.bf.labels.remove(self.furious)
         )
 
+
 class MultiTableInheritanceWithM2MTest(M2MTests):
-
-    def setUp(self):
-        self.bf = PremiumBrand.objects.create()
-        self.bs = PremiumBrand.objects.create()
-
-        self.fast = Label.objects.create(text='fast')
-        self.slow = Label.objects.create(text='slow')
-        self.furious = Label.objects.create(text='furios')
-
-        self.bf.labels.add(self.fast, self.furious)
-        self.bs.labels.add(self.slow, self.furious)
-
-        super(M2MTests, self).setUp()
+    brand_cls = PremiumBrand
 
 
 class M2MThroughTests(M2MTests):
