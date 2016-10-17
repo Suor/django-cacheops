@@ -2,7 +2,7 @@
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any
+from funcy import memoize, compose, wraps, any, partial
 from funcy.py2 import mapcat
 from .cross import md5hex
 
@@ -90,28 +90,26 @@ def stamp_fields(model):
 
 ### Cache keys calculation
 
-def obj_key(obj):
-    if isinstance(obj, models.Model):
-        return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
-    else:
-        return str(obj)
-
-def func_cache_key(func, args, kwargs, extra=None):
+def func_cache_key(func, args, kwargs, extra=None, debug=False):
     """
     Calculate cache key based on func and arguments
     """
-    factors = [func.__module__, func.__name__, args, kwargs, extra]
-    if hasattr(func, '__code__'):
-        factors.append(func.__code__.co_firstlineno)
+    def obj_key(obj):
+        if isinstance(obj, models.Model):
+            return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
+        elif inspect.isfunction(obj):
+            factors = [obj.__module__, obj.__name__]
+            # Really useful to ignore this when editing code
+            if debug and hasattr(func, '__code__'):
+                factors.append(obj.__code__.co_firstlineno)
+            return factors
+        else:
+            return str(obj)
+
+    factors = [obj_key(func), args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
 
-def debug_cache_key(func, args, kwargs, extra=None):
-    """
-    Same as func_cache_key(), but doesn't take into account function line.
-    Handy to use when editing code.
-    """
-    factors = [func.__module__, func.__name__, args, kwargs, extra]
-    return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
+debug_cache_key = partial(func_cache_key, debug=True)
 
 def view_cache_key(func, args, kwargs, extra=None):
     """

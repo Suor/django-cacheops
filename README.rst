@@ -11,7 +11,8 @@ And there is more to it:
 
 - decorators to cache any user function or view as a queryset or by time
 - extensions for django and jinja2 templates to cache template fragments as querysets or by time
-- concurrent file cache with a decorator
+- transparent transaction support
+- dog-pile prevention mechanism
 - a couple of hacks to make django faster
 
 
@@ -32,7 +33,7 @@ Using pip::
 Or you can get latest one from github::
 
     $ git clone git://github.com/Suor/django-cacheops.git
-    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/path/
+    $ pip install -e django-cacheops
 
 
 Setup
@@ -610,7 +611,7 @@ CAVEATS
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
    One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
-4. Mass updates don't trigger invalidation by default.
+4. Mass updates don't trigger invalidation by default. But see `.invalidated_update()`.
 5. Sliced queries are invalidated as non-sliced ones.
 6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
@@ -625,7 +626,7 @@ cache too much when update conditions are orthogonal to most queries conditions,
 see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
 more interest or a champion willing to implement any one of them emerge.
 
-All unsupported things could still be used easyly enough with the help of `@cached_as()`.
+All unsupported things could still be used easily enough with the help of `@cached_as()`.
 
 
 Performance tips

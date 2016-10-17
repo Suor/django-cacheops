@@ -1,3 +1,8 @@
+3.0.1
+- support Django 1.10 (worked before, but now it's official)
+- accept empty CACHEOPS_REDIS setting
+- fixed ImportError in cleanfilecache command (Roman)
+
 3.0
 - support PyPy
 - support Python 3.5

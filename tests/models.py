@@ -6,7 +6,6 @@ import django
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
-from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 # Deprecated this thing in Django 1.8 and removed in 1.10
 if django.VERSION < (1, 8):
@@ -162,11 +161,6 @@ class Movie(Media):
     year = models.IntegerField()
 
 
-# Decimals
-class Point(models.Model):
-    x = models.DecimalField(decimal_places=6, max_digits=8, blank=True, default=0.0)
-
-
 # M2M models
 class Label(models.Model):
     text = models.CharField(max_length=127, blank=True, default='')
@@ -189,6 +183,7 @@ class Labeling(models.Model):
 class PremiumBrand(Brand):
     extra = models.CharField(max_length=127, blank=True, default='')
 
+
 # local_get
 class Local(models.Model):
     tag = models.IntegerField(null=True)
@@ -207,43 +202,13 @@ class DbBinded(models.Model):
     pass
 
 
-# 62
-class Product(models.Model):
-    name = models.CharField(max_length=32)
-
-class ProductReview(models.Model):
-    product = models.ForeignKey(Product, related_name='reviews', null=True)
-    status = models.IntegerField()
-
-
-# 70
-try:
-    from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
-except ImportError:
-    from django.contrib.contenttypes.generic import GenericForeignKey, GenericRelation
-
-class GenericContainer(models.Model):
-    content_type = models.ForeignKey(ContentType)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
-    name = models.CharField(max_length=30)
-
-class Contained(models.Model):
-    name = models.CharField(max_length=30)
-    containers = GenericRelation(GenericContainer)
-
-
-# 117
-class All(models.Model):
-    tag = models.IntegerField(null=True)
-
-
 # contrib.postgis
 if os.environ.get('CACHEOPS_DB') == 'postgis':
     from django.contrib.gis.db import models as gis_models
 
     class Geometry(gis_models.Model):
         point = gis_models.PointField(geography=True, dim=3, blank=True, null=True, default=None)
+
 
 # 145
 class One(models.Model):
@@ -253,17 +218,8 @@ def set_boolean_true(sender, instance, created, **kwargs):
     if created:
         return
 
-    dialog = One.objects.cache(ops='all').get(id=instance.id)
+    dialog = One.objects.cache().get(id=instance.id)
     assert dialog.boolean is True
-
-# 159
-class M2MBase(models.Model):
-    char_many_to_many = models.ManyToManyField('M2MWithCharId')
-
-class M2MWithCharId(models.Model):
-    id = models.CharField(max_length=30, primary_key=True)
-    name = models.CharField(max_length=30)
-
 
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)

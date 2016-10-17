@@ -10,7 +10,7 @@ README = open('README.rst').read()    \
 
 setup(
     name='django-cacheops',
-    version='3.0',
+    version='3.0.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
@@ -47,6 +47,7 @@ setup(
         'Framework :: Django :: 1.7',
         'Framework :: Django :: 1.8',
         'Framework :: Django :: 1.9',
+        'Framework :: Django :: 1.10',
 
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
