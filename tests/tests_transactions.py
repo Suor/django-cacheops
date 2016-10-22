@@ -130,11 +130,3 @@ class TransactionSupportTests(TransactionTestCase):
             get_category()
         with self.assertNumQueries(0):
             get_category()
-
-    @override_settings(CACHEOPS_TRANSACTION_SUPPORT=False)
-    def test_disabled_transaction_support(self):
-        with atomic():
-            with self.assertNumQueries(1):
-                get_category()
-            with self.assertNumQueries(1):
-                get_category()
