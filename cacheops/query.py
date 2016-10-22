@@ -39,7 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    assert not transaction_state.disallows_caching()
+    assert not transaction_state.is_dirty()
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
@@ -89,7 +89,7 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if transaction_state.disallows_caching() or not settings.CACHEOPS_ENABLED:
+            if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
@@ -258,7 +258,7 @@ class QuerySetMixin(object):
         # TODO: drop this in next major release
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or transaction_state.disallows_caching() or not settings.CACHEOPS_ENABLED:
+                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
@@ -283,7 +283,7 @@ class QuerySetMixin(object):
     def _fetch_all(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or transaction_state.disallows_caching() or not settings.CACHEOPS_ENABLED:
+                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return self._no_monkey._fetch_all(self)
 
         if self._result_cache is None:
@@ -420,7 +420,7 @@ class ManagerMixin(object):
             invalidate_obj(old)
         invalidate_obj(instance)
 
-        if transaction_state.disallows_caching() or not settings.CACHEOPS_ENABLED:
+        if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,

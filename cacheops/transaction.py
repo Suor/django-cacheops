@@ -39,12 +39,10 @@ class TransactionState(threading.local):
         return bool(self._stack)
 
     def is_dirty(self):
-        return any(self._stack)
-
-    def disallows_caching(self):
         if settings.CACHEOPS_SMART_TRANSACTIONS:
-            return self.is_dirty()
+            return any(self._stack)
         else:
+            # Dumb mode: transactions are always dirty
             return self.in_transaction()
 
 transaction_state = TransactionState()
