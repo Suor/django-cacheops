@@ -42,7 +42,7 @@ class TransactionState(threading.local):
         return any(self._stack)
 
     def disallows_caching(self):
-        if settings.CACHEOPS_TRANSACTION_SUPPORT:
+        if settings.CACHEOPS_SMART_TRANSACTIONS:
             return self.is_dirty()
         else:
             return self.in_transaction()

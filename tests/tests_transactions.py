@@ -107,8 +107,8 @@ class TransactionSupportTests(TransactionTestCase):
         self.assertEqual('Django', get_category().title)
         self.assertEqual('Django', run_in_thread(get_category).title)
 
-    @override_settings(CACHEOPS_TRANSACTION_SUPPORT=True)
-    def test_transaction_support(self):
+    @override_settings(CACHEOPS_SMART_TRANSACTIONS=True)
+    def test_smart_transactions(self):
         with atomic():
             get_category()
             with self.assertNumQueries(0):
