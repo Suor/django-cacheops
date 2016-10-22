@@ -3,10 +3,12 @@ import threading
 from funcy import wraps, once
 from django.db.transaction import get_connection, Atomic
 
+from .conf import settings
 from .utils import monkey_mix
 
 
-__all__ = ('in_transaction', 'queue_when_in_transaction', 'install_cacheops_transaction_support')
+__all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support',
+           'transaction_state')
 
 
 class TransactionState(threading.local):
@@ -33,16 +35,25 @@ class TransactionState(threading.local):
     def append(self, item):
         self._stack[-1].append(item)
 
+    def in_transaction(self):
+        return bool(self._stack)
+
+    def is_dirty(self):
+        return any(self._stack)
+
+    def disallows_caching(self):
+        if settings.CACHEOPS_TRANSACTION_SUPPORT:
+            return self.is_dirty()
+        else:
+            return self.in_transaction()
+
 transaction_state = TransactionState()
 
-
-def in_transaction():
-    return bool(transaction_state._stack)
 
 def queue_when_in_transaction(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if in_transaction():
+        if transaction_state.in_transaction():
             transaction_state.append((func, args, kwargs))
         else:
             func(*args, **kwargs)
