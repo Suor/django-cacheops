@@ -110,8 +110,7 @@ class TransactionSupportTests(TransactionTestCase):
     @override_settings(CACHEOPS_TRANSACTION_SUPPORT=True)
     def test_transaction_support(self):
         with atomic():
-            with self.assertNumQueries(1):
-                get_category()
+            get_category()
             with self.assertNumQueries(0):
                 get_category()
             with atomic():
@@ -122,11 +121,6 @@ class TransactionSupportTests(TransactionTestCase):
             obj.title += ' changed'
             obj.save()
 
+            get_category()
             with self.assertNumQueries(1):
                 get_category()
-            with self.assertNumQueries(1):
-                get_category()
-        with self.assertNumQueries(1):
-            get_category()
-        with self.assertNumQueries(0):
-            get_category()
