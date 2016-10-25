@@ -8,6 +8,9 @@ import cacheops
 from cacheops.utils import carefully_strip_whitespace
 
 
+__all__ = ['cache']
+
+
 class CacheopsExtension(Extension):
     tags = ['cached_as', 'cached']
 
