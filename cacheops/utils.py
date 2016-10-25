@@ -100,7 +100,7 @@ def func_cache_key(func, args, kwargs, extra=None, debug=False):
         elif inspect.isfunction(obj):
             factors = [obj.__module__, obj.__name__]
             # Really useful to ignore this when editing code
-            if debug and hasattr(func, '__code__'):
+            if not debug and hasattr(func, '__code__'):
                 factors.append(obj.__code__.co_firstlineno)
             return factors
         else:
