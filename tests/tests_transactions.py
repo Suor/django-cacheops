@@ -3,7 +3,7 @@ from threading import Thread
 import six
 
 from django.db.transaction import atomic
-from django.test import TransactionTestCase, override_settings
+from django.test import TransactionTestCase
 
 from .models import Category
 

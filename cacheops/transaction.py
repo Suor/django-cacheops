@@ -6,7 +6,6 @@ from funcy import wraps, once
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import get_connection, Atomic
 
-from .conf import settings
 from .utils import monkey_mix
 
 
