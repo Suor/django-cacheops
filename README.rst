@@ -611,7 +611,8 @@ CAVEATS
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
    One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
-4. Mass updates don't trigger invalidation by default. But see `.invalidated_update()`.
+   Use ``.prefetch_related()`` instead.
+4. Mass updates don't trigger invalidation by default. But see ``.invalidated_update()``.
 5. Sliced queries are invalidated as non-sliced ones.
 6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
