@@ -39,7 +39,6 @@ def run_in_thread(target):
     return t.join()
 
 
-
 # A version of before_after that works with methods
 # See https://github.com/c-oreills/before_after
 #
@@ -88,5 +87,5 @@ def before_after(
     patcher = patch(target, **kwargs)
     original, _ = patcher.get_original()
     patcher.new = before_after_wrap(original)
-    with patcher as mock_fn:
+    with patcher:
         yield

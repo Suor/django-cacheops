@@ -916,7 +916,7 @@ class LockingTests(BaseTestCase):
                 try:
                     with before('redis.StrictRedis.brpoplpush', lambda *a, **kw: locked.set()):
                         results.append(func())
-                except Exception as e:
+                except Exception:
                     locked.set()
                     raise
 
