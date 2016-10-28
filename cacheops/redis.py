@@ -58,7 +58,7 @@ class CacheopsRedis(redis.StrictRedis):
             if data is None:
                 if self._lock(keys=[key, signal_key], args=[LOCK_TIMEOUT]):
                     return None
-            elif data != 'LOCK':
+            elif data != b'LOCK':
                 return data
 
             # No data and not locked, wait
@@ -68,7 +68,7 @@ class CacheopsRedis(redis.StrictRedis):
     def _release_lock(self, key):
         self._unlock = getattr(self, '_unlock', self.register_script("""
             if redis.call('get', KEYS[1]) == 'LOCK' then
-                redis.del(KEYS[1])
+                redis.call('del', KEYS[1])
             end
             redis.call('lpush', KEYS[2], 1)
             redis.call('expire', KEYS[2], 1)
