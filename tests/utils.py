@@ -29,7 +29,7 @@ class ThreadWithReturnValue(Thread):
     def join(self, *args, **kwargs):
         super(ThreadWithReturnValue, self).join(*args, **kwargs)
         if self._exc_info:
-            raise self._exc_info[1], None, self._exc_info[2]
+            six.reraise(*self._exc_info)
         return self._return
 
 
