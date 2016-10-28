@@ -897,6 +897,41 @@ class SignalsTests(BaseTestCase):
         self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
 
 
+class LockingTests(BaseTestCase):
+    def test_lock(self):
+        import random
+        import threading
+        from .utils import ThreadWithReturnValue, before
+
+        @cached_as(Post, lock=True, timeout=60)
+        def func():
+            return random.random()
+
+        results = []
+        locked = threading.Event()
+        thread = [None]
+
+        def second_thread():
+            def _target():
+                try:
+                    with before('redis.StrictRedis.brpoplpush', lambda *a, **kw: locked.set()):
+                        results.append(func())
+                except Exception as e:
+                    locked.set()
+                    raise
+
+            thread[0] = ThreadWithReturnValue(target=_target)
+            thread[0].start()
+            assert locked.wait(1)  # Wait until right before the block
+
+        with before('random.random', second_thread):
+            results.append(func())
+
+        thread[0].join()
+
+        self.assertEquals(results[0], results[1])
+
+
 # Utilities
 
 def _make_inc(deco=lambda x: x):
