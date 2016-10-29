@@ -81,7 +81,7 @@ def cached_as(*samples, **kwargs):
     cond_dnfs = mapcat(dnfs, querysets)
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
-    if not timeout:
+    if not timeout:  # TODO: switch to is None on major release
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
     if lock is None:
         lock = any(qs._cacheprofile['lock'] for qs in querysets)
