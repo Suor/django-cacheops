@@ -52,8 +52,8 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
 
 def cached_as(*samples, **kwargs):
     """
-    Caches results of a function and invalidates them same way as given queryset.
-    NOTE: Ignores queryset cached ops settings, just caches.
+    Caches results of a function and invalidates them same way as given queryset(s).
+    NOTE: Ignores queryset cached ops settings, always caches.
     """
     timeout = kwargs.pop('timeout', None)
     extra = kwargs.pop('extra', None)
