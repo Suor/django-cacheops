@@ -55,10 +55,12 @@ def cached_as(*samples, **kwargs):
     Caches results of a function and invalidates them same way as given queryset.
     NOTE: Ignores queryset cached ops settings, just caches.
     """
-    timeout = kwargs.get('timeout')
-    extra = kwargs.get('extra')
-    key_func = kwargs.get('key_func', func_cache_key)
-    lock = kwargs.get('lock')
+    timeout = kwargs.pop('timeout', None)
+    extra = kwargs.pop('extra', None)
+    key_func = kwargs.pop('key_func', func_cache_key)
+    lock = kwargs.pop('lock', None)
+    if kwargs:
+        raise TypeError('Unexpected keyword arguments %s' % ', '.join(kwargs))
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
