@@ -42,8 +42,7 @@ class TransactionState(threading.local):
         return bool(self._stack)
 
     def mark_dirty(self):
-        if self._stack:
-            self._stack[-1]['dirty'] = True
+        self._stack[-1]['dirty'] = True
 
     def is_dirty(self):
         return any(context['dirty'] for context in self._stack)
@@ -79,18 +78,19 @@ class AtomicMixIn(object):
 class CursorWrapperMixin(object):
     def callproc(self, procname, params=None):
         result = self._no_monkey.callproc(self, procname, params)
-        transaction_state.mark_dirty()
+        if transaction_state.in_transaction():
+            transaction_state.mark_dirty()
         return result
 
     def execute(self, sql, params=None):
         result = self._no_monkey.execute(self, sql, params)
-        if is_sql_dirty(sql):
+        if transaction_state.in_transaction() and is_sql_dirty(sql):
             transaction_state.mark_dirty()
         return result
 
     def executemany(self, sql, param_list):
         result = self._no_monkey.executemany(self, sql, param_list)
-        if is_sql_dirty(sql):
+        if transaction_state.in_transaction() and is_sql_dirty(sql):
             transaction_state.mark_dirty()
         return result
 
