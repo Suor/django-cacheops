@@ -343,37 +343,6 @@ In the case you actually want to perform the latter cacheops provides a shortcut
 Note that all the updated objects are fetched twice, prior and post the update.
 
 
-Using memory limit
-------------------
-
-If your cache never grows too large you may not bother. But if you do you have some options.
-Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will.
-For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
-So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
-
-First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
-Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
-one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
-You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
-
-Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
-However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
-
-
-Multiple database support
--------------------------
-
-By default cacheops considers query result is same for same query, not depending
-on database queried. That could be changed with ``db_agnostic`` cache profile option:
-
-.. code:: python
-
-    CACHEOPS = {
-        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
-    }
-
-
 Simple time-invalidated cache
 -----------------------------
 
@@ -581,6 +550,37 @@ or
     {% endcached %}
 
 Tags work the same way as corresponding decorators.
+
+
+Multiple database support
+-------------------------
+
+By default cacheops considers query result is same for same query, not depending
+on database queried. That could be changed with ``db_agnostic`` cache profile option:
+
+.. code:: python
+
+    CACHEOPS = {
+        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
+    }
+
+
+Using memory limit
+------------------
+
+If your cache never grows too large you may not bother. But if you do you have some options.
+Cacheops stores cached data along with invalidation data,
+so you can't just set ``maxmemory`` and let redis evict at its will.
+For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
+So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
+
+First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
+one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
+You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
+
+Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
+However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
 
 
 Keeping stats
