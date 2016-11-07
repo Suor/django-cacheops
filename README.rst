@@ -552,6 +552,20 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Transactions
+------------
+
+Cacheops transparently supports transactions. This is implemented by following simple rules:
+
+1. Once transaction is dirty (has changes) caching turns off. The reason is that the state of database at this point is only visible to current transaction and should not affect other users and vice versa.
+
+2. Any invalidating calls are scheduled to run on the outer commit of transaction.
+
+3. Savepoints and rollbacks are also handled appropriately.
+
+Mind that simple and file cache doesn't turn itself off in transactions but works as usual.
+
+
 Multiple database support
 -------------------------
 
