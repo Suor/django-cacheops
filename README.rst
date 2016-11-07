@@ -566,6 +566,23 @@ Cacheops transparently supports transactions. This is implemented by following s
 Mind that simple and file cache doesn't turn itself off in transactions but works as usual.
 
 
+Dog-pile effect prevention
+--------------------------
+
+There is optional locking mechanism to prevent several threads or processes simultaneously performing same heavy task. It works with ``@cached_as()`` and querysets:
+
+.. code:: python
+
+    @cached_as(qs, lock=True)
+    def heavy_func(...):
+        # ...
+
+    for item in qs.cache(lock=True):
+        # ...
+
+It is also possible to specify ``lock: True`` in ``CACHEOPS`` setting but that would probably be a waste. Locking has no overhead on cache hit though.
+
+
 Multiple database support
 -------------------------
 
