@@ -1,3 +1,9 @@
+3.1
+- added locking to combat dog-pile effect
+- handle transactions smarter (ihucos)
+- handle functions in @cached_as() and @cached() args
+- do not allow unknown kwargs in @cached_as()
+
 3.0.1
 - support Django 1.10 (worked before, but now it's official)
 - accept empty CACHEOPS_REDIS setting
