@@ -901,7 +901,8 @@ class LockingTests(BaseTestCase):
     def test_lock(self):
         import random
         import threading
-        from .utils import ThreadWithReturnValue, before
+        from .utils import ThreadWithReturnValue
+        from before_after import before
 
         @cached_as(Post, lock=True, timeout=60)
         def func():
