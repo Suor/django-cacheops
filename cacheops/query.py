@@ -382,7 +382,7 @@ class QuerySetMixin(object):
 def connect_first(signal, receiver, sender):
     old_receivers = signal.receivers
     signal.receivers = []
-    signal.connect(receiver, sender=sender)
+    signal.connect(receiver, sender=sender, weak=False)
     signal.receivers += old_receivers
 
 # We need to stash old object before Model.save() to invalidate on its properties
