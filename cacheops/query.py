@@ -39,7 +39,9 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
     """
     Writes data to cache and creates appropriate invalidators.
     """
-    assert not transaction_state.is_dirty()
+    # Could have changed after last check, sometimes superficially
+    if transaction_state.is_dirty():
+        return
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
         args=[
