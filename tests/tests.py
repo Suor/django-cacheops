@@ -523,6 +523,20 @@ class IssueTests(BaseTestCase):
         c.posts_copy = c.posts.cache()
         bool(c.posts_copy)
 
+    def test_217(self):
+        # Destroy and recreate model manager
+        Post.objects.__class__().contribute_to_class(Post, 'objects')
+
+        # Test invalidation
+        post = Post.objects.cache().get(pk=1)
+        post.title += ' changed'
+        post.save()
+
+        with self.assertNumQueries(1):
+            changed_post = Post.objects.cache().get(pk=1)
+            self.assertEqual(post.title, changed_post.title)
+
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
