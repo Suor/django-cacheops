@@ -537,7 +537,6 @@ class IssueTests(BaseTestCase):
             self.assertEqual(post.title, changed_post.title)
 
 
-
 class LocalGetTests(BaseTestCase):
     def setUp(self):
         Local.objects.create(pk=1)
