@@ -8,8 +8,12 @@ try:
     import psycopg2  # noqa
 except ImportError:
     # Fall back to psycopg2cffi
-    from psycopg2cffi import compat
-    compat.register()
+    try:
+        from psycopg2cffi import compat
+        compat.register()
+    except ImportError:
+        # Test won't work with PSQL, only SQLite supported
+        pass
 
 
 # Set up Django
