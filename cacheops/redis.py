@@ -112,8 +112,13 @@ def load_script(name, strip=False):
     with open(filename) as f:
         code = f.read()
 
+    prefix = ""
+    # Don't add ":" if no prefix set
+    if settings.CACHEOPS_KEY_PREFIX:
+        prefix = "%s:" % settings.CACHEOPS_KEY_PREFIX
+
     # Having a variable keyprefix here is enough to change the stored script's SHA1 signature
-    code = code.replace("%KEY_PREFIX%", settings.CACHEOPS_KEY_PREFIX)
+    code = code.replace("%KEY_PREFIX%", prefix)
 
     if strip:
         code = STRIP_RE.sub('', code)
