@@ -111,6 +111,10 @@ def load_script(name, strip=False):
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
+
+    # Having a variable keyprefix here is enough to change the stored script's SHA1 signature
+    code = code.replace("%KEY_PREFIX%", settings.CACHEOPS_KEY_PREFIX)
+
     if strip:
         code = STRIP_RE.sub('', code)
     return redis_client.register_script(code)

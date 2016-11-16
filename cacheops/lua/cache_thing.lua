@@ -1,8 +1,9 @@
+local internal_keys_prefix = '%KEY_PREFIX%'
+
 local key = KEYS[1]
 local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
 local timeout = tonumber(ARGV[3])
-
 
 -- Write data to cache
 redis.call('setex', key, timeout, data)
@@ -18,13 +19,13 @@ local conj_schema = function (conj)
     return table.concat(parts, ',')
 end
 
-local conj_cache_key = function (db_table, conj)
+local conj_cache_key = function (db_table, conj, prefix)
     local parts = {}
     for _, eq in ipairs(conj) do
         table.insert(parts, eq[1] .. '=' .. tostring(eq[2]))
     end
 
-    return 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
+    return prefix .. 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
 end
 
 
@@ -34,10 +35,10 @@ for _, disj_pair in ipairs(dnfs) do
     local disj = disj_pair[2]
     for _, conj in ipairs(disj) do
         -- Ensure scheme is known
-        redis.call('sadd', 'schemes:' .. db_table, conj_schema(conj))
+        redis.call('sadd', internal_keys_prefix .. 'schemes:' .. db_table, conj_schema(conj))
 
         -- Add new cache_key to list of dependencies
-        local conj_key = conj_cache_key(db_table, conj)
+        local conj_key = conj_cache_key(db_table, conj, internal_keys_prefix)
         redis.call('sadd', conj_key, key)
         -- NOTE: an invalidator should live longer than any key it references.
         --       So we update its ttl on every key if needed.

@@ -1,15 +1,17 @@
+local internal_keys_prefix = '%KEY_PREFIX%'
+
 local db_table = ARGV[1]
 local obj = cjson.decode(ARGV[2])
 
 
 -- Utility functions
-local conj_cache_key = function (db_table, scheme, obj)
+local conj_cache_key = function (db_table, scheme, obj, prefix)
     local parts = {}
     for field in string.gmatch(scheme, "[^,]+") do
         table.insert(parts, field .. '=' .. tostring(obj[field]))
     end
 
-    return 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
+    return prefix .. 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
 end
 
 local call_in_chunks = function (command, args)
@@ -22,9 +24,9 @@ end
 
 -- Calculate conj keys
 local conj_keys = {}
-local schemes = redis.call('smembers', 'schemes:' .. db_table)
+local schemes = redis.call('smembers', internal_keys_prefix .. 'schemes:' .. db_table)
 for _, scheme in ipairs(schemes) do
-    table.insert(conj_keys, conj_cache_key(db_table, scheme, obj))
+    table.insert(conj_keys, conj_cache_key(db_table, scheme, obj, internal_keys_prefix))
 end
 
 

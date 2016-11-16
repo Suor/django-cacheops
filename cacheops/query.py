@@ -21,7 +21,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, model_is_fake, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, prefix_cache_key, cached_view_fab, family_has_profile
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -164,7 +164,7 @@ class QuerySetMixin(object):
         if hasattr(self, 'flat'):
             md.update(str(self.flat))
 
-        return 'q:%s' % md.hexdigest()
+        return prefix_cache_key('q:%s' % md.hexdigest())
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
