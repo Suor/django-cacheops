@@ -84,12 +84,8 @@ else:
         }
     }
 
-redis_host = "localhost"
-if os.getenv("DOCKER_CONTAINER_TEST", '0') == '1':
-    redis_host = 'cacheops_tests_redis'
-
 CACHEOPS_REDIS = {
-    'host': redis_host,
+    'host': 'localhost',
     'port': 6379,
     'db': 13,
     'socket_timeout': 3,
