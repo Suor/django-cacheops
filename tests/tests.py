@@ -946,6 +946,15 @@ class LockingTests(BaseTestCase):
         self.assertEquals(results[0], results[1])
 
 
+class PolymorphicTests(BaseTestCase):
+    def test_polymorphic(self):
+        b = PolymorphicB.objects.create()
+        z = PolymorphicZ.objects.create(a=b)
+        z2 = PolymorphicZ.objects.get(id=z.id)
+        self.assertEqual(type(z.a), PolymorphicB)
+        self.assertEqual(type(z2.a), PolymorphicB)
+
+
 # Utilities
 
 def _make_inc(deco=lambda x: x):

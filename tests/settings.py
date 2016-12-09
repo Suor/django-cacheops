@@ -100,7 +100,9 @@ CACHEOPS = {
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
-    'auth.*': {}
+    'auth.*': {},
+    'tests.polymorphica': {'ops': 'all', 'timeout': 60 * 15},
+    'tests.polymorphicb': {'ops': 'all', 'timeout': 60 * 15},
 }
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))

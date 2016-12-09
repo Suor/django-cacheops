@@ -7,6 +7,9 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.auth.models import User
+
+from polymorphic.models import PolymorphicModel
+
 # Deprecated this thing in Django 1.8 and removed in 1.10
 if django.VERSION < (1, 8):
     from django.db.models import SubfieldBase
@@ -223,3 +226,15 @@ def set_boolean_true(sender, instance, created, **kwargs):
 
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)
+
+
+class PolymorphicA(PolymorphicModel):
+    pass
+
+
+class PolymorphicB(PolymorphicA):
+    pass
+
+
+class PolymorphicZ(models.Model):
+    a = models.ForeignKey(PolymorphicA)
