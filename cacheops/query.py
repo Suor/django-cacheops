@@ -61,6 +61,8 @@ def cached_as(*samples, **kwargs):
     extra = kwargs.pop('extra', None)
     key_func = kwargs.pop('key_func', func_cache_key)
     lock = kwargs.pop('lock', None)
+    if not samples:
+        raise TypeError('Pass a queryset, a model or an object to cache like')
     if kwargs:
         raise TypeError('Unexpected keyword arguments %s' % ', '.join(kwargs))
 
