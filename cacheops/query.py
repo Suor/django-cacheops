@@ -295,7 +295,8 @@ class QuerySetMixin(object):
             lock = self._cacheprofile['lock']
 
             if self._cacheprofile['write_only'] or self._for_write:
-                self._result_cache = list(self._no_monkey.iterator(self))
+                # TODO: remove .nocache() when iterator() is dropped
+                self._result_cache = list(self.nocache().iterator())
                 self._cache_results(cache_key, self._result_cache)
             else:
                 with redis_client.getting(cache_key, lock=lock) as cache_data:
@@ -303,7 +304,8 @@ class QuerySetMixin(object):
                     if cache_data is not None:
                         self._result_cache = pickle.loads(cache_data)
                     else:
-                        self._result_cache = list(self._no_monkey.iterator(self))
+                        # TODO: remove .nocache() when iterator() is dropped
+                        self._result_cache = list(self.nocache().iterator())
                         self._cache_results(cache_key, self._result_cache)
 
         self._no_monkey._fetch_all(self)
