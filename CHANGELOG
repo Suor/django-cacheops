@@ -1,3 +1,8 @@
+3.1.2
+- fixed querysets with custom .iterator() (like django-polymorphic)
+- support on argument @cached_view
+- check that sample is passed into @cached_as()
+
 3.1.1
 - fixed unexpected dirty transaction
 - fixed a bug with destroying manager
