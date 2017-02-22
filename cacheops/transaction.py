@@ -66,8 +66,16 @@ class AtomicMixIn(object):
         self._no_monkey.__enter__(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         connection = get_connection(self.using)
+
+        # migrate possible django on commit callbacks to cacheops on commit
+        # callbacks. This should ensure that callbacks get called after
+        # cacheops invalidation handlers
+        while getattr(connection, 'run_on_commit', []):
+            cb = connection.run_on_commit.pop(0)[1]
+            transaction_state.append((cb, [], {}))
+
+        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
             transaction_state.commit()
