@@ -66,13 +66,13 @@ class AtomicMixIn(object):
         self._no_monkey.__enter__(self)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         connection = get_connection(self.using)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
             transaction_state.commit()
         else:
             transaction_state.rollback()
+        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
 
 
 class CursorWrapperMixin(object):
