@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
+import unittest
+
+from django.db import connection
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
+
+from cacheops.transaction import queue_when_in_transaction
 
 from .models import Category
 from .utils import run_in_thread
@@ -87,3 +92,22 @@ class TransactionSupportTests(TransactionTestCase):
             get_category()
             with self.assertNumQueries(1):
                 get_category()
+
+
+    @unittest.skipIf(not hasattr(connection, 'on_commit'), 'that only xx')
+    def test_call_cacheops_cbs_before_on_commit_cbs(self):
+
+        with atomic():
+            calls = []
+
+            @queue_when_in_transaction
+            def cacheops_commit_handler():
+                calls.append(cacheops_commit_handler)
+            cacheops_commit_handler()
+
+            def django_commit_handler():
+                calls.append(django_commit_handler)
+
+            connection.on_commit(django_commit_handler)
+
+        self.assertTrue([cacheops_commit_handler, django_commit_handler], calls)
