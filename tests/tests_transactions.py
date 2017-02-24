@@ -93,7 +93,6 @@ class TransactionSupportTests(TransactionTestCase):
             with self.assertNumQueries(1):
                 get_category()
 
-
     @unittest.skipIf(not hasattr(connection, 'on_commit'), 'that only xx')
     def test_call_cacheops_cbs_before_on_commit_cbs(self):
 
