@@ -5,6 +5,11 @@ import six
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import Atomic, get_connection
+# Hack for Django < 1.9
+try:
+    from django.db.transaction import on_commit
+except ImportError:
+    on_commit = None
 from funcy import once, wraps
 
 from .utils import monkey_mix
@@ -62,27 +67,21 @@ def queue_when_in_transaction(func):
 
 class AtomicMixIn(object):
     def __enter__(self):
+        entering = not transaction_state.in_transaction()
         transaction_state.begin()
         self._no_monkey.__enter__(self)
+        if on_commit and entering:
+            on_commit(transaction_state.commit)
 
     def __exit__(self, exc_type, exc_value, traceback):
         connection = get_connection(self.using)
-        connection._cacheops_commited = False
         self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
-        if not connection._cacheops_commited:
-            if not connection.closed_in_transaction and exc_type is None and \
-                    not connection.needs_rollback:
+        if not connection.closed_in_transaction and exc_type is None and \
+                not connection.needs_rollback:
+            if not on_commit or transaction_state.in_transaction():
                 transaction_state.commit()
-            else:
-                transaction_state.rollback()
-
-class BaseDatabaseWrapperMixin(object):
-    if hasattr(BaseDatabaseWrapper, 'run_and_clear_commit_hooks'):
-        def run_and_clear_commit_hooks(self):
-            if not getattr(self, '_cacheops_commited', False):
-                transaction_state.commit()
-                self._cacheops_commited = True
-            self._no_monkey.run_and_clear_commit_hooks(self)
+        else:
+            transaction_state.rollback()
 
 class CursorWrapperMixin(object):
     def callproc(self, procname, params=None):
@@ -117,4 +116,3 @@ def is_sql_dirty(sql):
 def install_cacheops_transaction_support():
     monkey_mix(Atomic, AtomicMixIn)
     monkey_mix(CursorWrapper, CursorWrapperMixin)
-    monkey_mix(BaseDatabaseWrapper, BaseDatabaseWrapperMixin)
