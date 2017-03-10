@@ -96,18 +96,16 @@ class TransactionSupportTests(TransactionTestCase):
     @unittest.skipIf(not hasattr(connection, 'on_commit'),
                      'No on commit hooks support (Django < 1.9)')
     def test_call_cacheops_cbs_before_on_commit_cbs(self):
+        calls = []
 
         with atomic():
-            calls = []
+            def django_commit_handler():
+                calls.append('django')
+            connection.on_commit(django_commit_handler)
 
             @queue_when_in_transaction
             def cacheops_commit_handler():
-                calls.append(cacheops_commit_handler)
+                calls.append('cacheops')
             cacheops_commit_handler()
 
-            def django_commit_handler():
-                calls.append(django_commit_handler)
-
-            connection.on_commit(django_commit_handler)
-
-        self.assertTrue([cacheops_commit_handler, django_commit_handler], calls)
+        self.assertEqual(calls, ['cacheops', 'django'])
