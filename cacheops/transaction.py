@@ -2,7 +2,6 @@
 import threading
 
 import six
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import Atomic, get_connection
 # Hack for Django < 1.9
