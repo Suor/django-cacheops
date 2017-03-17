@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
-from django.db.models import F
+from django.db.models import F, Q
 
 from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invalidation, \
                      cached, cached_view, cached_as, cached_view_as
@@ -535,6 +535,13 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_post = Post.objects.cache().get(pk=1)
             self.assertEqual(post.title, changed_post.title)
+
+    def test_232(self):
+        site = Site.objects.create(domain='example.com')
+        Article.objects.create(title='Article 1', site=site)
+        Article.objects.create(title='Article 2')
+        articles = Article.objects.cache().filter(Q(site__isnull=True) | Q(site__in=[site])).filter(site=site)
+        assert articles.count() == 1
 
 
 class LocalGetTests(BaseTestCase):

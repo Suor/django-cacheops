@@ -119,7 +119,7 @@ def dnfs(qs):
         if not all(cleaned):
             return [[]]
         # To keep all schemes the same we sort conjunctions
-        return map(sorted, cleaned)
+        return map(lambda l: sorted(l, key=lambda x: str(x)), cleaned)
 
     def table_for(alias):
         if alias == main_alias:
