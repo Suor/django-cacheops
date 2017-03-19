@@ -3,6 +3,7 @@ import re
 import unittest
 
 from django.db import connection, connections
+from django.db.transaction import atomic
 from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
@@ -535,6 +536,22 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_post = Post.objects.cache().get(pk=1)
             self.assertEqual(post.title, changed_post.title)
+
+    def test_234(self):
+        # ensure generation of a sql query which contains the matching column names
+        with atomic():
+            with self.assertNumQueries(1):
+                cnt1 = KeywordColumn.objects.filter(
+                    delete=True, deleted=True, is_deleted=True,
+                    insert=True, inserted=True, is_inserted=True,
+                    update=True, updated=True, is_updated=True
+                ).cache().count()
+                cnt2 = KeywordColumn.objects.filter(
+                    delete=True, deleted=True, is_deleted=True,
+                    insert=True, inserted=True, is_inserted=True,
+                    update=True, updated=True, is_updated=True
+                ).cache().count()
+                self.assertEqual(cnt1, cnt2)
 
 
 class LocalGetTests(BaseTestCase):
