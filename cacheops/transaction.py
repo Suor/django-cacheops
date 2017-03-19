@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import threading
 
 import six
@@ -102,13 +103,14 @@ class CursorWrapperMixin(object):
         return result
 
 
+DIRTY_SQL_RE = re.compile(r'(^| |\))(UPDATE|INSERT|DELETE)( |\()', flags=re.I)
+
 def is_sql_dirty(sql):
     # This should not happen as using bytes in Python 3 is against db protocol,
     # but some people will pass it anyway
     if six.PY3 and isinstance(sql, six.binary_type):
         sql = sql.decode()
-    sql = sql.lower()
-    return 'update' in sql or 'insert' in sql or 'delete' in sql
+    return DIRTY_SQL_RE.search(sql)
 
 
 @once

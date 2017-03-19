@@ -238,3 +238,16 @@ class PolymorphicB(PolymorphicA):
 
 class PolymorphicZ(models.Model):
     a = models.ForeignKey(PolymorphicA)
+
+
+# 234
+class KeywordColumn(models.Model):
+    delete = models.BooleanField(default=False)
+    insert = models.BooleanField(default=False)
+    update = models.BooleanField(default=False)
+    deleted = models.BooleanField(default=False)
+    inserted = models.BooleanField(default=False)
+    updated = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    is_inserted = models.BooleanField(default=False)
+    is_updated = models.BooleanField(default=False)
