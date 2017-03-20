@@ -118,11 +118,13 @@ def dnfs(qs):
                     result.append((attname, value))
                 # Conjs with duplicate fields and different values are useless, they will never cause invalidation
                 elif seen[attname] != value:
-                    return []
+                    return None
         return result
 
     def clean_dnf(tree, for_alias):
         cleaned = [clean_conj(conj, for_alias) for conj in tree]
+        # Remove useless conjunctions
+        cleaned = [conj for conj in cleaned if conj is not None]
         # Any empty conjunction eats up the rest
         # NOTE: a more elaborate DNF reduction is not really needed,
         #       just keep your querysets sane.
