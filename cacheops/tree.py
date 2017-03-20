@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from builtins import str
 from itertools import product
 # Use Python 2 map here for now
 from funcy.py2 import map, cat
@@ -108,9 +107,19 @@ def dnfs(qs):
             return result
 
     def clean_conj(conj, for_alias):
-        # "SOME" conds, negated conds and conds for other aliases should be stripped
-        return [(attname, str(value)) for alias, attname, value, negation in conj
-                                 if value is not SOME and negation and alias == for_alias]
+        seen = {}
+        result = []
+        for alias, attname, value, negation in conj:
+            # "SOME" conds, negated conds and conds for other aliases should be stripped
+            if value is not SOME and negation and alias == for_alias:
+                # Dupes with same values can be safely deduped with no resulting change in invalidation logic
+                if attname not in seen:
+                    seen[attname] = value
+                    result.append((attname, value))
+                # Conjs with duplicate fields and different values are useless, they will never cause invalidation
+                elif seen[attname] != value:
+                    return []
+        return result
 
     def clean_dnf(tree, for_alias):
         cleaned = [clean_conj(conj, for_alias) for conj in tree]

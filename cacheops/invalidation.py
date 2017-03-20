@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import threading
-from builtins import str
 from funcy import memoize, post_processing, ContextDecorator
 from django.db.models.expressions import F
 # Since Django 1.8, `ExpressionNode` is `Expression`
@@ -100,4 +99,4 @@ def get_obj_dict(model, obj):
         elif isinstance(value, (F, Expression)):
             continue
         else:
-            yield field.attname, str(field.get_prep_value(value))
+            yield field.attname, field.get_prep_value(value)
