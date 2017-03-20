@@ -239,12 +239,3 @@ class PolymorphicB(PolymorphicA):
 class PolymorphicZ(models.Model):
     a = models.ForeignKey(PolymorphicA)
 
-
-# 232
-class Site(models.Model):
-    domain = models.CharField(max_length=127, unique=True)
-
-
-class Article(models.Model):
-    site = models.ForeignKey(Site, null=True)
-    title = models.CharField(max_length=127, unique=True)

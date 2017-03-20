@@ -537,11 +537,9 @@ class IssueTests(BaseTestCase):
             self.assertEqual(post.title, changed_post.title)
 
     def test_232(self):
-        site = Site.objects.create(domain='example.com')
-        Article.objects.create(title='Article 1', site=site)
-        Article.objects.create(title='Article 2')
-        articles = Article.objects.cache().filter(Q(site__isnull=True) | Q(site__in=[site])).filter(site=site)
-        assert articles.count() == 1
+        c = Category.objects.get(pk=1)
+        posts = Post.objects.cache().filter(Q(category__isnull=True) | Q(category__in=[c])).filter(category=c)
+        assert posts.count() == 1
 
 
 class LocalGetTests(BaseTestCase):
