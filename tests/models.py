@@ -238,3 +238,4 @@ class PolymorphicB(PolymorphicA):
 
 class PolymorphicZ(models.Model):
     a = models.ForeignKey(PolymorphicA)
+

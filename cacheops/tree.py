@@ -107,12 +107,24 @@ def dnfs(qs):
             return result
 
     def clean_conj(conj, for_alias):
-        # "SOME" conds, negated conds and conds for other aliases should be stripped
-        return [(attname, value) for alias, attname, value, negation in conj
-                                 if value is not SOME and negation and alias == for_alias]
+        seen = {}
+        result = []
+        for alias, attname, value, negation in conj:
+            # "SOME" conds, negated conds and conds for other aliases should be stripped
+            if value is not SOME and negation and alias == for_alias:
+                # Dupes with same values can be safely deduped with no resulting change in invalidation logic
+                if attname not in seen:
+                    seen[attname] = value
+                    result.append((attname, value))
+                # Conjs with duplicate fields and different values are useless, they will never cause invalidation
+                elif seen[attname] != value:
+                    return None
+        return result
 
     def clean_dnf(tree, for_alias):
         cleaned = [clean_conj(conj, for_alias) for conj in tree]
+        # Remove useless conjunctions
+        cleaned = [conj for conj in cleaned if conj is not None]
         # Any empty conjunction eats up the rest
         # NOTE: a more elaborate DNF reduction is not really needed,
         #       just keep your querysets sane.
