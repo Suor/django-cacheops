@@ -108,7 +108,16 @@ def is_sql_dirty(sql):
     if six.PY3 and isinstance(sql, six.binary_type):
         sql = sql.decode()
     sql = sql.lower()
-    return 'update' in sql or 'insert' in sql or 'delete' in sql
+    chars = 'abcdefghijklmnoprqstuvwxyz_'
+    for action in ('update', 'insert', 'delete'):
+        p = sql.find(action)
+        if p == -1:
+            continue
+        start, end = p - 1, p + len(action)
+        if (start < 0 or sql[start] not in chars) and (end >= len(sql) or sql[end] not in chars):
+            return True
+    else:
+        return False
 
 
 @once
