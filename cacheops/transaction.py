@@ -107,6 +107,7 @@ def is_sql_dirty(sql):
     # but some people will pass it anyway
     if six.PY3 and isinstance(sql, six.binary_type):
         sql = sql.decode()
+    # NOTE: not using regex here for speed
     sql = sql.lower()
     chars = 'abcdefghijklmnoprqstuvwxyz_'
     for action in ('update', 'insert', 'delete'):
