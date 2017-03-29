@@ -1,6 +1,6 @@
 3.1.2
 - fixed querysets with custom .iterator() (like django-polymorphic)
-- support on argument @cached_view
+- support no argument @cached_view
 - check that sample is passed into @cached_as()
 
 3.1.1
