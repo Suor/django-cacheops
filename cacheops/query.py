@@ -416,10 +416,7 @@ class ManagerMixin(object):
             self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
-        profile_model = model_profile(sender)
-        if "all" not in profile_model["ops"] and "get" not in profile_model["ops"]:
-            return
-        if instance.pk is not None and not no_invalidation.active:
+        if instance.pk is not None and not instance._state.adding and not no_invalidation.active:
             try:
                 _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
             except sender.DoesNotExist:
