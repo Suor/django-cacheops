@@ -121,6 +121,12 @@ Additionally, you can tell cacheops to degrade gracefully on redis fail with:
 
     CACHEOPS_DEGRADE_ON_FAILURE = True
 
+Optionally, set a prefix for the keys stored in redis. Defaults to empty string:
+
+.. code:: python
+
+    CACHEOPS_KEY_PREFIX = "cacheops_keys_"
+
 There is also a possibility to make all cacheops methods and decorators no-op, e.g. for testing:
 
 .. code:: python
@@ -699,6 +705,8 @@ Here is how you do that. I suppose you have some application code causing it.
 6. Execute ``./run_tests.py IssueTests.test_{issue_number}`` and see it failing.
 7. Cut down model and test code until error disappears and make a step back.
 8. Commit changes and make a pull request.
+
+OSX users can run tests via a Docker container using : ``make tests``.
 
 
 TODO

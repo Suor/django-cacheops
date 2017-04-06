@@ -10,7 +10,7 @@ except ImportError:
     from django.db.models.expressions import Expression
 
 from .conf import settings
-from .utils import non_proxy, NOT_SERIALIZED_FIELDS
+from .utils import non_proxy, prefix_cache_key, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
 from .transaction import queue_when_in_transaction
 
@@ -49,7 +49,7 @@ def invalidate_model(model):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
-    conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
+    conjs_keys = redis_client.keys(prefix_cache_key('conj:%s:*' % model._meta.db_table))
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))

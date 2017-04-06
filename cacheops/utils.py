@@ -9,7 +9,7 @@ from .cross import md5hex
 from django.db import models
 from django.http import HttpRequest
 
-from .conf import model_profile
+from .conf import model_profile, settings
 
 
 # NOTE: we don't serialize this fields since their values could be very long
@@ -120,7 +120,7 @@ def view_cache_key(func, args, kwargs, extra=None):
         uri = args[0].build_absolute_uri()
     else:
         uri = args[0]
-    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+    return prefix_cache_key('v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra)))
 
 def cached_view_fab(_cached):
     def force_render(response):
@@ -150,6 +150,11 @@ def cached_view_fab(_cached):
         return decorator
     return cached_view
 
+def prefix_cache_key(key):
+    if settings.CACHEOPS_KEY_PREFIX:
+        return "%s:%s" % (settings.CACHEOPS_KEY_PREFIX, key, )
+    else:
+        return key
 
 ### Whitespace handling for template tags
 
