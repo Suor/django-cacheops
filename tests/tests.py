@@ -946,7 +946,7 @@ class LockingTests(BaseTestCase):
 
         thread[0].join()
 
-        self.assertEquals(results[0], results[1])
+        self.assertEqual(results[0], results[1])
 
 
 # TODO: remove this test when .iterator() is dropped
