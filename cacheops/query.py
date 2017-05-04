@@ -268,6 +268,7 @@ class QuerySetMixin(object):
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
+        # Get rid of write_only? redo self._for_write?
         if not self._cacheprofile['write_only'] and not self._for_write:
             # Trying get data from cache
             cache_data = redis_client.get(cache_key)

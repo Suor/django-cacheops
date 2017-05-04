@@ -68,6 +68,8 @@ def dnfs(qs):
             if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
                 return SOME_TREE
 
+            # 1.10: django.db.models.fields.related_lookups.RelatedExact
+
             attname = where.lhs.target.attname
             if isinstance(where, Exact):
                 return [[(where.lhs.alias, attname, where.rhs, True)]]
@@ -81,6 +83,7 @@ def dnfs(qs):
             return [[]]
         elif isinstance(where, NothingNode):
             return []
+            # SubqueryConstraint - Django 1.7
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
             return SOME_TREE
         elif len(where) == 0:
