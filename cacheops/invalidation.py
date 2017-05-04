@@ -13,6 +13,7 @@ from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
 from .transaction import queue_when_in_transaction
+from .signals import invalidation_all, invalidation_model, invalidation_obj, invalidation_dict
 
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
@@ -28,6 +29,7 @@ def invalidate_dict(model, obj_dict):
         model._meta.db_table,
         json.dumps(obj_dict, default=str)
     ])
+    invalidation_dict.send(sender=model, obj_dict=obj_dict)
 
 
 def invalidate_obj(obj):
@@ -36,6 +38,7 @@ def invalidate_obj(obj):
     """
     model = non_proxy(obj.__class__)
     invalidate_dict(model, get_obj_dict(model, obj))
+    invalidation_obj.send(sender=model, obj=obj)
 
 
 @queue_when_in_transaction
@@ -53,6 +56,7 @@ def invalidate_model(model):
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
+    invalidation_model.send(sender=model)
 
 
 @queue_when_in_transaction
@@ -61,6 +65,7 @@ def invalidate_all():
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     redis_client.flushdb()
+    invalidation_all.send(sender=None)
 
 
 class InvalidationState(threading.local):

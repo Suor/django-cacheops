@@ -617,8 +617,14 @@ However, this makes invalidation structures persistent, they are still removed o
 Keeping stats
 -------------
 
-Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
-``func`` - decorated function and ``hit`` - fetch success as boolean value.
+Cacheops provides `Django signals <https://docs.djangoproject.com/en/dev/topics/signals/>`_ for cache lookups and invalidations. You can register signal handlers for them to keep stats. Avoid any heavy operations or actions that would cause infinite recursions.
+
+The following signals are available:
+
+- ``cacheops.signals.cache_read``: Emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched, ``func`` - decorated function and ``hit`` - fetch success as boolean value.
+- ``cacheops.signals.invalidation_all``: Emitted immediately after the whole cache is cleared with ``invalidate_all``. Passed arguments are: ``sender`` - ``None``.
+- ``cacheops.signals.invalidation_model``: Emitted immediately after a model is invalidated with ``invalidate_model``. Passed arguments are: ``sender`` - model class being invalidated.
+- ``cacheops.signals.invalidation_obj``: Emitted immediately after a model instance is invalidated with ``invalidate_obj``. Passed arguments are: ``sender`` - model class of the invalidated instance, ``obj`` - the instance of the model being invalidated.
 
 Here is simple stats implementation:
 

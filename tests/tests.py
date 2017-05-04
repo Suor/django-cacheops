@@ -14,7 +14,9 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 from cacheops.transaction import transaction_state
-from cacheops.signals import cache_read
+from cacheops.invalidation import get_obj_dict
+from cacheops.signals import cache_read, invalidation_all, invalidation_model, invalidation_obj, \
+                             invalidation_dict
 
 decorator_tag = register.decorator_tag
 from .models import *  # noqa
@@ -875,29 +877,41 @@ class GISTests(BaseTestCase):
 
 
 class SignalsTests(BaseTestCase):
+    fixtures = ['basic']
+    maxDiff = None
+
     def setUp(self):
         super(SignalsTests, self).setUp()
 
         def set_signal(signal=None, **kwargs):
-            self.signal_calls.append(kwargs)
+            self.signal_calls.append((signal, kwargs))
 
         self.signal_calls = []
-        cache_read.connect(set_signal, dispatch_uid=1, weak=False)
+        cache_read.connect(set_signal, dispatch_uid='cache_read', weak=False)
+        invalidation_all.connect(set_signal, dispatch_uid='invalidation_all', weak=False)
+        invalidation_model.connect(set_signal, dispatch_uid='invalidation_model', weak=False)
+        invalidation_obj.connect(set_signal, dispatch_uid='invalidation_obj', weak=False)
+        invalidation_dict.connect(set_signal, dispatch_uid='invalidation_dict', weak=False)
 
     def tearDown(self):
+        cache_read.disconnect(dispatch_uid='cache_read')
+        invalidation_all.disconnect(dispatch_uid='invalidation_all')
+        invalidation_model.disconnect(dispatch_uid='invalidation_model')
+        invalidation_obj.disconnect(dispatch_uid='invalidation_obj')
+        invalidation_dict.disconnect(dispatch_uid='invalidation_dict')
         super(SignalsTests, self).tearDown()
-        cache_read.disconnect(dispatch_uid=1)
 
     def test_queryset(self):
         # Miss
         test_model = Category.objects.create(title="foo")
+        self.signal_calls = []
         Category.objects.cache().get(id=test_model.id)
-        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
+        self.assertEqual(self.signal_calls, [(cache_read, {'sender': Category, 'func': None, 'hit': False})])
 
         # Hit
         self.signal_calls = []
         Category.objects.cache().get(id=test_model.id) # hit
-        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': True}])
+        self.assertEqual(self.signal_calls, [(cache_read, {'sender': Category, 'func': None, 'hit': True})])
 
     def test_cached_as(self):
         get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
@@ -905,12 +919,28 @@ class SignalsTests(BaseTestCase):
 
         # Miss
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': False}])
+        self.assertEqual(self.signal_calls, [(cache_read, {'sender': None, 'func': func, 'hit': False})])
 
         # Hit
         self.signal_calls = []
         self.assertEqual(get_calls(), 1)
-        self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
+        self.assertEqual(self.signal_calls, [(cache_read, {'sender': None, 'func': func, 'hit': True})])
+
+    def test_invalidate_all(self):
+        invalidate_all()
+        self.assertEqual(self.signal_calls, [(invalidation_all, {'sender': None})])
+
+    def test_invalidate_model(self):
+        invalidate_model(Post)
+        self.assertEqual(self.signal_calls, [(invalidation_model, {'sender': Post})])
+
+    def test_invalidate_obj(self):
+        post = Post.objects.nocache().get(pk=1)
+        invalidate_obj(post)
+        self.assertEqual(self.signal_calls, [
+            (invalidation_dict, {'sender': Post, 'obj_dict': get_obj_dict(Post, post)}),
+            (invalidation_obj, {'sender': Post, 'obj': post}),
+        ])
 
 
 class LockingTests(BaseTestCase):
