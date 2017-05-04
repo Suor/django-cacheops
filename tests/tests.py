@@ -950,6 +950,7 @@ class LockingTests(BaseTestCase):
 
 
 # TODO: remove this test when .iterator() is dropped
+@unittest.skipIf(PolymorphicModel is None, "django-polumorphic doesn't work with Django 2.0")
 class PolymorphicTests(BaseTestCase):
     def test_polymorphic(self):
         b = PolymorphicB.objects.create()

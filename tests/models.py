@@ -8,8 +8,6 @@ from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.auth.models import User
 
-from polymorphic.models import PolymorphicModel
-
 # Deprecated this thing in Django 1.8 and removed in 1.10
 if django.VERSION < (1, 8):
     from django.db.models import SubfieldBase
@@ -28,16 +26,16 @@ class Category(models.Model):
 
 class Post(models.Model):
     title = models.CharField(max_length=128)
-    category = models.ForeignKey(Category, related_name='posts')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='posts')
     visible = models.BooleanField(default=True)
 
     def __unicode__(self):
         return self.title
 
 class Extra(models.Model):
-    post = models.OneToOneField(Post)
+    post = models.OneToOneField(Post, on_delete=models.CASCADE)
     tag = models.IntegerField(db_column='custom_column_name', unique=True)
-    to_tag = models.ForeignKey('self', to_field='tag', null=True)
+    to_tag = models.ForeignKey('self', on_delete=models.CASCADE, to_field='tag', null=True)
 
     def __unicode__(self):
         return 'Extra(post_id=%s, tag=%s)' % (self.post_id, self.tag)
@@ -132,7 +130,7 @@ if ArrayField and os.environ.get('CACHEOPS_DB') != 'mysql':
 
 # 16
 class Profile(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     tag = models.IntegerField()
 
 
@@ -179,8 +177,8 @@ class BrandT(models.Model):
     labels = models.ManyToManyField(LabelT, related_name='brands', through='Labeling')
 
 class Labeling(models.Model):
-    label = models.ForeignKey(LabelT)
-    brand = models.ForeignKey(BrandT)
+    label = models.ForeignKey(LabelT, on_delete=models.CASCADE)
+    brand = models.ForeignKey(BrandT, on_delete=models.CASCADE)
     tag = models.IntegerField()
 
 class PremiumBrand(Brand):
@@ -228,13 +226,16 @@ from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)
 
 
-class PolymorphicA(PolymorphicModel):
-    pass
+try:
+    from polymorphic.models import PolymorphicModel
 
+    class PolymorphicA(PolymorphicModel):
+        pass
 
-class PolymorphicB(PolymorphicA):
-    pass
+    class PolymorphicB(PolymorphicA):
+        pass
 
-
-class PolymorphicZ(models.Model):
-    a = models.ForeignKey(PolymorphicA)
+    class PolymorphicZ(models.Model):
+        a = models.ForeignKey(PolymorphicA)
+except:
+    PolymorphicModel = None

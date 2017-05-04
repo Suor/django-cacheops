@@ -498,8 +498,13 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if action not in ('pre_clear', 'post_add', 'pre_remove'):
         return
 
+    # NOTE: .rel moved to .remote_field in Django 1.9
+    if django.VERSION >= (1, 9):
+        get_remote = lambda f: f.remote_field
+    else:
+        get_remote = lambda f: f.rel
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
-                   if m2m.rel.through == sender)
+                   if get_remote(m2m).through == sender)
     instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
     if reverse:
         instance_column, model_column = model_column, instance_column
