@@ -12,27 +12,33 @@ env:
   - TOXENV=py27-dj18
   - TOXENV=py27-dj19
   - TOXENV=py27-dj110
-  - TOXENV=py27-djmaster
+  - TOXENV=py27-dj111
   - TOXENV=py33-dj17
   - TOXENV=py33-dj18
   - TOXENV=py34-dj17
   - TOXENV=py34-dj18
   - TOXENV=py34-dj19
   - TOXENV=py34-dj110
+  - TOXENV=py34-dj111
   - TOXENV=py34-djmaster
   - TOXENV=py35-dj18
   - TOXENV=py35-dj19
   - TOXENV=py35-dj110
+  - TOXENV=py35-dj111
   - TOXENV=py35-djmaster
+  - TOXENV=py36-dj111
+  - TOXENV=py36-djmaster
   - TOXENV=pypy-dj17
   - TOXENV=pypy-dj18
   - TOXENV=pypy-dj19
   - TOXENV=pypy-dj110
+  - TOXENV=pypy-dj111
 matrix:
   allow_failures:
-    - env: "TOXENV=py27-djmaster"
+    - env: "TOXENV=pypy-dj111" # psycopg2cffi fails with db-side cursors
     - env: "TOXENV=py34-djmaster"
     - env: "TOXENV=py35-djmaster"
+    - env: "TOXENV=py36-djmaster"
 install:
   - pip install tox
 before_script:
