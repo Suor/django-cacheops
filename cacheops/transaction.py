@@ -81,6 +81,7 @@ class AtomicMixIn(object):
                 transaction_state.commit()
         else:
             transaction_state.rollback()
+        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
 
 class CursorWrapperMixin(object):
     def callproc(self, procname, params=None):
