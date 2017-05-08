@@ -2,6 +2,7 @@
 import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator
+from django.db import DEFAULT_DB_ALIAS
 from django.db.models.expressions import F
 # Since Django 1.8, `ExpressionNode` is `Expression`
 try:
@@ -20,7 +21,7 @@ __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidat
 
 @queue_when_in_transaction
 @handle_connection_failure
-def invalidate_dict(model, obj_dict):
+def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
@@ -30,17 +31,17 @@ def invalidate_dict(model, obj_dict):
     ])
 
 
-def invalidate_obj(obj):
+def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
     """
     Invalidates caches that can possibly be influenced by object
     """
     model = non_proxy(obj.__class__)
-    invalidate_dict(model, get_obj_dict(model, obj))
+    invalidate_dict(model, get_obj_dict(model, obj), using=using)
 
 
 @queue_when_in_transaction
 @handle_connection_failure
-def invalidate_model(model):
+def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     """
     Invalidates all caches for given model.
     NOTE: This is a heavy artillery which uses redis KEYS request,
@@ -57,7 +58,7 @@ def invalidate_model(model):
 
 @queue_when_in_transaction
 @handle_connection_failure
-def invalidate_all():
+def invalidate_all(using=DEFAULT_DB_ALIAS):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     redis_client.flushdb()

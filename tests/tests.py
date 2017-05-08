@@ -13,7 +13,7 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
-from cacheops.transaction import transaction_state
+from cacheops.transaction import transaction_states
 from cacheops.signals import cache_read
 
 decorator_tag = register.decorator_tag
@@ -25,12 +25,14 @@ class BaseTestCase(TestCase):
         # Emulate not being in transaction by tricking system to ignore its pretest level.
         # TestCase wraps each test into 1 or 2 transaction(s) altering cacheops behavior.
         # The alternative is using TransactionTestCase, which is 10x slow.
-        transaction_state._stack, self._stack = [], transaction_state._stack
+        from funcy import empty
+        transaction_states._states, self._states \
+            = empty(transaction_states._states), transaction_states._states
 
         invalidate_all()
 
     def tearDown(self):
-        transaction_state._stack = self._stack
+        transaction_states._states = self._states
 
 
 class BasicTests(BaseTestCase):

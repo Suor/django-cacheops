@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import threading
+from collections import defaultdict
 
 import six
+from django.db import DEFAULT_DB_ALIAS
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import Atomic, get_connection
 # Hack for Django < 1.9
@@ -9,17 +11,17 @@ try:
     from django.db.transaction import on_commit
 except ImportError:
     on_commit = None
-from funcy import once, wraps
+from funcy import once, wraps, decorator
 
 from .utils import monkey_mix
+
 
 __all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support',
            'transaction_state')
 
 
-class TransactionState(threading.local):
-    def __init__(self, *args, **kwargs):
-        super(TransactionState, self).__init__(*args, **kwargs)
+class TransactionState(object):
+    def __init__(self):
         self._stack = []
 
     def begin(self):
@@ -51,54 +53,64 @@ class TransactionState(threading.local):
     def is_dirty(self):
         return any(context['dirty'] for context in self._stack)
 
-transaction_state = TransactionState()
+class TransactionStates(threading.local):
+    def __init__(self):
+        super(TransactionStates, self).__init__()
+        self._states = defaultdict(TransactionState)
+
+    def __getitem__(self, key):
+        return self._states[key or DEFAULT_DB_ALIAS]
+
+    def is_dirty(self, dbs):
+        return any(self[db].is_dirty() for db in dbs)
+
+transaction_states = TransactionStates()
 
 
-def queue_when_in_transaction(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if transaction_state.in_transaction():
-            transaction_state.append((func, args, kwargs))
-        else:
-            func(*args, **kwargs)
-    return wrapper
+@decorator
+def queue_when_in_transaction(call):
+    if transaction_states[call.using].in_transaction():
+        transaction_states[call.using].append((call, (), {}))
+    else:
+        return call()
 
 
 class AtomicMixIn(object):
     def __enter__(self):
-        entering = not transaction_state.in_transaction()
-        transaction_state.begin()
+        entering = not transaction_states[self.using].in_transaction()
+        transaction_states[self.using].begin()
         self._no_monkey.__enter__(self)
         if on_commit and entering:
-            on_commit(transaction_state.commit)
+            on_commit(transaction_states[self.using].commit, self.using)
 
     def __exit__(self, exc_type, exc_value, traceback):
         connection = get_connection(self.using)
         self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
-            if not on_commit or transaction_state.in_transaction():
-                transaction_state.commit()
+            if not on_commit or transaction_states[self.using].in_transaction():
+                transaction_states[self.using].commit()
         else:
-            transaction_state.rollback()
+            transaction_states[self.using].rollback()
+
 
 class CursorWrapperMixin(object):
     def callproc(self, procname, params=None):
         result = self._no_monkey.callproc(self, procname, params)
-        if transaction_state.in_transaction():
-            transaction_state.mark_dirty()
+        if transaction_states[self.db.alias].in_transaction():
+            transaction_states[self.db.alias].mark_dirty()
         return result
 
     def execute(self, sql, params=None):
         result = self._no_monkey.execute(self, sql, params)
-        if transaction_state.in_transaction() and is_sql_dirty(sql):
-            transaction_state.mark_dirty()
+        if transaction_states[self.db.alias].in_transaction() and is_sql_dirty(sql):
+            transaction_states[self.db.alias].mark_dirty()
         return result
 
     def executemany(self, sql, param_list):
         result = self._no_monkey.executemany(self, sql, param_list)
-        if transaction_state.in_transaction() and is_sql_dirty(sql):
-            transaction_state.mark_dirty()
+        if transaction_states[self.db.alias].in_transaction() and is_sql_dirty(sql):
+            transaction_states[self.db.alias].mark_dirty()
         return result
 
 

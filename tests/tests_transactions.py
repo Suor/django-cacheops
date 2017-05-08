@@ -104,8 +104,20 @@ class TransactionSupportTests(TransactionTestCase):
             connection.on_commit(django_commit_handler)
 
             @queue_when_in_transaction
-            def cacheops_commit_handler():
+            def cacheops_commit_handler(using):
                 calls.append('cacheops')
-            cacheops_commit_handler()
+            cacheops_commit_handler('default')
 
         self.assertEqual(calls, ['cacheops', 'django'])
+
+    def test_multidb(self):
+        try:
+            with atomic('slave'):
+                with atomic():
+                    obj = get_category()
+                    obj.title = 'Changed'
+                    obj.save()
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assertEqual('Changed', get_category().title)

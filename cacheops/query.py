@@ -25,7 +25,7 @@ from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, fa
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
-from .transaction import transaction_state
+from .transaction import transaction_states
 from .signals import cache_read
 
 
@@ -35,12 +35,12 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(cache_key, data, cond_dnfs, timeout):
+def cache_thing(cache_key, data, cond_dnfs, timeout, dbs=()):
     """
     Writes data to cache and creates appropriate invalidators.
     """
     # Could have changed after last check, sometimes superficially
-    if transaction_state.is_dirty():
+    if transaction_states.is_dirty(dbs):
         return
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[cache_key],
@@ -84,6 +84,7 @@ def cached_as(*samples, **kwargs):
         return queryset
 
     querysets = map(_get_queryset, samples)
+    dbs = {qs.db for qs in querysets}
     cond_dnfs = mapcat(dnfs, querysets)
     key_extra = [qs._cache_key() for qs in querysets]
     key_extra.append(extra)
@@ -95,7 +96,7 @@ def cached_as(*samples, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
+            if not settings.CACHEOPS_ENABLED or transaction_states.is_dirty(dbs):
                 return func(*args, **kwargs)
 
             cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
@@ -106,7 +107,7 @@ def cached_as(*samples, **kwargs):
                     return pickle.loads(cache_data)
                 else:
                     result = func(*args, **kwargs)
-                    cache_thing(cache_key, result, cond_dnfs, timeout)
+                    cache_thing(cache_key, result, cond_dnfs, timeout, dbs=dbs)
                     return result
 
         return wrapper
@@ -170,7 +171,7 @@ class QuerySetMixin(object):
 
     def _cache_results(self, cache_key, results):
         cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'])
+        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
 
     def cache(self, ops=None, timeout=None, write_only=None, lock=None):
         """
@@ -264,7 +265,7 @@ class QuerySetMixin(object):
         # TODO: drop this in next major release
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
+                or not settings.CACHEOPS_ENABLED or transaction_states[self.db].is_dirty():
             return self._no_monkey.iterator(self)
 
         cache_key = self._cache_key()
@@ -290,7 +291,7 @@ class QuerySetMixin(object):
     def _fetch_all(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
+                or not settings.CACHEOPS_ENABLED or transaction_states[self.db].is_dirty():
             return self._no_monkey._fetch_all(self)
 
         if self._result_cache is None:
@@ -423,13 +424,17 @@ class ManagerMixin(object):
                 pass
 
     def _post_save(self, sender, instance, **kwargs):
+        if not settings.CACHEOPS_ENABLED:
+            return
+
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
             invalidate_obj(old)
         invalidate_obj(instance)
 
-        if transaction_state.is_dirty() or not settings.CACHEOPS_ENABLED:
+        # We run invalidations but skip caching if we are dirty
+        if transaction_states[instance._state.db].is_dirty():
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
