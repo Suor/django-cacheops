@@ -11,13 +11,13 @@ try:
     from django.db.transaction import on_commit
 except ImportError:
     on_commit = None
-from funcy import once, wraps, decorator
+from funcy import once, decorator
 
 from .utils import monkey_mix
 
 
 __all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support',
-           'transaction_state')
+           'transaction_states')
 
 
 class TransactionState(list):
