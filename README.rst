@@ -20,7 +20,7 @@ Requirements
 ------------
 
 | Python 2.7 or 3.3+, Django 1.7+ and Redis 2.6+.
-| **Note:** use cacheops 2.4.3 for older Djangos and Python.
+| **Note:** use cacheops 2.4.5 for older Djangos and Python.
 
 
 Installation
