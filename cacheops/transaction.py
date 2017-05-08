@@ -20,38 +20,32 @@ __all__ = ('queue_when_in_transaction', 'install_cacheops_transaction_support',
            'transaction_state')
 
 
-class TransactionState(object):
-    def __init__(self):
-        self._stack = []
-
+class TransactionState(list):
     def begin(self):
-        self._stack.append({'cbs': [], 'dirty': False})
+        self.append({'cbs': [], 'dirty': False})
 
     def commit(self):
-        context = self._stack.pop()
-        if self._stack:
+        context = self.pop()
+        if self:
             # savepoint
-            self._stack[-1]['cbs'].extend(context['cbs'])
-            self._stack[-1]['dirty'] = self._stack[-1]['dirty'] or context['dirty']
+            self[-1]['cbs'].extend(context['cbs'])
+            self[-1]['dirty'] = self[-1]['dirty'] or context['dirty']
         else:
             # transaction
             for func, args, kwargs in context['cbs']:
                 func(*args, **kwargs)
 
     def rollback(self):
-        self._stack.pop()
+        self.pop()
 
-    def append(self, item):
-        self._stack[-1]['cbs'].append(item)
-
-    def in_transaction(self):
-        return bool(self._stack)
+    def push(self, item):
+        self[-1]['cbs'].append(item)
 
     def mark_dirty(self):
-        self._stack[-1]['dirty'] = True
+        self[-1]['dirty'] = True
 
     def is_dirty(self):
-        return any(context['dirty'] for context in self._stack)
+        return any(context['dirty'] for context in self)
 
 class TransactionStates(threading.local):
     def __init__(self):
@@ -69,15 +63,15 @@ transaction_states = TransactionStates()
 
 @decorator
 def queue_when_in_transaction(call):
-    if transaction_states[call.using].in_transaction():
-        transaction_states[call.using].append((call, (), {}))
+    if transaction_states[call.using]:
+        transaction_states[call.using].push((call, (), {}))
     else:
         return call()
 
 
 class AtomicMixIn(object):
     def __enter__(self):
-        entering = not transaction_states[self.using].in_transaction()
+        entering = not transaction_states[self.using]
         transaction_states[self.using].begin()
         self._no_monkey.__enter__(self)
         if on_commit and entering:
@@ -88,7 +82,7 @@ class AtomicMixIn(object):
         self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         if not connection.closed_in_transaction and exc_type is None and \
                 not connection.needs_rollback:
-            if not on_commit or transaction_states[self.using].in_transaction():
+            if not on_commit or transaction_states[self.using]:
                 transaction_states[self.using].commit()
         else:
             transaction_states[self.using].rollback()
@@ -97,19 +91,19 @@ class AtomicMixIn(object):
 class CursorWrapperMixin(object):
     def callproc(self, procname, params=None):
         result = self._no_monkey.callproc(self, procname, params)
-        if transaction_states[self.db.alias].in_transaction():
+        if transaction_states[self.db.alias]:
             transaction_states[self.db.alias].mark_dirty()
         return result
 
     def execute(self, sql, params=None):
         result = self._no_monkey.execute(self, sql, params)
-        if transaction_states[self.db.alias].in_transaction() and is_sql_dirty(sql):
+        if transaction_states[self.db.alias] and is_sql_dirty(sql):
             transaction_states[self.db.alias].mark_dirty()
         return result
 
     def executemany(self, sql, param_list):
         result = self._no_monkey.executemany(self, sql, param_list)
-        if transaction_states[self.db.alias].in_transaction() and is_sql_dirty(sql):
+        if transaction_states[self.db.alias] and is_sql_dirty(sql):
             transaction_states[self.db.alias].mark_dirty()
         return result
 
