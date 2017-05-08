@@ -48,6 +48,11 @@ Backwards incompatible changes:
 - removed .cached_call() from basic and file caches
 - disabled cacheops for fake migration models
 
+2.4.5
+- backport: disabled cacheops for fake migration models
+- disabled cacheops for south models
+- fixed get_queryset() on custom qs rename bug
+
 2.4.3
 - fixed .get() on reverse fk related manager
 - fixed memory leak on migrations
