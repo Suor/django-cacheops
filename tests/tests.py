@@ -925,16 +925,6 @@ class LockingTests(BaseTestCase):
         self.assertEqual(results[0], results[1])
 
 
-# TODO: remove this test when .iterator() is dropped
-@unittest.skipIf(PolymorphicModel is None, "django-polumorphic doesn't work with Django 2.0")
-class PolymorphicTests(BaseTestCase):
-    def test_polymorphic(self):
-        b = PolymorphicB.objects.create()
-        z = PolymorphicZ.objects.create(a=b)
-        z2 = PolymorphicZ.objects.get(id=z.id)
-        self.assertEqual(type(z2.a), PolymorphicB)
-
-
 # Utilities
 
 def _make_inc(deco=lambda x: x):

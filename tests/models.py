@@ -212,18 +212,3 @@ def set_boolean_true(sender, instance, created, **kwargs):
 
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)
-
-
-try:
-    from polymorphic.models import PolymorphicModel
-
-    class PolymorphicA(PolymorphicModel):
-        pass
-
-    class PolymorphicB(PolymorphicA):
-        pass
-
-    class PolymorphicZ(models.Model):
-        a = models.ForeignKey(PolymorphicA)
-except:
-    PolymorphicModel = None
