@@ -3,7 +3,7 @@ import sys
 import json
 import threading
 import six
-from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk
+from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py2 import mapcat, map
 from .cross import pickle, md5
 
@@ -256,33 +256,6 @@ class QuerySetMixin(object):
             clone._cloning = self._cloning - 1 if self._cloning else 0
             return clone
 
-    def iterator(self):
-        # TODO: drop this in next major release
-        # If cache is not enabled or in transaction just fall back
-        if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or not settings.CACHEOPS_ENABLED or transaction_states[self.db].is_dirty():
-            return self._no_monkey.iterator(self)
-
-        cache_key = self._cache_key()
-        # Get rid of write_only? redo self._for_write?
-        if not self._cacheprofile['write_only'] and not self._for_write:
-            # Trying get data from cache
-            cache_data = redis_client.get(cache_key)
-            cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
-            if cache_data is not None:
-                return iter(pickle.loads(cache_data))
-
-        # Cache miss - fetch data from overriden implementation
-        def iterate():
-            # NOTE: we are using self._result_cache to avoid fetching-while-fetching bug #177
-            self._result_cache = []
-            for obj in self._no_monkey.iterator(self):
-                self._result_cache.append(obj)
-                yield obj
-            self._cache_results(cache_key, self._result_cache)
-
-        return iterate()
-
     def _fetch_all(self):
         # If cache is not enabled or in transaction just fall back
         if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
@@ -294,8 +267,7 @@ class QuerySetMixin(object):
             lock = self._cacheprofile['lock']
 
             if self._cacheprofile['write_only'] or self._for_write:
-                # TODO: remove .nocache() when iterator() is dropped
-                self._result_cache = list(self.nocache().iterator())
+                self._result_cache = list(self.iterator())
                 self._cache_results(cache_key, self._result_cache)
             else:
                 with redis_client.getting(cache_key, lock=lock) as cache_data:
@@ -303,8 +275,7 @@ class QuerySetMixin(object):
                     if cache_data is not None:
                         self._result_cache = pickle.loads(cache_data)
                     else:
-                        # TODO: remove .nocache() when iterator() is dropped
-                        self._result_cache = list(self.nocache().iterator())
+                        self._result_cache = list(self.iterator())
                         self._cache_results(cache_key, self._result_cache)
 
         self._no_monkey._fetch_all(self)
@@ -320,7 +291,7 @@ class QuerySetMixin(object):
             return self._no_monkey.count(self)
 
     def get(self, *args, **kwargs):
-        # .get() uses the same .iterator() method to fetch data,
+        # .get() uses the same ._fetch_all() method to fetch data,
         # so here we add 'fetch' to ops
         if self._cacheprofile and 'get' in self._cacheprofile['ops']:
             # NOTE: local_get=True enables caching of simple gets in local memory,
@@ -372,10 +343,10 @@ class QuerySetMixin(object):
         clone = self._clone().nocache()
         clone._for_write = True  # affects routing
 
-        objects = list(clone.iterator())  # bypass queryset cache
-        rows = clone.update(**kwargs)
-        objects.extend(clone.iterator())
-        for obj in objects:
+        objects = list(clone)
+        rows = clone.update(**kwargs)  # Also drops queryset cache
+
+        for obj in chain(objects, clone):
             invalidate_obj(obj)
         return rows
 
@@ -531,13 +502,6 @@ def install_cacheops():
     monkey_mix(QuerySet, QuerySetMixin)
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
     QuerySet._cloning = QuerySetMixin._cloning
-
-    # Values*QuerySet existed in Django 1.8 and earlier
-    from django.db.models import query
-    for cls_name in ('ValuesQuerySet', 'ValuesListQuerySet'):
-        if hasattr(query, cls_name):
-            cls = getattr(query, cls_name)
-            monkey_mix(cls, QuerySetMixin, ['iterator'])
 
     # Use app registry to introspect used apps
     from django.apps import apps

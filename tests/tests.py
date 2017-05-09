@@ -67,20 +67,6 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Category.objects.exclude(pk__in=range(10), pk__isnull=False).cache())
 
-    # TODO: remove this test when .iterator() is removed
-    def test_lazy(self):
-        inc = _make_inc()
-
-        from django.db.models.signals import post_init
-        post_init.connect(inc, sender=Category)
-
-        qs = Category.objects.cache()
-        for c in qs.iterator():
-            break
-        self.assertEqual(inc.get(), 1)
-
-        post_init.disconnect(inc)
-
     def test_invalidation(self):
         post = Post.objects.cache().get(pk=1)
         post.title += ' changed'
@@ -508,7 +494,6 @@ class IssueTests(BaseTestCase):
         # Fail because neither Extra nor Catehory changed, but something in between
         self.assertEqual([], list(Extra.objects.filter(post__category__title=title).cache()))
 
-    # TODO: remove with QuerySetMixin.iterator() on next major release
     def test_177(self):
         c = Category.objects.get(pk=1)
         c.posts_copy = c.posts.cache()
