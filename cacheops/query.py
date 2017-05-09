@@ -270,7 +270,12 @@ class QuerySetMixin(object):
             if cache_data is not None:
                 self._result_cache = pickle.loads(cache_data)
             else:
-                self._result_cache = list(self.iterator())
+                # This thing appears in Django 1.9  and from in Django 1.11
+                # is used instead of .iterator() call
+                if hasattr(self, '_iterable_class'):
+                    self._result_cache = list(self._iterable_class(self))
+                else:
+                    self._result_cache = list(self.iterator())
                 self._cache_results(cache_key, self._result_cache)
 
         return self._no_monkey._fetch_all(self)
