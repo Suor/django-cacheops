@@ -8,7 +8,6 @@ from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
-from django.db.models.sql.datastructures import Join
 # This thing existed in Django 1.8 and earlier
 try:
     from django.db.models.sql.where import EverythingNode

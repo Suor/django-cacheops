@@ -1,8 +1,6 @@
 import os
-import six
 from datetime import date, datetime, time
 
-import django
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql
