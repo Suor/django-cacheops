@@ -1,3 +1,10 @@
+3.2
+- support Django 1.11
+- support Python 3.6
+- preliminary support for Django 2.0
+- support multidb nested transactions
+- fixed pk with default (leonardo orozco)
+
 3.1.3
 - better dirty sql heuristic
 - fixed on commit sequence issue (thx to Irae Hueck Costa)
