@@ -66,7 +66,7 @@ def model_profile(model):
     """
     Returns cacheops profile for a model
     """
-    if model_is_fake(model):
+    if model.__module__ == '__fake__':
         return None
 
     model_profiles = prepare_profiles()
@@ -78,7 +78,3 @@ def model_profile(model):
             return model_profiles[guess]
     else:
         return None
-
-
-def model_is_fake(model):
-    return model.__module__ == '__fake__'

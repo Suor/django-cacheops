@@ -20,7 +20,7 @@ try:
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, model_is_fake, settings, ALL_OPS
+from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
@@ -413,7 +413,7 @@ class ManagerMixin(object):
         # Django 1.7+ migrations create lots of fake models, just skip them
         # NOTE: we make it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
-        if not model_is_fake(cls):
+        if cls.__module__ != '__fake__':
             self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
