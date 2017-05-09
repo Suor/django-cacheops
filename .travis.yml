@@ -8,14 +8,11 @@ addons:
   postgresql: "9.3"
 env:
   - TOXENV=lint
-  - TOXENV=py27-dj17
   - TOXENV=py27-dj18
   - TOXENV=py27-dj19
   - TOXENV=py27-dj110
   - TOXENV=py27-dj111
-  - TOXENV=py33-dj17
   - TOXENV=py33-dj18
-  - TOXENV=py34-dj17
   - TOXENV=py34-dj18
   - TOXENV=py34-dj19
   - TOXENV=py34-dj110
@@ -26,7 +23,6 @@ env:
   - TOXENV=py35-dj110
   - TOXENV=py35-dj111
   - TOXENV=py35-djmaster
-  - TOXENV=pypy-dj17
   - TOXENV=pypy-dj18
   - TOXENV=pypy-dj19
   - TOXENV=pypy-dj110

@@ -274,12 +274,8 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_view_on_template_response(self):
         from django.template.response import TemplateResponse
-        # NOTE: get_template_from_string() removed in Django 1.8
-        try:
-            from django.template import engines
-            from_string = engines['django'].from_string
-        except ImportError:
-            from django.template.loader import get_template_from_string as from_string
+        from django.template import engines
+        from_string = engines['django'].from_string
 
         @cached_view_as(Category)
         def view(request):
@@ -334,13 +330,6 @@ class WeirdTests(BaseTestCase):
         list(Weird.customs.cache())
 
 
-# First appeared in Django 1.8
-try:
-    from django.contrib.postgres.fields import ArrayField
-except ImportError:
-    ArrayField = None
-
-@unittest.skipIf(ArrayField is None, "No postgres array fields")
 @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
 class ArrayTests(BaseTestCase):
     def test_contains(self):

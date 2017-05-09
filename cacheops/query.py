@@ -14,11 +14,6 @@ from django.db.models import Manager, Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
-# This thing was removed in Django 1.8
-try:
-    from django.db.models.query import MAX_GET_RESULTS
-except ImportError:
-    MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
@@ -410,7 +405,7 @@ class ManagerMixin(object):
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
-        # Django 1.7+ migrations create lots of fake models, just skip them
+        # Django migrations create lots of fake models, just skip them
         # NOTE: we make it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
         if cls.__module__ != '__fake__':
@@ -463,8 +458,6 @@ class ManagerMixin(object):
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
             qs = sender.objects.inplace().filter(**cond).order_by()
-            if MAX_GET_RESULTS:
-                qs = qs[:MAX_GET_RESULTS + 1]
             qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
@@ -539,10 +532,9 @@ def install_cacheops():
     QuerySet._cacheprofile = QuerySetMixin._cacheprofile
     QuerySet._cloning = QuerySetMixin._cloning
 
-    # DateQuerySet existed in Django 1.7 and earlier
     # Values*QuerySet existed in Django 1.8 and earlier
     from django.db.models import query
-    for cls_name in ('ValuesQuerySet', 'ValuesListQuerySet', 'DateQuerySet'):
+    for cls_name in ('ValuesQuerySet', 'ValuesListQuerySet'):
         if hasattr(query, cls_name):
             cls = getattr(query, cls_name)
             monkey_mix(cls, QuerySetMixin, ['iterator'])

@@ -8,13 +8,6 @@ from django.db.models.query import QuerySet
 from django.db.models import sql
 from django.contrib.auth.models import User
 
-# Deprecated this thing in Django 1.8 and removed in 1.10
-if django.VERSION < (1, 8):
-    from django.db.models import SubfieldBase
-else:
-    class SubfieldBase(type):
-        pass
-
 
 ### For basic tests and bench
 
@@ -53,7 +46,7 @@ class CustomValue(object):
     def __eq__(self, other):
         return isinstance(other, CustomValue) and self.value == other.value
 
-class CustomField(six.with_metaclass(SubfieldBase, models.Field)):
+class CustomField(models.Field):
     def db_type(self, connection):
         return 'text'
 
@@ -81,7 +74,7 @@ class CustomManager(models.Manager):
     get_queryset = get_query_set
 
 
-class IntegerArrayField(six.with_metaclass(SubfieldBase, models.Field)):
+class IntegerArrayField(models.Field):
     def db_type(self, connection):
         return 'text'
 
@@ -113,16 +106,13 @@ class Weird(models.Model):
     objects = models.Manager()
     customs = CustomManager()
 
+
 # TODO: check other new fields:
 #       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
-#       - Other: UUIDField, DurationField
-# contrib.postgres ArrayField
-try:
+#       - Other: DurationField
+if os.environ.get('CACHEOPS_DB') in {'postgresql', 'postgis'}:
     from django.contrib.postgres.fields import ArrayField
-except ImportError:
-    ArrayField = None
 
-if ArrayField and os.environ.get('CACHEOPS_DB') != 'mysql':
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
         tags = ArrayField(models.IntegerField())

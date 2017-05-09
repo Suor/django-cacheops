@@ -41,6 +41,7 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'USER': 'cacheops',
             'PASSWORD': '',
             'HOST': '',
+            'PORT': 5434,
         },
         'slave': {
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -48,6 +49,7 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'USER': 'cacheops',
             'PASSWORD': '',
             'HOST': '',
+            'PORT': 5434,
         },
     }
 elif os.environ.get('CACHEOPS_DB') == 'mysql':

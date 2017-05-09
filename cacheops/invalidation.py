@@ -3,12 +3,7 @@ import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models.expressions import F
-# Since Django 1.8, `ExpressionNode` is `Expression`
-try:
-    from django.db.models.expressions import ExpressionNode as Expression
-except ImportError:
-    from django.db.models.expressions import Expression
+from django.db.models.expressions import F, Expression
 
 from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS

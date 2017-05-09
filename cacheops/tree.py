@@ -8,23 +8,12 @@ from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
+from django.db.models.sql.datastructures import Join
 # This thing existed in Django 1.8 and earlier
 try:
     from django.db.models.sql.where import EverythingNode
 except ImportError:
     class EverythingNode(object):
-        pass
-# This thing existed in Django 1.7 and earlier
-try:
-    from django.db.models.sql.expressions import SQLEvaluator
-except ImportError:
-    class SQLEvaluator(object):
-        pass
-# A new thing in Django 1.8
-try:
-    from django.db.models.sql.datastructures import Join
-except ImportError:
-    class Join(object):
         pass
 
 from .utils import NOT_SERIALIZED_FIELDS
@@ -62,7 +51,7 @@ def dnfs(qs):
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE
             # Don't bother with complex right hand side either
-            if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
+            if isinstance(where.rhs, (QuerySet, Query)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
@@ -83,7 +72,6 @@ def dnfs(qs):
             return [[]]
         elif isinstance(where, NothingNode):
             return []
-            # SubqueryConstraint - Django 1.7
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
             return SOME_TREE
         elif len(where) == 0:
@@ -135,9 +123,7 @@ def dnfs(qs):
     def table_for(alias):
         if alias == main_alias:
             return model._meta.db_table
-        # Django 1.7 and earlier used tuples to encode joins
-        join = qs.query.alias_map[alias]
-        return join.table_name if isinstance(join, Join) else join[0]
+        return qs.query.alias_map[alias].table_name
 
     where = qs.query.where
     model = qs.model
