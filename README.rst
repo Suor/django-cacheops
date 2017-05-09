@@ -172,8 +172,7 @@ There is, however, a shortcut for the latter:
 
 It is useful when you want to disable automatic caching on particular queryset.
 
-You can also override default timeout for particular queryset with ``.cache(timeout=...)``
-or make queryset only write cache, but don't try to fetch it with ``.cache(write_only=True)``.
+You can also override default timeout for particular queryset with ``.cache(timeout=...)``.
 
 
 | **Function caching**

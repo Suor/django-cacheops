@@ -168,13 +168,12 @@ class QuerySetMixin(object):
         cond_dnfs = dnfs(self)
         cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
 
-    def cache(self, ops=None, timeout=None, write_only=None, lock=None):
+    def cache(self, ops=None, timeout=None, lock=None):
         """
         Enables caching for given ops
             ops        - a subset of {'get', 'fetch', 'count', 'exists'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
-            write_only - don't try fetching from cache, still write result there
             lock       - use lock to prevent dog-pile effect
 
         NOTE: you actually can disable caching by omiting corresponding ops,
@@ -190,8 +189,6 @@ class QuerySetMixin(object):
 
         if timeout is not None:
             self._cacheprofile['timeout'] = timeout
-        if write_only is not None:
-            self._cacheprofile['write_only'] = write_only
         if lock is not None:
             self._cacheprofile['lock'] = lock
 
@@ -266,7 +263,7 @@ class QuerySetMixin(object):
             cache_key = self._cache_key()
             lock = self._cacheprofile['lock']
 
-            if self._cacheprofile['write_only'] or self._for_write:
+            if self._for_write:
                 self._result_cache = list(self.iterator())
                 self._cache_results(cache_key, self._result_cache)
             else:
