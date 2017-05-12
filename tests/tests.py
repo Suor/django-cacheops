@@ -573,46 +573,12 @@ class RelatedTests(BaseTestCase):
 class AnnotationTests(BaseTestCase):
     fixtures = ['basic']
 
-    def _template(self, qs_or_action, change, should_invalidate=True):
-        if hasattr(qs_or_action, 'cache'):
-            action = lambda: list(qs_or_action.cache())
-        else:
-            action = qs_or_action
-
-        action()
-        change()
-        with self.assertNumQueries(1 if should_invalidate else 0):
-            action()
-
-    def test_fetch_annotate_count_invalidation(self):
-        self._template(
-            Category.objects.annotate(posts_count=Count('posts')),
-            lambda: Post.objects.create(title='Django', category=Category.objects.all()[0])
-        )
-
-    def test_fetch_annotate_count(self):
-        self._template(
-            Category.objects.annotate(posts_count=Count('posts')),
-            lambda: Post.objects.all(),
-            should_invalidate=False
-        )
-
-    def test_get_annotate_count_invalidation(self):
-        post = Post.objects.all()[0]
-        category = Category.objects.get(pk=post.category_id)
-        self._template(
-            lambda: Category.objects.annotate(posts_count=Count('posts')).cache().get(pk=category.pk),
-            lambda: Post.objects.create(title='Django', category=category)
-        )
-
-    def test_get_annotate_count(self):
-        post = Post.objects.all()[0]
-        category = Category.objects.get(pk=post.category_id)
-        self._template(
-            lambda: Category.objects.annotate(posts_count=Count('posts')).cache().get(pk=category.pk),
-            lambda: Post.objects.all(),
-            should_invalidate=False
-        )
+    def test_fetch(self):
+        qs = Category.objects.annotate(posts_count=Count('posts')).cache()
+        list(qs._clone())
+        Post.objects.create(title='New One', category=Category.objects.all()[0])
+        with self.assertNumQueries(1):
+            list(qs._clone())
 
 
 class M2MTests(BaseTestCase):
