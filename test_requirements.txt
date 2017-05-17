@@ -1,6 +1,6 @@
 django>=1.7
 redis>=2.9.1
-funcy>=1.2,<2.0
+funcy>=1.7.5,<2.0
 six>=1.4.0
 before_after==1.0.0
 django-polymorphic>=1.0.2
