@@ -1,3 +1,6 @@
+3.2.1
+- fixed CACHEOPS_DEGRADE_ON_FAILURE=True
+
 3.2
 - support Django 1.11
 - support Python 3.6
