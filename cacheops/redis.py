@@ -2,6 +2,8 @@ from __future__ import absolute_import
 import warnings
 from contextlib import contextmanager
 import six
+import sys
+import traceback
 
 from funcy import decorator, identity, memoize
 import redis
@@ -18,6 +20,8 @@ if settings.CACHEOPS_DEGRADE_ON_FAILURE:
             warnings.warn("The cacheops cache is unreachable! Error: %s" % e, RuntimeWarning)
         except redis.TimeoutError as e:
             warnings.warn("The cacheops cache timed out! Error: %s" % e, RuntimeWarning)
+        except Exception as e:
+            warnings.warn(traceback.format_exception(*sys.exc_info()))
 else:
     handle_connection_failure = identity
 
