@@ -683,6 +683,15 @@ Here come some performance tips to make cacheops and Django ORM faster.
    Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 
+Security
+--------
+
+Since ``pickle`` library is using in this application, you should understand
+that `pickle <https://docs.python.org/3/library/pickle.html>`_ module is not
+secure against erroneous or maliciously constructed data, so basically your
+security depends on ``redis``, which also has tricky `security model <http://redis.io/topics/security>`_
+and should be accessed by trusted clients inside trusted environments.
+
 Writing a test
 --------------
 
