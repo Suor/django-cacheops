@@ -51,9 +51,8 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
         redis_client.delete(*(list(cache_keys) + conjs_keys))
 
 
-@queue_when_in_transaction
 @handle_connection_failure
-def invalidate_all(using=DEFAULT_DB_ALIAS):
+def invalidate_all():
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     redis_client.flushdb()
