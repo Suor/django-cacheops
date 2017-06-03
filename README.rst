@@ -73,8 +73,8 @@ Setup redis connection and enable caching for desired models:
         # to other django.contrib.auth models for an hour
         'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
 
-        # Cache gets, fetches, counts and exists to Permission
-        # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
+        # Cache all queries to Permission
+        # 'all' is just an alias for {'get', 'fetch', 'count', 'aggregate', 'exists'}
         'auth.permission': {'ops': 'all', 'timeout': 60*60},
 
         # Enable manual caching on all other models with default timeout of an hour
@@ -159,8 +159,8 @@ Here you can specify which ops should be cached for queryset, for example, this 
 
 
 will cache count call in ``Paginator`` but not later articles fetch.
-There are four possible actions - ``get``, ``fetch``, ``count`` and ``exists``. You can
-pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
+There are five possible actions - ``get``, ``fetch``, ``count``, ``aggregate`` and ``exists``.
+You can pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
 There is, however, a shortcut for the latter:
 
 .. code:: python
