@@ -290,6 +290,14 @@ class QuerySetMixin(object):
         else:
             return self._no_monkey.count(self)
 
+    def aggregate(self, *args, **kwargs):
+        if self._cacheprofile and 'aggregate' in self._cacheprofile['ops']:
+            # Annotate add all the same annotations, but doesn't run the query
+            qs = self.clone().annotate(*args, **kwargs)
+            return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
+        else:
+            return self._no_monkey.aggregate(self, *args, **kwargs)
+
     def get(self, *args, **kwargs):
         # .get() uses the same ._fetch_all() method to fetch data,
         # so here we add 'fetch' to ops

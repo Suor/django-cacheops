@@ -646,15 +646,14 @@ CAVEATS
 6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
 8. Doesn't work right with multi-table inheritance.
-9. Aggregates are not implemented yet.
 
 Here 1, 2, 3, 5 are part of the design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions,
-see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
-more interest or a champion willing to implement any one of them emerge.
+see, however, `.invalidated_update()`. 8 is postponed until it will gain
+more interest or a champion willing to implement it emerges.
 
 All unsupported things could still be used easily enough with the help of `@cached_as()`.
 

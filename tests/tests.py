@@ -570,15 +570,26 @@ class RelatedTests(BaseTestCase):
         )
 
 
-class AnnotationTests(BaseTestCase):
+class AggregationTests(BaseTestCase):
     fixtures = ['basic']
 
-    def test_fetch(self):
+    def test_annotate(self):
         qs = Category.objects.annotate(posts_count=Count('posts')).cache()
         list(qs._clone())
         Post.objects.create(title='New One', category=Category.objects.all()[0])
         with self.assertNumQueries(1):
             list(qs._clone())
+
+    def test_aggregate(self):
+        qs = Category.objects.cache()
+        qs.aggregate(posts_count=Count('posts'))
+        # Test caching
+        with self.assertNumQueries(0):
+            qs.aggregate(posts_count=Count('posts'))
+        # Test invalidation
+        Post.objects.create(title='New One', category=Category.objects.all()[0])
+        with self.assertNumQueries(1):
+            qs.aggregate(posts_count=Count('posts'))
 
 
 class M2MTests(BaseTestCase):

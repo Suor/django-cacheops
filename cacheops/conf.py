@@ -6,7 +6,7 @@ from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 
 
-ALL_OPS = {'get', 'fetch', 'count', 'exists'}
+ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
 
 
 class Settings(object):
