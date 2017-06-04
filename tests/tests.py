@@ -919,11 +919,11 @@ class SignalsTests(BaseTestCase):
 
         invalidate_all()
         invalidate_model(Post)
-        Category.objects.create(title='Hey')
+        c = Category.objects.create(title='Hey')
         self.assertEqual(signal_calls, [
             {'sender': None, 'obj_dict': None},
             {'sender': Post, 'obj_dict': None},
-            {'sender': Category, 'obj_dict': {'id': 1, 'title': 'Hey'}},
+            {'sender': Category, 'obj_dict': {'id': c.pk, 'title': 'Hey'}},
         ])
 
 
