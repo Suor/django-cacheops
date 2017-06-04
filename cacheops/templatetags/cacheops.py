@@ -17,6 +17,7 @@ except ImportError:
 import django
 if django.VERSION >= (2, 0):
     _parse_bits = parse_bits
+
     def parse_bits(parser, bits, params, varargs, varkw, defaults,
                    takes_context=None, name=None):
         return _parse_bits(parser, bits, params, varargs, varkw, defaults, (), (),
