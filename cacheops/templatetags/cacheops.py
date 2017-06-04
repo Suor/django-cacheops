@@ -1,6 +1,6 @@
 from __future__ import absolute_import
-import inspect
 from functools import partial
+from ..cross import getargspec
 
 # NOTE: moved in Django 1.9
 try:
@@ -28,7 +28,7 @@ class CacheopsLibrary(Library):
             return partial(self.decorator_tag, takes_context=takes_context)
 
         name = func.__name__
-        params, varargs, varkw, defaults = inspect.getargspec(func)
+        params, varargs, varkw, defaults = getargspec(func)
 
         def _compile(parser, token):
             # content
