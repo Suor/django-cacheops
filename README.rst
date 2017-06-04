@@ -615,10 +615,12 @@ However, this makes invalidation structures persistent, they are still removed o
 Keeping stats
 -------------
 
-Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
+Cacheops provides ``cache_read`` and ``cache_invalidated`` signals for you to keep track.
+
+Cache read signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
 ``func`` - decorated function and ``hit`` - fetch success as boolean value.
 
-Here is simple stats implementation:
+Here is a simple stats implementation:
 
 .. code:: python
 
@@ -630,6 +632,8 @@ Here is simple stats implementation:
         statsd.incr('cacheops.%s' % event)
 
     cache_read.connect(stats_collector)
+
+Cache invalidation signal is emitted after object, model or global invalidation passing ``sender`` and ``obj_dict`` args. Note that during normal operation cacheops only uses object invalidation, calling it once for each model create/delete and twice for update: passing old and new object dictionary.
 
 
 CAVEATS

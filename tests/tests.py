@@ -14,7 +14,7 @@ from cacheops import invalidate_all, invalidate_model, invalidate_obj, no_invali
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
 from cacheops.transaction import transaction_states
-from cacheops.signals import cache_read
+from cacheops.signals import cache_read, cache_invalidated
 
 decorator_tag = register.decorator_tag
 from .models import *  # noqa
@@ -909,6 +909,22 @@ class SignalsTests(BaseTestCase):
         self.signal_calls = []
         self.assertEqual(get_calls(), 1)
         self.assertEqual(self.signal_calls, [{'sender': None, 'func': func, 'hit': True}])
+
+    def test_invalidation_signal(self):
+        def set_signal(signal=None, **kwargs):
+            signal_calls.append(kwargs)
+
+        signal_calls = []
+        cache_invalidated.connect(set_signal, dispatch_uid=1, weak=False)
+
+        invalidate_all()
+        invalidate_model(Post)
+        Category.objects.create(title='Hey')
+        self.assertEqual(signal_calls, [
+            {'sender': None, 'obj_dict': None},
+            {'sender': Post, 'obj_dict': None},
+            {'sender': Category, 'obj_dict': {'id': 1, 'title': 'Hey'}},
+        ])
 
 
 class LockingTests(BaseTestCase):

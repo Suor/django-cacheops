@@ -8,6 +8,7 @@ from django.db.models.expressions import F, Expression
 from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
 from .redis import redis_client, handle_connection_failure, load_script
+from .signals import cache_invalidated
 from .transaction import queue_when_in_transaction
 
 
@@ -24,6 +25,7 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
         model._meta.db_table,
         json.dumps(obj_dict, default=str)
     ])
+    cache_invalidated.send(sender=model, obj_dict=obj_dict)
 
 
 def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
@@ -49,6 +51,7 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
+    cache_invalidated.send(sender=model, obj_dict=None)
 
 
 @handle_connection_failure
@@ -56,6 +59,7 @@ def invalidate_all():
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     redis_client.flushdb()
+    cache_invalidated.send(sender=None, obj_dict=None)
 
 
 class InvalidationState(threading.local):
