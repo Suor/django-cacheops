@@ -13,6 +13,15 @@ except ImportError:
             _TagHelperNode.__init__(self, takes_context, args, kwargs)
             self.func = func
 
+# Fix Django 2.0 parse_bits being too smart
+import django
+if django.VERSION >= (2, 0):
+    _parse_bits = parse_bits
+    def parse_bits(parser, bits, params, varargs, varkw, defaults,
+                   takes_context=None, name=None):
+        return _parse_bits(parser, bits, params, varargs, varkw, defaults, (), (),
+                           takes_context=takes_context, name=name)
+
 from django.template import Library
 
 import cacheops
