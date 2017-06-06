@@ -332,6 +332,16 @@ class QuerySetMixin(object):
 
         return qs._no_monkey.get(qs, *args, **kwargs)
 
+    def first(self):
+        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+            return self._no_monkey.first(self._clone().cache())
+        return self._no_monkey.first(self)
+
+    def last(self):
+        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+            return self._no_monkey.last(self._clone().cache())
+        return self._no_monkey.last(self)
+
     def exists(self):
         if self._cacheprofile and 'exists' in self._cacheprofile['ops']:
             if self._result_cache is not None:

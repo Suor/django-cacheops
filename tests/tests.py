@@ -147,6 +147,14 @@ class BasicTests(BaseTestCase):
         qs = Post.objects.filter(pk__in=[1, 2]) | Post.objects.none()
         self.assertEqual(list(qs.cache()), list(qs))
 
+    def test_first_and_last(self):
+        qs = Category.objects.cache(ops='get')
+        qs.first()
+        qs.last()
+        with self.assertNumQueries(0):
+            qs.first()
+            qs.last()
+
 
 class ValuesTests(BaseTestCase):
     fixtures = ['basic']
