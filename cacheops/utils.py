@@ -2,7 +2,7 @@
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any, partial
+from funcy import memoize, compose, wraps, any
 from funcy.py2 import mapcat
 from .cross import md5hex
 
