@@ -5,6 +5,7 @@ from funcy import memoize, merge
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
+from django.utils.module_loading import import_string
 
 
 ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
@@ -15,6 +16,7 @@ class Defaults:
     CACHEOPS_REDIS = {},
     CACHEOPS_DEFAULTS = {},
     CACHEOPS = {},
+    CACHEOPS_PREFIX = lambda query: ''
     CACHEOPS_LRU = False,
     CACHEOPS_DEGRADE_ON_FAILURE = False,
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache',
@@ -24,6 +26,8 @@ class Defaults:
 class Settings(object):
     def __getattr__(self, name):
         res = getattr(base_settings, name, getattr(Defaults, name))
+        if name == 'CACHEOPS_PREFIX':
+            res = res if callable(res) else import_string(res)
         # Save to dict to speed up next access, __getattr__ won't be called
         self.__dict__[name] = res
         return res

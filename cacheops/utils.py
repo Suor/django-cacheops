@@ -2,7 +2,7 @@
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any
+from funcy import memoize, compose, wraps, any, any_fn, select_values
 from funcy.py2 import mapcat
 from .cross import md5hex
 
@@ -47,13 +47,9 @@ def family_has_profile(cls):
 
 
 class MonkeyProxy(object):
-    def __init__(self, cls):
-        monkey_bases = [b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey')]
-        for monkey_base in monkey_bases:
-            self.__dict__.update(monkey_base.__dict__)
+    pass
 
-
-def monkey_mix(cls, mixin, methods=None):
+def monkey_mix(cls, mixin):
     """
     Mixes a mixin into existing class.
     Does not use actual multi-inheritance mixins, just monkey patches methods.
@@ -65,15 +61,14 @@ def monkey_mix(cls, mixin, methods=None):
             self._no_monkey.do_smth(self, arg)
             ... do smth else after
     """
-    assert '_no_monkey' not in cls.__dict__, 'Multiple monkey mix not supported'
-    cls._no_monkey = MonkeyProxy(cls)
+    assert not hasattr(cls, '_no_monkey'), 'Multiple monkey mix not supported'
+    cls._no_monkey = MonkeyProxy()
 
-    if methods is None:
-        methods = [(name, m) for name, m in mixin.__dict__.items() if inspect.isfunction(m)]
-    else:
-        methods = [(m, mixin.__dict__[m]) for m in methods]
+    test = any_fn(inspect.isfunction, inspect.ismethoddescriptor)
+    # TODO: remove .copy() once funcy is updated to 1.8
+    methods = select_values(test, mixin.__dict__.copy())
 
-    for name, method in methods:
+    for name, method in methods.items():
         if hasattr(cls, name):
             setattr(cls._no_monkey, name, getattr(cls, name))
         setattr(cls, name, method)

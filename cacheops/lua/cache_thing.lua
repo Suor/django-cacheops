@@ -1,4 +1,5 @@
-local key = KEYS[1]
+local prefix = KEYS[1]
+local key = KEYS[2]
 local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
 local timeout = tonumber(ARGV[3])
@@ -24,7 +25,7 @@ local conj_cache_key = function (db_table, conj)
         table.insert(parts, eq[1] .. '=' .. tostring(eq[2]))
     end
 
-    return 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
+    return prefix .. 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
 end
 
 
@@ -34,7 +35,7 @@ for _, disj_pair in ipairs(dnfs) do
     local disj = disj_pair[2]
     for _, conj in ipairs(disj) do
         -- Ensure scheme is known
-        redis.call('sadd', 'schemes:' .. db_table, conj_schema(conj))
+        redis.call('sadd', prefix .. 'schemes:' .. db_table, conj_schema(conj))
 
         -- Add new cache_key to list of dependencies
         local conj_key = conj_cache_key(db_table, conj)

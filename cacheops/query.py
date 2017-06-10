@@ -17,6 +17,7 @@ from django.db.models.signals import pre_save, post_save, post_delete, m2m_chang
 
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
@@ -30,7 +31,7 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(cache_key, data, cond_dnfs, timeout, dbs=()):
+def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=()):
     """
     Writes data to cache and creates appropriate invalidators.
     """
@@ -38,7 +39,7 @@ def cache_thing(cache_key, data, cond_dnfs, timeout, dbs=()):
     if transaction_states.is_dirty(dbs):
         return
     load_script('cache_thing', settings.CACHEOPS_LRU)(
-        keys=[cache_key],
+        keys=[prefix, cache_key],
         args=[
             pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
@@ -94,7 +95,8 @@ def cached_as(*samples, **kwargs):
             if not settings.CACHEOPS_ENABLED or transaction_states.is_dirty(dbs):
                 return func(*args, **kwargs)
 
-            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+            prefix = get_prefix(func=func, _cond_dnfs=cond_dnfs, dbs=dbs)
+            cache_key = prefix + 'as:' + key_func(func, args, kwargs, key_extra)
 
             with redis_client.getting(cache_key, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
@@ -102,7 +104,7 @@ def cached_as(*samples, **kwargs):
                     return pickle.loads(cache_data)
                 else:
                     result = func(*args, **kwargs)
-                    cache_thing(cache_key, result, cond_dnfs, timeout, dbs=dbs)
+                    cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
                     return result
 
         return wrapper
@@ -164,9 +166,17 @@ class QuerySetMixin(object):
 
         return 'q:%s' % md.hexdigest()
 
+    @cached_property
+    def _prefix(self):
+        return get_prefix(_queryset=self)
+
+    @cached_property
+    def _cond_dnfs(self):
+        return dnfs(self)
+
     def _cache_results(self, cache_key, results):
-        cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
+        cache_thing(self._prefix, cache_key, results,
+                    self._cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
 
     def cache(self, ops=None, timeout=None, lock=None):
         """
@@ -262,7 +272,7 @@ class QuerySetMixin(object):
                 or transaction_states[self.db].is_dirty():
             return self._no_monkey._fetch_all(self)
 
-        cache_key = self._cache_key()
+        cache_key = self._prefix + self._cache_key()
         lock = self._cacheprofile['lock']
 
         with redis_client.getting(cache_key, lock=lock) as cache_data:
@@ -518,8 +528,6 @@ def install_cacheops():
     """
     monkey_mix(Manager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
-    QuerySet._cacheprofile = QuerySetMixin._cacheprofile
-    QuerySet._cloning = QuerySetMixin._cloning
 
     # Use app registry to introspect used apps
     from django.apps import apps

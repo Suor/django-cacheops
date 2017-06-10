@@ -7,6 +7,7 @@ from django.db.models.expressions import F, Expression
 
 from .conf import settings
 from .utils import non_proxy, NOT_SERIALIZED_FIELDS
+from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .signals import cache_invalidated
 from .transaction import queue_when_in_transaction
@@ -21,7 +22,8 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
-    load_script('invalidate')(args=[
+    prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
+    load_script('invalidate')(keys=[prefix], args=[
         model._meta.db_table,
         json.dumps(obj_dict, default=str)
     ])
@@ -47,7 +49,10 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
     model = non_proxy(model)
-    conjs_keys = redis_client.keys('conj:%s:*' % model._meta.db_table)
+    # NOTE: if we use sharding dependent on DNF then this will fail,
+    #       which is ok, since it's hard/impossible to predict all the shards
+    prefix = get_prefix(tables=[model._meta.db_table], dbs=[using])
+    conjs_keys = redis_client.keys('%sconj:%s:*' % (prefix, model._meta.db_table))
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         redis_client.delete(*(list(cache_keys) + conjs_keys))
