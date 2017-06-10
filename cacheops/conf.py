@@ -4,27 +4,32 @@ from funcy import memoize, merge
 
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.signals import setting_changed
 
 
 ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
 
 
-class Settings(object):
-    CACHEOPS_ENABLED = True
-    CACHEOPS_REDIS = {}
-    CACHEOPS_DEFAULTS = {}
-    CACHEOPS = {}
-    CACHEOPS_LRU = False
-    CACHEOPS_DEGRADE_ON_FAILURE = False
-    FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
-    FILE_CACHE_TIMEOUT = 60*60*24*30
+class Defaults:
+    CACHEOPS_ENABLED = True,
+    CACHEOPS_REDIS = {},
+    CACHEOPS_DEFAULTS = {},
+    CACHEOPS = {},
+    CACHEOPS_LRU = False,
+    CACHEOPS_DEGRADE_ON_FAILURE = False,
+    FILE_CACHE_DIR = '/tmp/cacheops_file_cache',
+    FILE_CACHE_TIMEOUT = 60*60*24*30,
 
-    def __getattribute__(self, name):
-        if hasattr(base_settings, name):
-            return getattr(base_settings, name)
-        return object.__getattribute__(self, name)
+
+class Settings(object):
+    def __getattr__(self, name):
+        res = getattr(base_settings, name, getattr(Defaults, name))
+        # Save to dict to speed up next access, __getattr__ won't be called
+        self.__dict__[name] = res
+        return res
 
 settings = Settings()
+setting_changed.connect(lambda setting, **kw: settings.__dict__.pop(setting), weak=False)
 
 
 @memoize
