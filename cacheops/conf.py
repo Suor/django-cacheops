@@ -16,7 +16,7 @@ class Defaults:
     CACHEOPS_REDIS = {},
     CACHEOPS_DEFAULTS = {},
     CACHEOPS = {},
-    CACHEOPS_PREFIX = lambda query: ''
+    CACHEOPS_PREFIX = staticmethod(lambda query: '')
     CACHEOPS_LRU = False,
     CACHEOPS_DEGRADE_ON_FAILURE = False,
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache',
