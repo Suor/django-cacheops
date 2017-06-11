@@ -108,6 +108,8 @@ class CursorWrapperMixin(object):
         return result
 
 
+CHARS = set('abcdefghijklmnoprqstuvwxyz_')
+
 def is_sql_dirty(sql):
     # This should not happen as using bytes in Python 3 is against db protocol,
     # but some people will pass it anyway
@@ -115,13 +117,12 @@ def is_sql_dirty(sql):
         sql = sql.decode()
     # NOTE: not using regex here for speed
     sql = sql.lower()
-    chars = 'abcdefghijklmnoprqstuvwxyz_'
     for action in ('update', 'insert', 'delete'):
         p = sql.find(action)
         if p == -1:
             continue
         start, end = p - 1, p + len(action)
-        if (start < 0 or sql[start] not in chars) and (end >= len(sql) or sql[end] not in chars):
+        if (start < 0 or sql[start] not in CHARS) and (end >= len(sql) or sql[end] not in CHARS):
             return True
     else:
         return False
