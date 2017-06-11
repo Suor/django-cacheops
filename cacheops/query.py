@@ -82,7 +82,7 @@ def cached_as(*samples, **kwargs):
     querysets = map(_get_queryset, samples)
     dbs = {qs.db for qs in querysets}
     cond_dnfs = mapcat(dnfs, querysets)
-    key_extra = [qs._cache_key() for qs in querysets]
+    key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
     if not timeout:  # TODO: switch to is None on major release
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
@@ -133,7 +133,7 @@ class QuerySetMixin(object):
                 'you can configure it with empty ops.'
                     % (self.model._meta.app_label, self.model._meta.model_name))
 
-    def _cache_key(self):
+    def _cache_key(self, prefix=True):
         """
         Compute a cache key for this queryset
         """
@@ -164,7 +164,8 @@ class QuerySetMixin(object):
         if hasattr(self, 'flat'):
             md.update(str(self.flat))
 
-        return 'q:%s' % md.hexdigest()
+        cache_key = 'q:%s' % md.hexdigest()
+        return self._prefix + cache_key if prefix else cache_key
 
     @cached_property
     def _prefix(self):
@@ -272,7 +273,7 @@ class QuerySetMixin(object):
                 or transaction_states[self.db].is_dirty():
             return self._no_monkey._fetch_all(self)
 
-        cache_key = self._prefix + self._cache_key()
+        cache_key = self._cache_key()
         lock = self._cacheprofile['lock']
 
         with redis_client.getting(cache_key, lock=lock) as cache_data:

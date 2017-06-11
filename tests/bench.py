@@ -16,8 +16,7 @@ def do_unpickle():
     pickle.loads(posts_pickle)
 
 
-get_qs = Category.objects.filter(pk=1).order_by()
-get_key = get_qs._prefix + get_qs._cache_key()
+get_key = Category.objects.filter(pk=1).order_by()._cache_key()
 def invalidate_get():
     redis_client.delete(get_key)
 
@@ -40,7 +39,7 @@ def do_count_no_cache():
 
 
 fetch_qs = Category.objects.all()
-fetch_key = fetch_qs._prefix + fetch_qs._cache_key()
+fetch_key = fetch_qs._cache_key()
 
 def invalidate_fetch():
     redis_client.delete(fetch_key)
