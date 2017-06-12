@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import six
-from funcy import memoize, merge
+from funcy import memoize, merge, namespace
 
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
@@ -11,12 +11,12 @@ from django.utils.module_loading import import_string
 ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
 
 
-class Defaults:
+class Defaults(namespace):
     CACHEOPS_ENABLED = True,
     CACHEOPS_REDIS = {},
     CACHEOPS_DEFAULTS = {},
     CACHEOPS = {},
-    CACHEOPS_PREFIX = staticmethod(lambda query: '')
+    CACHEOPS_PREFIX = lambda query: ''
     CACHEOPS_LRU = False,
     CACHEOPS_DEGRADE_ON_FAILURE = False,
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache',
