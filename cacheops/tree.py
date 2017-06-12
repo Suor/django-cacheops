@@ -121,15 +121,12 @@ def dnfs(qs):
 
     def table_for(alias):
         if alias == main_alias:
-            return model._meta.db_table
+            return alias
         return qs.query.alias_map[alias].table_name
 
-    where = qs.query.where
-    model = qs.model
-    main_alias = model._meta.db_table
-
-    dnf = _dnf(where)
+    dnf = _dnf(qs.query.where)
     # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
+    main_alias = qs.model._meta.db_table
     aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
             | {main_alias} - {'django_content_type'}
     return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
