@@ -317,6 +317,13 @@ class QuerySetMixin(object):
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
+            #
+            # TODO: this checks are far from adequete, at least these are missed:
+            #       - settings.CACHEOPS_ENABLED
+            #       - self._for_write
+            #       - self._fields (values, values_list)
+            #       - annotations
+            #       - ...
             if self._cacheprofile['local_get']        \
                     and not args                      \
                     and not self.query.select_related \
