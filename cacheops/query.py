@@ -324,6 +324,7 @@ class QuerySetMixin(object):
             #       - self._fields (values, values_list)
             #       - annotations
             #       - ...
+            # TODO: don't distinguish between pk, pk__exaxt, id, id__exact
             if self._cacheprofile['local_get']        \
                     and not args                      \
                     and not self.query.select_related \
