@@ -3,7 +3,7 @@ import warnings
 from contextlib import contextmanager
 import six
 
-from funcy import decorator, identity, memoize
+from funcy import decorator, identity, memoize, LazyObject
 import redis
 
 from .conf import settings
@@ -77,26 +77,13 @@ class CacheopsRedis(redis.StrictRedis):
         self._unlock(keys=[key, signal_key])
 
 
-class LazyRedis(object):
-    def _setup(self):
-        # Allow client connection settings to be specified by a URL.
-        if isinstance(settings.CACHEOPS_REDIS, six.string_types):
-            client = CacheopsRedis.from_url(settings.CACHEOPS_REDIS)
-        else:
-            client = CacheopsRedis(**settings.CACHEOPS_REDIS)
-
-        object.__setattr__(self, '__class__', client.__class__)
-        object.__setattr__(self, '__dict__', client.__dict__)
-
-    def __getattr__(self, name):
-        self._setup()
-        return getattr(self, name)
-
-    def __setattr__(self, name, value):
-        self._setup()
-        return setattr(self, name, value)
-
-redis_client = LazyRedis()
+@LazyObject
+def redis_client():
+    # Allow client connection settings to be specified by a URL.
+    if isinstance(settings.CACHEOPS_REDIS, six.string_types):
+        return CacheopsRedis.from_url(settings.CACHEOPS_REDIS)
+    else:
+        return CacheopsRedis(**settings.CACHEOPS_REDIS)
 
 
 ### Lua script loader

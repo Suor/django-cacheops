@@ -65,8 +65,7 @@ def monkey_mix(cls, mixin):
     cls._no_monkey = MonkeyProxy()
 
     test = any_fn(inspect.isfunction, inspect.ismethoddescriptor)
-    # TODO: remove .copy() once funcy is updated to 1.8
-    methods = select_values(test, mixin.__dict__.copy())
+    methods = select_values(test, mixin.__dict__)
 
     for name, method in methods.items():
         if hasattr(cls, name):
