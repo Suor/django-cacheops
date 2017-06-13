@@ -28,10 +28,10 @@ setup(
     install_requires=[
         'django>=1.8',
         'redis>=2.9.1',
-        'funcy>=1.7.5,<2.0',
+        'funcy==1.8beta',
         'six>=1.4.0',
     ],
-
+    dependency_links=['https://github.com/Suor/funcy/tarball/master#egg=funcy-1.8beta'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
