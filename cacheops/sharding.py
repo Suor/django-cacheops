@@ -31,7 +31,6 @@ class PrefixQuery(object):
 
     @cached_property
     def tables(self):
-        # Not guaranteed to be unique
         return [table for table, _ in self._dnfs]
 
     @cached_property

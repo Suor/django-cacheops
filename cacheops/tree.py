@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import product
 # Use Python 2 map here for now
-from funcy.py2 import map, cat
+from funcy.py2 import map, cat, group_by
 
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
@@ -107,8 +107,8 @@ def dnfs(qs):
                 conds[attname] = value
         return conds.items()
 
-    def clean_dnf(tree, for_alias):
-        cleaned = [clean_conj(conj, for_alias) for conj in tree]
+    def clean_dnf(tree, aliases):
+        cleaned = [clean_conj(conj, alias) for conj in tree for alias in aliases]
         # Remove deleted conjunctions
         cleaned = [conj for conj in cleaned if conj is not None]
         # Any empty conjunction eats up the rest
@@ -129,4 +129,5 @@ def dnfs(qs):
     main_alias = qs.model._meta.db_table
     aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
             | {main_alias} - {'django_content_type'}
-    return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
+    tables = group_by(table_for, aliases)
+    return [(table, clean_dnf(dnf, table_aliases)) for table, table_aliases in tables.items()]
