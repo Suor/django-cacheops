@@ -124,6 +124,8 @@ def dnfs(qs):
             return alias
         return qs.query.alias_map[alias].table_name
 
+    # TODO: support Django 1.11 .union() and friends
+
     dnf = _dnf(qs.query.where)
     # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
     main_alias = qs.model._meta.db_table
