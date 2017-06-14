@@ -905,6 +905,10 @@ class SignalsTests(BaseTestCase):
         Category.objects.cache().get(id=test_model.id) # hit
         self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': True}])
 
+    def test_queryset_empty(self):
+        list(Category.objects.cache().filter(pk__in=[]))
+        self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
+
     def test_cached_as(self):
         get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
         func = get_calls.__wrapped__

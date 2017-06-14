@@ -266,7 +266,7 @@ class QuerySetMixin(object):
 
     def _fetch_all(self):
         # If already fetched, cache not enabled, within write or in dirty transaction then fall back
-        if self._result_cache \
+        if self._result_cache is not None \
                 or not settings.CACHEOPS_ENABLED \
                 or not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
                 or self._for_write \
