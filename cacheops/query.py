@@ -80,7 +80,7 @@ def cached_as(*samples, **kwargs):
         return queryset
 
     querysets = map(_get_queryset, samples)
-    dbs = {qs.db for qs in querysets}
+    dbs = list({qs.db for qs in querysets})
     cond_dnfs = mapcat(dnfs, querysets)
     key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
