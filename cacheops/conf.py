@@ -33,7 +33,7 @@ class Settings(object):
         return res
 
 settings = Settings()
-setting_changed.connect(lambda setting, **kw: settings.__dict__.pop(setting), weak=False)
+setting_changed.connect(lambda setting, **kw: settings.__dict__.pop(setting, None), weak=False)
 
 
 @memoize
