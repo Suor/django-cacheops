@@ -31,12 +31,11 @@ class PrefixQuery(object):
 
     @cached_property
     def tables(self):
-        return [table for table, _ in self._dnfs]
+        return [table for table, _ in self._cond_dnfs]
 
     @cached_property
     def table(self):
-        tables = list(set(self.tables))
-        if len(tables) > 1:
-            tables_str = ', '.join(tables)
+        if len(self.tables) > 1:
+            tables_str = ', '.join(self.tables)
             raise ImproperlyConfigured('Single table required, but several used: ' + tables_str)
-        return tables[0]
+        return self.tables[0]
