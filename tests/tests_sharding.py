@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.test import override_settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db import connections
 
 from .models import Category, Post
 from .tests import BaseTestCase
@@ -21,6 +22,11 @@ class PrefixTests(BaseTestCase):
     def test_db(self):
         with self.assertNumQueries(1):
             list(Category.objects.cache())
+
+        # HACK: This prevents initialization queries to break .assertNumQueries() in MySQL.
+        #       Also there is no .ensure_connection() in older Djangos, thus it's even uglier.
+        # TODO: remove in Django 1.10
+        connections['slave'].cursor().close()
 
         with self.assertNumQueries(1, using='slave'):
             list(Category.objects.cache().using('slave'))
