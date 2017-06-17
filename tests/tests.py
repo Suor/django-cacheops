@@ -155,6 +155,19 @@ class BasicTests(BaseTestCase):
             qs.first()
             qs.last()
 
+    def test_union(self):
+        qs = Post.objects.filter(category=1).values('id', 'title').union(
+                Category.objects.filter(title='Perl').values('id', 'title')).cache()
+        list(qs.clone())
+        # Invalidated
+        Category.objects.create(title='Perl')
+        with self.assertNumQueries(1):
+            list(qs.clone())
+        # Not invalidated
+        Category.objects.create(title='Ruby')
+        with self.assertNumQueries(0):
+            list(qs.clone())
+
 
 class ValuesTests(BaseTestCase):
     fixtures = ['basic']

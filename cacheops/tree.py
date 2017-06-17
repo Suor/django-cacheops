@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import product
 # Use Python 2 map here for now
-from funcy.py2 import map, cat, group_by
+from funcy.py2 import map, cat, mapcat, group_by
 
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
@@ -119,17 +119,22 @@ def dnfs(qs):
         # To keep all schemes the same we sort conjunctions
         return map(sorted, cleaned)
 
-    def table_for(alias):
-        if alias == main_alias:
-            return alias
-        return qs.query.alias_map[alias].table_name
+    def query_dnf(query):
+        def table_for(alias):
+            if alias in main_alias:
+                return alias
+            return query.alias_map[alias].table_name
 
-    # TODO: support Django 1.11 .union() and friends
+        dnf = _dnf(query.where)
 
-    dnf = _dnf(qs.query.where)
-    # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
-    main_alias = qs.model._meta.db_table
-    aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
-            | {main_alias} - {'django_content_type'}
-    tables = group_by(table_for, aliases)
-    return [(table, clean_dnf(dnf, table_aliases)) for table, table_aliases in tables.items()]
+        # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
+        main_alias = query.model._meta.db_table
+        aliases = {alias for alias, cnt in query.alias_refcount.items() if cnt} \
+                | {main_alias} - {'django_content_type'}
+        tables = group_by(table_for, aliases)
+        return [(table, clean_dnf(dnf, table_aliases)) for table, table_aliases in tables.items()]
+
+    if qs.query.combined_queries:
+        return mapcat(query_dnf, qs.query.combined_queries)
+    else:
+        return query_dnf(qs.query)
