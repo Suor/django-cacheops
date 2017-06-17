@@ -3,7 +3,7 @@ from django.test import override_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 
-from .models import Category, Post
+from .models import Category, Post, Extra
 from .tests import BaseTestCase
 
 
@@ -38,3 +38,12 @@ class PrefixTests(BaseTestCase):
 
         with self.assertRaises(ImproperlyConfigured):
             list(Post.objects.filter(category__title='Django').cache())
+
+    @override_settings(CACHEOPS_PREFIX=lambda q: q.table)
+    def test_self_join_tables(self):
+        list(Extra.objects.filter(to_tag__pk=1).cache())
+
+    @override_settings(CACHEOPS_PREFIX=lambda q: q.table)
+    def test_union_tables(self):
+        qs = Post.objects.filter(pk=1).union(Post.objects.filter(pk=2)).cache()
+        list(qs)

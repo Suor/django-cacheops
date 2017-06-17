@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import product
 # Use Python 2 map here for now
-from funcy.py2 import map, cat, mapcat, group_by
+from funcy.py2 import map, cat, group_by, join_with
 
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
@@ -132,9 +132,9 @@ def dnfs(qs):
         aliases = {alias for alias, cnt in query.alias_refcount.items() if cnt} \
                 | {main_alias} - {'django_content_type'}
         tables = group_by(table_for, aliases)
-        return [(table, clean_dnf(dnf, table_aliases)) for table, table_aliases in tables.items()]
+        return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
     if qs.query.combined_queries:
-        return mapcat(query_dnf, qs.query.combined_queries)
+        return join_with(cat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)

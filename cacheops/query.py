@@ -4,7 +4,7 @@ import json
 import threading
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
-from funcy.py2 import mapcat, map
+from funcy.py2 import map, imap, cat, join_with
 from .cross import pickle, md5
 
 import django
@@ -81,7 +81,7 @@ def cached_as(*samples, **kwargs):
 
     querysets = map(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
-    cond_dnfs = mapcat(dnfs, querysets)
+    cond_dnfs = join_with(cat, imap(dnfs, querysets))
     key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
     if not timeout:  # TODO: switch to is None on major release

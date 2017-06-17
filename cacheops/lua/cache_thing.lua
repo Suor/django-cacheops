@@ -30,9 +30,7 @@ end
 
 
 -- Update schemes and invalidators
-for _, disj_pair in ipairs(dnfs) do
-    local db_table = disj_pair[1]
-    local disj = disj_pair[2]
+for db_table, disj in pairs(dnfs) do
     for _, conj in ipairs(disj) do
         -- Ensure scheme is known
         redis.call('sadd', prefix .. 'schemes:' .. db_table, conj_schema(conj))

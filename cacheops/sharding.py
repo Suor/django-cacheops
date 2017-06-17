@@ -31,7 +31,7 @@ class PrefixQuery(object):
 
     @cached_property
     def tables(self):
-        return [table for table, _ in self._cond_dnfs]
+        return list(self._cond_dnfs)
 
     @cached_property
     def table(self):
