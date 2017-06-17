@@ -3,6 +3,7 @@ from itertools import product
 # Use Python 2 map here for now
 from funcy.py2 import map, cat, group_by, join_with
 
+import django
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -134,7 +135,7 @@ def dnfs(qs):
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
-    if qs.query.combined_queries:
+    if django.VERSION >= (1, 11) and qs.query.combined_queries:
         return join_with(cat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)

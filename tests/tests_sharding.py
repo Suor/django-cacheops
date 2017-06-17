@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import unittest
+
+import django
 from django.test import override_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
@@ -43,6 +46,7 @@ class PrefixTests(BaseTestCase):
     def test_self_join_tables(self):
         list(Extra.objects.filter(to_tag__pk=1).cache())
 
+    @unittest.skipIf(django.VERSION < (1, 11), 'Union added in Django 1.11')
     @override_settings(CACHEOPS_PREFIX=lambda q: q.table)
     def test_union_tables(self):
         qs = Post.objects.filter(pk=1).union(Post.objects.filter(pk=2)).cache()

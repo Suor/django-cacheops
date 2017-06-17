@@ -2,6 +2,7 @@
 import re
 import unittest
 
+import django
 from django.db import connection, connections
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -155,6 +156,7 @@ class BasicTests(BaseTestCase):
             qs.first()
             qs.last()
 
+    @unittest.skipIf(django.VERSION < (1, 11), 'Union added in Django 1.11')
     def test_union(self):
         qs = Post.objects.filter(category=1).values('id', 'title').union(
                 Category.objects.filter(title='Perl').values('id', 'title')).cache()
