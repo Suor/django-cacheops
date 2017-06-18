@@ -23,7 +23,7 @@ def invalidate_get():
 def do_get():
     Category.objects.cache().get(pk=1)
 
-def do_get_no_cache():
+def do_get_nocache():
     Category.objects.nocache().get(pk=1)
 
 
@@ -34,7 +34,7 @@ def invalidate_count():
 def do_count():
     Category.objects.cache().count()
 
-def do_count_no_cache():
+def do_count_nocache():
     Category.objects.nocache().count()
 
 
@@ -47,7 +47,7 @@ def invalidate_fetch():
 def do_fetch():
     list(Category.objects.cache().all())
 
-def do_fetch_no_cache():
+def do_fetch_nocache():
     list(Category.objects.nocache().all())
 
 def do_fetch_construct():
@@ -69,12 +69,25 @@ def do_common_inplace():
                    .filter(pk=1).exclude(title__contains='Hi').order_by('title')[:20]
 
 common_qs = do_common_construct()
+common_key = common_qs._cache_key()
+
 def do_common_cache_key():
     common_qs._cache_key()
 
 def do_common_dnfs():
     dnfs(common_qs)
 
+def do_common():
+    qs = Category.objects.filter(pk=1).exclude(title__contains='Hi').order_by('title').cache()[:20]
+    list(qs)
+
+def do_common_nocache():
+    qs = Category.objects.filter(pk=1).exclude(title__contains='Hi').order_by('title') \
+            .nocache()[:20]
+    list(qs)
+
+def invalidate_common():
+    redis_client.delete(common_key)
 
 def prepare_obj():
     return Category.objects.cache().get(pk=1)
@@ -149,16 +162,16 @@ TESTS = [
     ('pickle', {'run': do_pickle}),
     ('unpickle', {'run': do_unpickle}),
 
-    ('get_no_cache', {'run': do_get_no_cache}),
+    ('get_nocache', {'run': do_get_nocache}),
     ('get_hit', {'prepare_once': do_get, 'run': do_get}),
     ('get_miss', {'prepare': invalidate_get, 'run': do_get}),
 
-    ('count_no_cache', {'run': do_count_no_cache}),
+    ('count_nocache', {'run': do_count_nocache}),
     ('count_hit', {'prepare_once': do_count, 'run': do_count}),
     ('count_miss', {'prepare': invalidate_count, 'run': do_count}),
 
     ('fetch_construct', {'run': do_fetch_construct}),
-    ('fetch_no_cache', {'run': do_fetch_no_cache}),
+    ('fetch_nocache', {'run': do_fetch_nocache}),
     ('fetch_hit', {'prepare_once': do_fetch, 'run': do_fetch}),
     ('fetch_miss', {'prepare': invalidate_fetch, 'run': do_fetch}),
     ('fetch_cache_key', {'run': do_fetch_cache_key}),
@@ -168,6 +181,9 @@ TESTS = [
     ('common_inplace', {'run': do_common_inplace}),
     ('common_cache_key', {'run': do_common_cache_key}),
     ('common_dnfs', {'run': do_common_dnfs}),
+    ('common_nocache', {'run': do_common_nocache}),
+    ('common_hit', {'prepare_once': do_common, 'run': do_common}),
+    ('common_miss', {'prepare': invalidate_common, 'run': do_common}),
 
     ('invalidate_obj', {'prepare': prepare_obj, 'run': do_invalidate_obj}),
     ('save_obj', {'prepare': prepare_obj, 'run': do_save_obj}),
