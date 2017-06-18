@@ -594,6 +594,38 @@ on database queried. That could be changed with ``db_agnostic`` cache profile op
     }
 
 
+Sharing redis instance
+----------------------
+
+Cacheops provides a way to share a redis instance by adding prefix to cache keys:
+
+.. code:: python
+
+    CACHEOPS_PREFIX = lambda query: ...
+    # or
+    CACHEOPS_PREFIX = 'some.module.cacheops_prefix'
+
+A most common usage would probably be a prefix by host name:
+
+.. code:: python
+
+    # get_request() returns current request saved to threadlocal by some middleware
+    cacheops_prefix = lambda _: get_request().get_host()
+
+A ``query`` object passed to callback also enables reflection on used databases and tables:
+
+.. code:: python
+
+    def cacheops_prefix(query):
+        query.dbs    # A list of databases queried
+        query.tables # A list of tables query is invalidated on
+
+        if set(query.tables) <= HELPER_TABLES:
+            return 'helper:'
+        if query.tables == ['blog_post']:
+            return 'blog:'
+
+
 Using memory limit
 ------------------
 
