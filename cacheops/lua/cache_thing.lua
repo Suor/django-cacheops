@@ -10,10 +10,11 @@ redis.call('setex', key, timeout, data)
 
 
 -- A pair of funcs
+-- NOTE: we depend here on keys order being stable
 local conj_schema = function (conj)
     local parts = {}
-    for _, eq in ipairs(conj) do
-        table.insert(parts, eq[1])
+    for field, _ in pairs(conj) do
+        table.insert(parts, field)
     end
 
     return table.concat(parts, ',')
@@ -21,8 +22,8 @@ end
 
 local conj_cache_key = function (db_table, conj)
     local parts = {}
-    for _, eq in ipairs(conj) do
-        table.insert(parts, eq[1] .. '=' .. tostring(eq[2]))
+    for field, val in pairs(conj) do
+        table.insert(parts, field .. '=' .. tostring(val))
     end
 
     return prefix .. 'conj:' .. db_table .. ':' .. table.concat(parts, '&')

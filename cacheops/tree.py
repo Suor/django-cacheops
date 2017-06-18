@@ -106,7 +106,7 @@ def dnfs(qs):
                 if attname in conds and conds[attname] != value:
                     return None
                 conds[attname] = value
-        return conds.items()
+        return conds
 
     def clean_dnf(tree, aliases):
         cleaned = [clean_conj(conj, alias) for conj in tree for alias in aliases]
@@ -118,7 +118,7 @@ def dnfs(qs):
         if not all(cleaned):
             return [[]]
         # To keep all schemes the same we sort conjunctions
-        return map(sorted, cleaned)
+        return cleaned
 
     def query_dnf(query):
         def table_for(alias):
