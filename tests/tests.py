@@ -77,6 +77,13 @@ class BasicTests(BaseTestCase):
             changed_post = Post.objects.cache().get(pk=1)
             self.assertEqual(post.title, changed_post.title)
 
+    def test_granular(self):
+        Post.objects.cache().get(pk=1)
+        Post.objects.get(pk=2).save()
+
+        with self.assertNumQueries(0):
+            Post.objects.cache().get(pk=1)
+
     def test_invalidate_by_foreign_key(self):
         posts = list(Post.objects.cache().filter(category=1))
         Post.objects.create(title='New Post', category_id=1)
