@@ -177,6 +177,17 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(0):
             list(qs.clone())
 
+    def test_invalidated_update(self):
+        list(Post.objects.filter(category=1).cache())
+        list(Post.objects.filter(category=2).cache())
+
+        # Should invalidate both queries
+        Post.objects.filter(category=1).invalidated_update(category=2)
+
+        with self.assertNumQueries(2):
+            list(Post.objects.filter(category=1).cache())
+            list(Post.objects.filter(category=2).cache())
+
 
 class ValuesTests(BaseTestCase):
     fixtures = ['basic']

@@ -381,9 +381,10 @@ class QuerySetMixin(object):
         clone._for_write = True  # affects routing
 
         objects = list(clone)
-        rows = clone.update(**kwargs)  # Also drops queryset cache
+        rows = clone.update(**kwargs)
 
-        for obj in chain(objects, clone):
+        pks = {obj.pk for obj in objects}
+        for obj in chain(objects, self.model.objects.filter(pk__in=pks)):
             invalidate_obj(obj)
         return rows
 
