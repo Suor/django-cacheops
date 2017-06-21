@@ -886,6 +886,7 @@ class DbAgnosticTests(BaseTestCase):
 
         # HACK: This prevents initialization queries to break .assertNumQueries() in MySQL.
         #       Also there is no .ensure_connection() in older Djangos, thus it's even uglier.
+        # TODO: remove in Django 1.10
         connections['slave'].cursor().close()
 
         with self.assertNumQueries(1, using='slave'):
