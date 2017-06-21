@@ -281,8 +281,10 @@ class QuerySetMixin(object):
             if cache_data is not None:
                 self._result_cache = pickle.loads(cache_data)
             else:
-                # This thing appears in Django 1.9  and from in Django 1.11
-                # is used instead of .iterator() call
+                # This thing appears in Django 1.9.
+                # In Djangos 1.9 and 1.10 both calls mean the same.
+                # Starting from Django 1.11 .iterator() uses chunked fetch
+                # while ._fetch_all() stays with bare _iterable_class.
                 if hasattr(self, '_iterable_class'):
                     self._result_cache = list(self._iterable_class(self))
                 else:
