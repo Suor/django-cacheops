@@ -403,23 +403,22 @@ _old_objs = threading.local()
 class ManagerMixin(object):
     @once_per('cls')
     def _install_cacheops(self, cls):
-        if family_has_profile(cls):
-            # Set up signals
-            connect_first(pre_save, self._pre_save, sender=cls)
-            connect_first(post_save, self._post_save, sender=cls)
-            connect_first(post_delete, self._post_delete, sender=cls)
+        # Set up signals
+        connect_first(pre_save, self._pre_save, sender=cls)
+        connect_first(post_save, self._post_save, sender=cls)
+        connect_first(post_delete, self._post_delete, sender=cls)
 
-            # Install auto-created models as their module attributes to make them picklable
-            module = sys.modules[cls.__module__]
-            if not hasattr(module, cls.__name__):
-                setattr(module, cls.__name__, cls)
+        # Install auto-created models as their module attributes to make them picklable
+        module = sys.modules[cls.__module__]
+        if not hasattr(module, cls.__name__):
+            setattr(module, cls.__name__, cls)
 
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
         # Django migrations create lots of fake models, just skip them
         # NOTE: we make it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
-        if cls.__module__ != '__fake__':
+        if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
     def _pre_save(self, sender, instance, **kwargs):
@@ -546,7 +545,12 @@ def install_cacheops():
 
     # Install profile and signal handlers for any earlier created models
     for model in apps.get_models(include_auto_created=True):
-        model._default_manager._install_cacheops(model)
+        if family_has_profile(model):
+            if not isinstance(model._default_manager, Manager):
+                raise ImproperlyConfigured("Can't install cacheops for %s.%s model:"
+                                           " non-django model class or manager is used."
+                                            % (model._meta.app_label, model._meta.model_name))
+            model._default_manager._install_cacheops(model)
 
     # Turn off caching in admin
     if apps.is_installed('django.contrib.admin'):
