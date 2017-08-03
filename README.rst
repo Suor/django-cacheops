@@ -725,7 +725,7 @@ Writing a test for an issue you are experiencing can speed up its resolution a l
 Here is how you do that. I suppose you have some application code causing it.
 
 1. Make a fork.
-2. Install all from ``test_requirements.txt``.
+2. Install all from ``requirements-test.txt``.
 3. Ensure you can run tests with ``./run_tests.py``.
 4. Copy relevant models code to ``tests/models.py``.
 5. Go to ``tests/tests.py`` and paste code causing exception to ``IssueTests.test_{issue_number}``.
