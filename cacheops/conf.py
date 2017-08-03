@@ -12,15 +12,15 @@ ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
 
 
 class Defaults(namespace):
-    CACHEOPS_ENABLED = True,
-    CACHEOPS_REDIS = {},
-    CACHEOPS_DEFAULTS = {},
-    CACHEOPS = {},
+    CACHEOPS_ENABLED = True
+    CACHEOPS_REDIS = {}
+    CACHEOPS_DEFAULTS = {}
+    CACHEOPS = {}
     CACHEOPS_PREFIX = lambda query: ''
-    CACHEOPS_LRU = False,
-    CACHEOPS_DEGRADE_ON_FAILURE = False,
-    FILE_CACHE_DIR = '/tmp/cacheops_file_cache',
-    FILE_CACHE_TIMEOUT = 60*60*24*30,
+    CACHEOPS_LRU = False
+    CACHEOPS_DEGRADE_ON_FAILURE = False
+    FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
+    FILE_CACHE_TIMEOUT = 60*60*24*30
 
 
 class Settings(object):
