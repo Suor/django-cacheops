@@ -84,7 +84,7 @@ def cached_as(*samples, **kwargs):
     cond_dnfs = join_with(cat, imap(dnfs, querysets))
     key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
-    if not timeout:  # TODO: switch to is None on major release
+    if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
     if lock is None:
         lock = any(qs._cacheprofile['lock'] for qs in querysets)
