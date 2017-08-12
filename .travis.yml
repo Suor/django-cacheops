@@ -34,7 +34,6 @@ matrix:
     - python: 3.6
       env: TOXENV=py36-djmaster
   allow_failures:
-    - env: "TOXENV=pypy-dj111" # psycopg2cffi fails with db-side cursors
     - env: "TOXENV=py34-djmaster"
     - env: "TOXENV=py35-djmaster"
     - env: "TOXENV=py36-djmaster"
