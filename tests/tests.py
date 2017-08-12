@@ -401,7 +401,7 @@ class TemplateTests(BaseTestCase):
         qs = Post.objects.all()
         t = Template("""
             {% load cacheops %}
-            {% cached_as qs 0 'a' %}.{{ inc }}{% endcached_as %}
+            {% cached_as qs None 'a' %}.{{ inc }}{% endcached_as %}
             {% cached_as qs timeout=60 fragment_name='a' %}.{{ inc }}{% endcached_as %}
             {% cached_as qs fragment_name='a' timeout=60 %}.{{ inc }}{% endcached_as %}
         """)
