@@ -117,7 +117,6 @@ def dnfs(qs):
         #       just keep your querysets sane.
         if not all(cleaned):
             return [[]]
-        # To keep all schemes the same we sort conjunctions
         return cleaned
 
     def query_dnf(query):
