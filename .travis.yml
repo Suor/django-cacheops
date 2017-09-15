@@ -5,8 +5,7 @@ python: 3.5
 cache: pip
 services:
   - redis-server
-addons:
-  postgresql: "9.3"
+  - postgresql
 env:
   - TOXENV=lint
   - TOXENV=py27-dj18
