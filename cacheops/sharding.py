@@ -25,6 +25,7 @@ class PrefixQuery(object):
             raise ImproperlyConfigured('Single db required, but several used: ' + dbs_str)
         return self.dbs[0]
 
+    # TODO: think if I should expose it and how. Same for queryset.
     @cached_property
     def _cond_dnfs(self):
         return self._queryset._cond_dnfs
