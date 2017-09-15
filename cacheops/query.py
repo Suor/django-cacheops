@@ -326,6 +326,7 @@ class QuerySetMixin(object):
             #       - annotations
             #       - ...
             # TODO: don't distinguish between pk, pk__exaxt, id, id__exact
+            # TOOD: work with .filter(**kwargs).get() ?
             if self._cacheprofile['local_get']        \
                     and not args                      \
                     and not self.query.select_related \
@@ -384,6 +385,7 @@ class QuerySetMixin(object):
         objects = list(clone)
         rows = clone.update(**kwargs)
 
+        # TODO: do not refetch objects but update with kwargs in simple cases?
         pks = {obj.pk for obj in objects}
         for obj in chain(objects, self.model.objects.filter(pk__in=pks)):
             invalidate_obj(obj)
