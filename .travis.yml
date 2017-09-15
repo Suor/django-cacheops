@@ -1,5 +1,5 @@
 dist: trusty
-sudo: false
+sudo: required
 language: python
 python: 3.5
 virtualenv:
@@ -43,6 +43,9 @@ matrix:
 install:
   - pip install tox
 before_script:
+  # set up gis
+  - sudo apt-get install libgdal-dev
+  # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
   # postgis django backend requires these to exist
   - psql -U postgres -c "create database cacheops"
