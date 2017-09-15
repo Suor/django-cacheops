@@ -1,6 +1,9 @@
+dist: trusty
+sudo: false
 language: python
 python: 3.5
-sudo: false
+virtualenv:
+  system_site_packages: true
 cache: pip
 services:
   - redis-server
