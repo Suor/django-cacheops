@@ -1,5 +1,5 @@
-__version__ = '3.2.1'
-VERSION = tuple(__version__.split('.'))
+__version__ = '4.0'
+VERSION = tuple(map(int, __version__.split('.')))
 
 
 from django.apps import AppConfig

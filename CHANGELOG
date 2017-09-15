@@ -1,13 +1,16 @@
+4.0
 - added cache key prefix function
 - added .aggregate() caching
+- support QuerySet.union() and friends
 - added cache_invalidated signal (thx to Kimmo Kiiski)
 - cache .first() and .last() on 'get' op
+- correctly skip or show nice error message on non-django models/managers
 - allow cleaning file cache in non default place
 - cache keys no longer change on fields reorder
+- fixed .invalidated_update() on updated object versions
 - fixed template tags in Django 2.0
 - fixed deprecation warnings in Python 3
 - use module global CACHEOPS_DEBUG to cache evolving code
-? published key_func param and obj_key() helper
 - minor optimizations
 Backwards incompatible changes:
 - dropped Django 1.7 support
@@ -15,6 +18,8 @@ Backwards incompatible changes:
 - dropped implicit write_only in .get_or_create(), .select_for_update() and friends
 - .iterator() is never cached now
 - invalidate_all() works immediately even in transaction
+- @cached_as(timeout=0) no longer means timeout is ignored/derived from querysets,
+  user timeout=None instead.
 
 3.2.1
 - fixed CACHEOPS_DEGRADE_ON_FAILURE=True
