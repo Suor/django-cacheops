@@ -2,8 +2,6 @@ dist: trusty
 sudo: required
 language: python
 python: 3.5
-virtualenv:
-  system_site_packages: true
 cache: pip
 services:
   - redis-server
