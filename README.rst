@@ -449,6 +449,7 @@ First, it's safe against concurrent writes. Second, it's invalidation is done as
 you'll need to call this from crontab for that to work::
 
     /path/manage.py cleanfilecache
+    /path/manage.py cleanfilecache /path/to/non-default/cache/dir
 
 
 Django templates integration
