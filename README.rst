@@ -65,7 +65,8 @@ Setup redis connection and enable caching for desired models:
 
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
-        # This includes request.user or post.author access,
+        # This also includes .first() and .last() calls,
+        # as well as request.user or post.author access,
         # where Post.author is a foreign key to auth.User
         'auth.user': {'ops': 'get', 'timeout': 60*15},
 
