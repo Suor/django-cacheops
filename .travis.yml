@@ -7,6 +7,7 @@ services:
   - redis-server
   - postgresql
 addons:
+  postgresql: "9.6"
   apt:
     packages:
     - postgresql-9.6-postgis-2.3
@@ -48,6 +49,7 @@ before_script:
   # check gis
   - gdal-config --version
   - gdal-config --cflags
+  - psql -U postgres -c "create extension postgis"
   # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
   # postgis django backend requires these to exist
