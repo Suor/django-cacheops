@@ -1,11 +1,16 @@
 dist: trusty
-sudo: required
+sudo: false
 language: python
 python: 3.5
 cache: pip
 services:
   - redis-server
   - postgresql
+addons:
+  apt:
+    packages:
+    - postgresql-9.6-postgis-2.3
+    - libgdal-dev
 env:
   - TOXENV=lint
   - TOXENV=py27-dj18
@@ -40,8 +45,7 @@ matrix:
 install:
   - pip install tox
 before_script:
-  # set up gis
-  - sudo apt-get install libgdal-dev
+  # check gis
   - gdal-config --version
   - gdal-config --cflags
   # set up postgresql
