@@ -43,6 +43,8 @@ install:
 before_script:
   # set up gis
   - sudo apt-get install libgdal-dev
+  - gdal-config --version
+  - gdal-config --cflags
   # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
   # postgis django backend requires these to exist
