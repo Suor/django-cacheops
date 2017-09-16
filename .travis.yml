@@ -35,6 +35,8 @@ matrix:
   exclude:
     - python: 2.7
       env: DJANGO=master
+    - python: pypy
+      env: DJANGO=master
   allow_failures:
     - python: 3.4
       env: DJANGO=master
