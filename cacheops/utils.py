@@ -2,10 +2,11 @@
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any, any_fn, select_values
+from funcy import memoize, compose, wraps, any, any_fn, select_values, make_lookuper
 from funcy.py2 import mapcat
 from .cross import md5hex
 
+from django.apps import apps
 from django.db import models
 from django.http import HttpRequest
 
@@ -44,6 +45,11 @@ def model_family(model):
 @memoize
 def family_has_profile(cls):
     return any(model_profile, model_family(cls))
+
+
+@make_lookuper
+def table_to_model():
+    return {m._meta.db_table: m for m in apps.get_models(include_auto_created=True)}
 
 
 class MonkeyProxy(object):

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import product
 # Use Python 2 map here for now
-from funcy.py2 import map, cat, group_by, join_with
+from funcy.py2 import map, cat, group_by, join_with, izip_dicts
 
 import django
 from django.db.models.query import QuerySet
@@ -16,7 +16,7 @@ except ImportError:
     class EverythingNode(object):
         pass
 
-from .utils import NOT_SERIALIZED_FIELDS
+from .utils import family_has_profile, table_to_model, NOT_SERIALIZED_FIELDS
 
 
 LONG_DISJUNCTION = 8
@@ -129,7 +129,8 @@ def dnfs(qs):
 
         # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
         main_alias = query.model._meta.db_table
-        aliases = {alias for alias, cnt in query.alias_refcount.items() if cnt} \
+        aliases = {alias for alias, (join, cnt) in izip_dicts(query.alias_map, query.alias_refcount)
+                   if cnt and family_has_profile(table_to_model(join.table_name))} \
                 | {main_alias} - {'django_content_type'}
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
