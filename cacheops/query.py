@@ -553,6 +553,14 @@ def install_cacheops():
                                             % (model._meta.app_label, model._meta.model_name))
             model._default_manager._install_cacheops(model)
 
+            # Bind m2m changed handlers
+            m2ms = (f for f in model._meta.get_fields(include_hidden=True) if f.many_to_many)
+            for m2m in m2ms:
+                rel = getattr(m2m, 'rel', m2m)
+                opts = rel.through._meta
+                m2m_changed.connect(invalidate_m2m, sender=rel.through,
+                                    dispatch_uid=(opts.app_label, opts.model_name))
+
     # Turn off caching in admin
     if apps.is_installed('django.contrib.admin'):
         from django.contrib.admin.options import ModelAdmin
@@ -560,9 +568,6 @@ def install_cacheops():
         @monkey(ModelAdmin)
         def get_queryset(self, request):
             return get_queryset.original(self, request).nocache()
-
-    # Bind m2m changed handler
-    m2m_changed.connect(invalidate_m2m)
 
     # Make buffers/memoryviews pickleable to serialize binary field data
     if six.PY2:
