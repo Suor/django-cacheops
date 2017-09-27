@@ -6,7 +6,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.db.models.expressions import F, Expression
 
 from .conf import settings
-from .utils import non_proxy, NOT_SERIALIZED_FIELDS
+from .utils import NOT_SERIALIZED_FIELDS
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .signals import cache_invalidated
@@ -21,7 +21,7 @@ __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidat
 def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
-    model = non_proxy(model)
+    model = model._meta.concrete_model
     prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
     load_script('invalidate')(keys=[prefix], args=[
         model._meta.db_table,
@@ -34,7 +34,7 @@ def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
     """
     Invalidates caches that can possibly be influenced by object
     """
-    model = non_proxy(obj.__class__)
+    model = obj.__class__._meta.concrete_model
     invalidate_dict(model, get_obj_dict(model, obj), using=using)
 
 
@@ -48,7 +48,7 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     """
     if no_invalidation.active or not settings.CACHEOPS_ENABLED:
         return
-    model = non_proxy(model)
+    model = model._meta.concrete_model
     # NOTE: if we use sharding dependent on DNF then this will fail,
     #       which is ok, since it's hard/impossible to predict all the shards
     prefix = get_prefix(tables=[model._meta.db_table], dbs=[using])

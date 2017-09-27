@@ -22,14 +22,6 @@ NOT_SERIALIZED_FIELDS = (
 )
 
 
-@memoize
-def non_proxy(model):
-    while model._meta.proxy:
-        # Every proxy model has exactly one non abstract parent model
-        model = next(b for b in model.__bases__
-                       if issubclass(b, models.Model) and not b._meta.abstract)
-    return model
-
 def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
@@ -39,7 +31,7 @@ def model_family(model):
 
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
-    return class_tree(non_proxy(model))
+    return class_tree(model._meta.concrete_model)
 
 
 @memoize
