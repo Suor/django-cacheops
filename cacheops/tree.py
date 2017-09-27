@@ -121,7 +121,7 @@ def dnfs(qs):
 
     def query_dnf(query):
         def table_for(alias):
-            if alias in main_alias:
+            if alias == main_alias:
                 return alias
             return query.alias_map[alias].table_name
 
