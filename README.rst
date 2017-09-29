@@ -72,10 +72,10 @@ Setup redis connection and enable caching for desired models:
 
         # Automatically cache all gets and queryset fetches
         # to other django.contrib.auth models for an hour
-        'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
+        'auth.*': {'ops': {'fetch', 'get'}, 'timeout': 60*60},
 
         # Cache all queries to Permission
-        # 'all' is just an alias for {'get', 'fetch', 'count', 'aggregate', 'exists'}
+        # 'all' is an alias for {'get', 'fetch', 'count', 'aggregate', 'exists'}
         'auth.permission': {'ops': 'all', 'timeout': 60*60},
 
         # Enable manual caching on all other models with default timeout of an hour
