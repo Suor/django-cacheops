@@ -87,6 +87,9 @@ Setup redis connection and enable caching for desired models:
 
         # And since ops is empty by default you can rewrite last line as:
         '*.*': {'timeout': 60*60},
+
+        # NOTE: binding signals has its overhead, like preventing fast mass deletes,
+        #       you might want to only register whatever you cache and dependencies.
     }
 
 You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
