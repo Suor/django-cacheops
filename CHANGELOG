@@ -1,3 +1,7 @@
+4.0.1
+- do not prevent fast path deletes on not cached models
+- minor optimization
+
 4.0
 - added cache key prefix function
 - added .aggregate() caching
