@@ -21,30 +21,22 @@ env:
   - DJANGO=1.9
   - DJANGO=1.10
   - DJANGO=1.11
-  - DJANGO=master
 matrix:
   include:
     - python: 3.5
       env: TOXENV=lint
     - python: 3.3
       env: DJANGO=1.8
+    - python: 3.5
+      env: DJANGO=master
     - python: 3.6
       env: DJANGO=1.11
     - python: 3.6
       env: DJANGO=master
-  exclude:
-    - python: 2.7
-      env: DJANGO=master
-    - python: pypy
-      env: DJANGO=master
   allow_failures:
-    - python: 3.4
-      env: DJANGO=master
     - python: 3.5
       env: DJANGO=master
     - python: 3.6
-      env: DJANGO=master
-    - python: pypy
       env: DJANGO=master
 install:
   - pip install tox-travis
