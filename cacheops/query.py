@@ -554,9 +554,10 @@ def install_cacheops():
             model._default_manager._install_cacheops(model)
 
             # Bind m2m changed handlers
+            rel_attr = 'remote_field' if django.VERSION >= (1, 9) else 'rel'
             m2ms = (f for f in model._meta.get_fields(include_hidden=True) if f.many_to_many)
             for m2m in m2ms:
-                rel = getattr(m2m, 'rel', m2m)
+                rel = m2m if hasattr(m2m, 'through') else getattr(m2m, rel_attr, m2m)
                 opts = rel.through._meta
                 m2m_changed.connect(invalidate_m2m, sender=rel.through,
                                     dispatch_uid=(opts.app_label, opts.model_name))
