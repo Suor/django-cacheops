@@ -33,7 +33,7 @@ def bench_test(test):
     n = 1
     while total < 2:
         gc.disable()
-        durations = [bench_once(test, prepared) for i in range(n)]
+        durations = [bench_once(test, prepared) for _ in range(n)]
         gc.enable()
 
         if '1' in flags:
