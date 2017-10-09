@@ -3,7 +3,7 @@ import re
 import json
 import inspect
 from funcy import memoize, compose, wraps, any, any_fn, select_values, make_lookuper
-from funcy.py2 import mapcat
+from funcy.py3 import lmapcat
 from .cross import md5hex
 
 from django.apps import apps
@@ -27,7 +27,7 @@ def model_family(model):
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
     """
     def class_tree(cls):
-        return [cls] + mapcat(class_tree, cls.__subclasses__())
+        return [cls] + lmapcat(class_tree, cls.__subclasses__())
 
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.

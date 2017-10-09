@@ -4,7 +4,7 @@ import json
 import threading
 import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
-from funcy.py2 import map, imap, cat, join_with
+from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
 
 import django
@@ -79,9 +79,9 @@ def cached_as(*samples, **kwargs):
 
         return queryset
 
-    querysets = map(_get_queryset, samples)
+    querysets = lmap(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
-    cond_dnfs = join_with(cat, imap(dnfs, querysets))
+    cond_dnfs = join_with(lcat, map(dnfs, querysets))
     key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
     if timeout is None:

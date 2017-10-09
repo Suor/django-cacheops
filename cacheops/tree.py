@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from itertools import product
-# Use Python 2 map here for now
-from funcy.py2 import map, cat, group_by, join_with, izip_dicts
+from funcy import group_by, join_with
+from funcy.py3 import lcat, lmap, zip_dicts
 
 import django
 from django.db.models.query import QuerySet
@@ -77,7 +77,7 @@ def dnfs(qs):
         elif len(where) == 0:
             return [[]]
         else:
-            chilren_dnfs = map(_dnf, where.children)
+            chilren_dnfs = lmap(_dnf, where.children)
 
             if len(chilren_dnfs) == 0:
                 return [[]]
@@ -86,14 +86,14 @@ def dnfs(qs):
             else:
                 # Just unite children joined with OR
                 if where.connector == OR:
-                    result = cat(chilren_dnfs)
+                    result = lcat(chilren_dnfs)
                 # Use Cartesian product to AND children
                 else:
-                    result = map(cat, product(*chilren_dnfs))
+                    result = lmap(lcat, product(*chilren_dnfs))
 
             # Negating and expanding brackets
             if where.negated:
-                result = [map(negate, p) for p in product(*result)]
+                result = [lmap(negate, p) for p in product(*result)]
 
             return result
 
@@ -129,13 +129,13 @@ def dnfs(qs):
 
         # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
         main_alias = query.model._meta.db_table
-        aliases = {alias for alias, (join, cnt) in izip_dicts(query.alias_map, query.alias_refcount)
+        aliases = {alias for alias, (join, cnt) in zip_dicts(query.alias_map, query.alias_refcount)
                    if cnt and family_has_profile(table_to_model(join.table_name))} \
                 | {main_alias} - {'django_content_type'}
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
     if django.VERSION >= (1, 11) and qs.query.combined_queries:
-        return join_with(cat, (query_dnf(q) for q in qs.query.combined_queries))
+        return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)
