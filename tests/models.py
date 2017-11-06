@@ -110,10 +110,16 @@ class Weird(models.Model):
 #       - Other: DurationField
 if os.environ.get('CACHEOPS_DB') in {'postgresql', 'postgis'}:
     from django.contrib.postgres.fields import ArrayField
+    try:
+        from django.contrib.postgres.fields import JSONField
+    except ImportError:
+        JSONField = None
 
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
         tags = ArrayField(models.IntegerField())
+        if JSONField:
+            meta = JSONField()
 
 
 # 16

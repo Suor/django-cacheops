@@ -358,12 +358,16 @@ class WeirdTests(BaseTestCase):
 
 
 @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
-class ArrayTests(BaseTestCase):
-    def test_contains(self):
+class PostgresTests(BaseTestCase):
+    def test_array_contains(self):
         list(TaggedPost.objects.filter(tags__contains=[42]).cache())
 
-    def test_len(self):
+    def test_array_len(self):
         list(TaggedPost.objects.filter(tags__len=42).cache())
+
+    @unittest.skipIf(django.VERSION < (1, 9), "JSONField added in Django 1.9")
+    def test_json(self):
+        list(TaggedPost.objects.filter(meta__author='Suor'))
 
 
 class TemplateTests(BaseTestCase):
