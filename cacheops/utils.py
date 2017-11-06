@@ -9,7 +9,6 @@ from .cross import md5hex
 from django.apps import apps
 from django.db import models
 from django.http import HttpRequest
-from django.db.migrations.recorder import MigrationRecorder
 
 from .conf import model_profile
 
@@ -43,6 +42,7 @@ def family_has_profile(cls):
 @make_lookuper
 def table_to_model():
     d = {m._meta.db_table: m for m in apps.get_models(include_auto_created=True)}
+    from django.db.migrations.recorder import MigrationRecorder
     d['django_migrations'] = MigrationRecorder.Migration
     return d
 
