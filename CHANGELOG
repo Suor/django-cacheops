@@ -1,3 +1,6 @@
+4.0.2
+- fixed caching django migrations
+
 4.0.1
 - do not prevent fast path deletes on not cached models
 - minor optimization
