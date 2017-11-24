@@ -63,9 +63,13 @@ Setup redis connection and enable caching for desired models:
     # or with password (note a colon)
     CACHEOPS_REDIS = "redis://:password@localhost:6379/1"
 
-    # If you want to use sentinel, specify both variables
-    CACHEOPS_SENTINEL_REDIS_LOCATION = [('localhost', 26379)]
-    CACHEOPS_SENTINEL_SERVICE_NAME = 'mymaster'
+    # If you want to use sentinel, specify this variable
+    CACHEOPS_SENTINEL = {
+        'location': [('localhost', 26379)],  # sentinel location, required
+        'service_name': 'mymaster',          # sentinel service name, required
+        'socket_timeout': 0.1,               # connection timeout in seconds, optional
+        'db': 0                              # redis database, optional, default: 0
+    }
 
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
