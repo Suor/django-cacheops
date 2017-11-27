@@ -5,7 +5,7 @@ import six
 
 from funcy import decorator, identity, memoize, LazyObject
 import redis
-
+from redis.sentinel import Sentinel
 from .conf import settings
 
 
@@ -79,6 +79,18 @@ class CacheopsRedis(redis.StrictRedis):
 
 @LazyObject
 def redis_client():
+
+    if settings.CACHEOPS_SENTINEL and isinstance(settings.CACHEOPS_SENTINEL, dict):
+        sentinel = Sentinel(
+            settings.CACHEOPS_SENTINEL['location'],
+            socket_timeout=settings.CACHEOPS_SENTINEL.get('socket_timeout')
+        )
+        return sentinel.master_for(
+            settings.CACHEOPS_SENTINEL['service_name'],
+            redis_class=CacheopsRedis,
+            db=settings.CACHEOPS_SENTINEL.get('db') or 0
+        )
+
     # Allow client connection settings to be specified by a URL.
     if isinstance(settings.CACHEOPS_REDIS, six.string_types):
         return CacheopsRedis.from_url(settings.CACHEOPS_REDIS)
