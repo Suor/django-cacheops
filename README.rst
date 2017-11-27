@@ -65,10 +65,10 @@ Setup redis connection and enable caching for desired models:
 
     # If you want to use sentinel, specify this variable
     CACHEOPS_SENTINEL = {
-        'location': [('localhost', 26379)],  # sentinel location, required
+        'locations': [('localhost', 26379)], # sentinel locations, required
         'service_name': 'mymaster',          # sentinel service name, required
         'socket_timeout': 0.1,               # connection timeout in seconds, optional
-        'db': 0                              # redis database, optional, default: 0
+        'db': 0                              # redis database, default: 0
     }
 
     CACHEOPS = {

@@ -3,6 +3,8 @@ import warnings
 from contextlib import contextmanager
 import six
 
+from django.core.exceptions import ImproperlyConfigured
+
 from funcy import decorator, identity, memoize, LazyObject
 import redis
 from redis.sentinel import Sentinel
@@ -79,16 +81,19 @@ class CacheopsRedis(redis.StrictRedis):
 
 @LazyObject
 def redis_client():
+    if settings.CACHEOPS_REDIS and settings.CACHEOPS_SENTINEL:
+        raise ImproperlyConfigured("CACHEOPS_REDIS and CACHEOPS_SENTINEL are mutually exclusive")
 
-    if settings.CACHEOPS_SENTINEL and isinstance(settings.CACHEOPS_SENTINEL, dict):
-        sentinel = Sentinel(
-            settings.CACHEOPS_SENTINEL['location'],
-            socket_timeout=settings.CACHEOPS_SENTINEL.get('socket_timeout')
-        )
+    if settings.CACHEOPS_SENTINEL:
+        if not {'locations', 'service_name'} <= set(settings.CACHEOPS_SENTINEL):
+            raise ImproperlyConfigured("Specify locations and service_name for CACHEOPS_SENTINEL")
+
+        sentinel = Sentinel(settings.CACHEOPS_SENTINEL['locations'])
         return sentinel.master_for(
             settings.CACHEOPS_SENTINEL['service_name'],
             redis_class=CacheopsRedis,
-            db=settings.CACHEOPS_SENTINEL.get('db') or 0
+            db=settings.CACHEOPS_SENTINEL.get('db', 0),
+            socket_timeout=settings.CACHEOPS_SENTINEL.get('socket_timeout')
         )
 
     # Allow client connection settings to be specified by a URL.
