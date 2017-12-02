@@ -1,3 +1,6 @@
+4.0.3
+- configure via Sentinel (Tapo4ek)
+
 4.0.2
 - fixed caching django migrations
 
