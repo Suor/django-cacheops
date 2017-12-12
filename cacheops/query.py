@@ -577,3 +577,11 @@ def install_cacheops():
     if six.PY3:
         import copyreg
         copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
+
+    # Fix random ordered dict keys producing different SQL for same QuerySet
+    if (3, 3) <= sys.version_info < (3, 6):
+        from django.db.models.query_utils import Q
+
+        def Q__init__(self, *args, **kwargs):
+            super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
+        Q.__init__ = Q__init__
