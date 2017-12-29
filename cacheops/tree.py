@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from itertools import product
-from funcy import group_by, join_with
-from funcy.py3 import lcat, lmap, zip_dicts
+from funcy import group_by, join_with, make_lookuper
+from funcy.py3 import lcat, lmap
 
 import django
+from django.apps import apps
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -16,7 +17,7 @@ except ImportError:
     class EverythingNode(object):
         pass
 
-from .utils import family_has_profile, table_to_model, NOT_SERIALIZED_FIELDS
+from .utils import family_has_profile, NOT_SERIALIZED_FIELDS
 
 
 LONG_DISJUNCTION = 8
@@ -127,8 +128,8 @@ def dnfs(qs):
 
         # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
         main_alias = query.model._meta.db_table
-        aliases = {alias for alias, (join, cnt) in zip_dicts(query.alias_map, query.alias_refcount)
-                   if cnt and family_has_profile(table_to_model(join.table_name))} \
+        aliases = {alias for alias, join in query.alias_map.items()
+                   if query.alias_refcount[alias] and table_tracked(join.table_name)} \
                 | {main_alias} - {'django_content_type'}
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
@@ -137,3 +138,21 @@ def dnfs(qs):
         return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)
+
+
+def table_tracked(table):
+    # If not all apps and models are populated then we don't know.
+    # Solution: assume that everything is tracked.
+    # Leads to some small non-growing amount of junk never fired invalidators.
+    if not apps.ready:
+        return True
+    return family_has_profile(table_to_model(table))
+
+
+@make_lookuper
+def table_to_model():
+    assert apps.ready
+    d = {m._meta.db_table: m for m in apps.get_models(include_auto_created=True)}
+    from django.db.migrations.recorder import MigrationRecorder
+    d['django_migrations'] = MigrationRecorder.Migration
+    return d
