@@ -319,7 +319,7 @@ class QuerySetMixin(object):
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
             #
-            # TODO: this checks are far from adequete, at least these are missed:
+            # TODO: this checks are far from adequate, at least these are missed:
             #       - settings.CACHEOPS_ENABLED
             #       - self._for_write
             #       - self._fields (values, values_list)
@@ -582,6 +582,6 @@ def install_cacheops():
     if (3, 3) <= sys.version_info < (3, 6):
         from django.db.models.query_utils import Q
 
-        def Q__init__(self, *args, **kwargs):
+        def Q__init__(self, *args, **kwargs):  # noqa
             super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
         Q.__init__ = Q__init__
