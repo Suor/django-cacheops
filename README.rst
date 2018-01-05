@@ -574,7 +574,7 @@ Cacheops transparently supports transactions. This is implemented by following s
 
 3. Savepoints and rollbacks are also handled appropriately.
 
-Mind that simple and file cache doesn't turn itself off in transactions but works as usual.
+Mind that simple and file cache don't turn itself off in transactions but work as usual.
 
 
 Dog-pile effect prevention
@@ -704,7 +704,7 @@ cache too much when update conditions are orthogonal to most queries conditions,
 see, however, `.invalidated_update()`. 8 is postponed until it will gain
 more interest or a champion willing to implement it emerges.
 
-All unsupported things could still be used easily enough with the help of `@cached_as()`.
+All unsupported things could still be used easily enough with the help of ``@cached_as()``.
 
 
 Performance tips
