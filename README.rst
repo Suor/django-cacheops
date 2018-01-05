@@ -481,7 +481,7 @@ and ``@cached`` decorators, however, they require explicit naming of each fragme
         ... some template code ...
     {% endcached %}
 
-You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
+You can use ``None`` for timeout in ``@cached_as`` to use it's default value for model.
 
 To invalidate cached fragment use:
 
