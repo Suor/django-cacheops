@@ -21,6 +21,9 @@ NOT_SERIALIZED_FIELDS = (
 )
 
 
+def get_concrete_model(model):
+    return next(b for b in model.__mro__ if issubclass(b, models.Model) and not b._meta.abstract)
+
 def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
@@ -30,7 +33,9 @@ def model_family(model):
 
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
-    return class_tree(model._meta.concrete_model)
+    # NOTE: when this is called in Manager.contribute_to_class()
+    #       ._meta.concrete_model might still be None
+    return class_tree(model._meta.concrete_model or get_concrete_model(model))
 
 
 @memoize
