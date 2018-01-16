@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from itertools import product
-from funcy import group_by, join_with, make_lookuper
+from funcy import group_by, join_with, memoize, any
 from funcy.py3 import lcat, lmap
 
 import django
@@ -17,7 +17,7 @@ except ImportError:
     class EverythingNode(object):
         pass
 
-from .utils import family_has_profile, NOT_SERIALIZED_FIELDS
+from .utils import model_profile, NOT_SERIALIZED_FIELDS
 
 
 LONG_DISJUNCTION = 8
@@ -140,19 +140,10 @@ def dnfs(qs):
         return query_dnf(qs.query)
 
 
+@memoize
 def table_tracked(table):
-    # If not all apps and models are populated then we don't know.
-    # Solution: assume that everything is tracked.
-    # Leads to some small non-growing amount of junk never fired invalidators.
-    if not apps.ready:
-        return True
-    return family_has_profile(table_to_model(table))
-
-
-@make_lookuper
-def table_to_model():
-    assert apps.ready
-    d = {m._meta.db_table: m for m in apps.get_models(include_auto_created=True)}
-    from django.db.migrations.recorder import MigrationRecorder
-    d['django_migrations'] = MigrationRecorder.Migration
-    return d
+    models = [m for m in apps.get_models(include_auto_created=True) if m._meta.db_table == table]
+    # Unknown table, track it to be safe
+    if not models:
+        raise memoize.skip(True)
+    return any(model_profile, models)
