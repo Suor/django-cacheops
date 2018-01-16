@@ -256,11 +256,11 @@ class QuerySetMixin(object):
                 return self
 
         def clone(self, klass=None, setup=False, **kwargs):
-            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
-                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
-
             clone = self._no_monkey._clone(self, klass, setup, **kwargs)
             clone._cloning = self._cloning - 1 if self._cloning else 0
+            # NOTE: need to copy profile so that clone changes won't affect this queryset
+            if self.__dict__.get('_cacheprofile'):
+                clone._cacheprofile = self._cacheprofile.copy()
             return clone
 
     def _fetch_all(self):
