@@ -414,6 +414,7 @@ class ManagerMixin(object):
         if not hasattr(module, cls.__name__):
             setattr(module, cls.__name__, cls)
 
+    # TODO: check if this is still needed
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
         # Django migrations create lots of fake models, just skip them
