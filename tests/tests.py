@@ -560,6 +560,32 @@ class IssueTests(BaseTestCase):
     def test_232(self):
         list(Post.objects.cache().filter(category__in=[None, 1]).filter(category=1))
 
+    def test_265(self):
+        # Databases must have different structure, so exception other then DoesNotExist would be raised
+        # Let's delete tests_category from default database
+        # And try working with it in slave database with using
+        connection.cursor().execute("DROP TABLE tests_category;")
+
+        # Works fine
+        c = Category.objects.db_manager('slave').create(title='test_265')
+        self.assertTrue(Category.objects.using('slave').filter(title='test_265').exists())
+
+        # Fails with "no such table: tests_category"
+        # Fixed by adding .using(instance._state.db) in query.ManagerMixin._pre_save() method
+        c.title = 'test_265_1'
+        c.save()
+        self.assertTrue(Category.objects.using('slave').filter(title='test_265_1').exists())
+
+        # This also didn't work before fix above. Test that it works.
+        c.title = 'test_265_2'
+        c.save(using='slave')
+        self.assertTrue(Category.objects.using('slave').filter(title='test_265_2').exists())
+
+        # Same bug in other method
+        # Fixed by adding .using(self._db) in query.QuerySetMixin.invalidated_update() method
+        Category.objects.using('slave').invalidated_update(title='test_265_3')
+        self.assertTrue(Category.objects.using('slave').filter(title='test_265_3').exists())
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
