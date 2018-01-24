@@ -576,6 +576,7 @@ class IssueTests(BaseTestCase):
         c.save()
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_1').exists())
 
+
         # This also didn't work before fix above. Test that it works.
         c.title = 'test_265_2'
         c.save(using='slave')
