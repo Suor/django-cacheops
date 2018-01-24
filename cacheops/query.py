@@ -387,7 +387,7 @@ class QuerySetMixin(object):
 
         # TODO: do not refetch objects but update with kwargs in simple cases?
         pks = {obj.pk for obj in objects}
-        for obj in chain(objects, self.model.objects.filter(pk__in=pks)):
+        for obj in chain(objects, self.model.objects.filter(pk__in=pks).using(self._db)):
             invalidate_obj(obj)
         return rows
 
@@ -426,7 +426,7 @@ class ManagerMixin(object):
     def _pre_save(self, sender, instance, **kwargs):
         if not (instance.pk is None or instance._state.adding or no_invalidation.active):
             try:
-                _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
+                _old_objs.__dict__[sender, instance.pk] = sender.objects.using(instance._state.db).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
