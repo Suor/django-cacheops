@@ -562,10 +562,11 @@ class IssueTests(BaseTestCase):
 
     @unittest.skipIf(connection.vendor == 'mysql', 'In MySQL DDL is not transaction safe')
     def test_265(self):
-        # Databases must have different structure, so exception other then DoesNotExist would be raised
+        # Databases must have different structure,
+        # so exception other then DoesNotExist would be raised.
         # Let's delete tests_video from default database
-        # And try working with it in slave database with using
-        # Table is not restored automatically in MySQL, so I disabled this test in MySQL
+        # and try working with it in slave database with using.
+        # Table is not restored automatically in MySQL, so I disabled this test in MySQL.
         connection.cursor().execute("DROP TABLE tests_video;")
 
         # Works fine
@@ -577,7 +578,6 @@ class IssueTests(BaseTestCase):
         c.title = 'test_265_1'
         c.save()
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_1').exists())
-
 
         # This also didn't work before fix above. Test that it works.
         c.title = 'test_265_2'
