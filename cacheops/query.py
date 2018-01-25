@@ -426,7 +426,8 @@ class ManagerMixin(object):
     def _pre_save(self, sender, instance, **kwargs):
         if not (instance.pk is None or instance._state.adding or no_invalidation.active):
             try:
-                _old_objs.__dict__[sender, instance.pk] = sender.objects.using(instance._state.db).get(pk=instance.pk)
+                _old_objs.__dict__[sender, instance.pk] = sender.objects.\
+                    using(instance._state.db).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
