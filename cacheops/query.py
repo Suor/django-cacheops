@@ -387,7 +387,7 @@ class QuerySetMixin(object):
 
         # TODO: do not refetch objects but update with kwargs in simple cases?
         pks = {obj.pk for obj in objects}
-        for obj in chain(objects, self.model.objects.filter(pk__in=pks).using(self._db)):
+        for obj in chain(objects, self.model.objects.filter(pk__in=pks).using(clone.db)):
             invalidate_obj(obj)
         return rows
 
