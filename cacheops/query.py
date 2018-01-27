@@ -386,8 +386,11 @@ class QuerySetMixin(object):
         rows = clone.update(**kwargs)
 
         # TODO: do not refetch objects but update with kwargs in simple cases?
+        # We use clone database to fetch new states, as this is the db they were written to.
+        # Using router with new_objects may fail, using self may return slave during lag.
         pks = {obj.pk for obj in objects}
-        for obj in chain(objects, self.model.objects.filter(pk__in=pks).using(clone.db)):
+        new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+        for obj in chain(objects, new_objects):
             invalidate_obj(obj)
         return rows
 
