@@ -1,3 +1,10 @@
+4.0.5
+- fixed db selection in invalidation fetch and .invalidated_update() when router fails (M1ha Shvn)
+- fixed unlickely "_clone() unexpected keyword '_cacheprofile'" error
+- fixed LookupError bug
+- fixed .meta.concrete_model not set bug
+- fixed docs on template tags
+
 4.0.4
 - fixed caching while app registry not ready
 - fixed random ordered dicts producing varying SQL for same query
