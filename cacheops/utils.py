@@ -148,6 +148,7 @@ NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
 SPACE_BETWEEN_TAGS = mark_safe('> <')
 
 def carefully_strip_whitespace(text):
-    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
-    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
+    def repl(m):
+        return NEWLINE_BETWEEN_TAGS if '\n' in m.group(0) else SPACE_BETWEEN_TAGS
+    text = re.sub(r'>\s{2,}<', repl, text)
     return text
