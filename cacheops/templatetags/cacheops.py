@@ -1,6 +1,6 @@
 from __future__ import absolute_import
-import inspect
 from functools import partial
+from ..cross import getargspec
 
 # NOTE: moved in Django 1.9
 try:
@@ -12,6 +12,16 @@ except ImportError:
         def __init__(self, func, takes_context, args, kwargs):
             _TagHelperNode.__init__(self, takes_context, args, kwargs)
             self.func = func
+
+# Fix Django 2.0 parse_bits being too smart
+import django
+if django.VERSION >= (2, 0):
+    _parse_bits = parse_bits
+
+    def parse_bits(parser, bits, params, varargs, varkw, defaults,
+                   takes_context=None, name=None):
+        return _parse_bits(parser, bits, params, varargs, varkw, defaults, (), (),
+                           takes_context=takes_context, name=name)
 
 from django.template import Library
 
@@ -28,7 +38,7 @@ class CacheopsLibrary(Library):
             return partial(self.decorator_tag, takes_context=takes_context)
 
         name = func.__name__
-        params, varargs, varkw, defaults = inspect.getargspec(func)
+        params, varargs, varkw, defaults = getargspec(func)
 
         def _compile(parser, token):
             # content

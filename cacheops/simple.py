@@ -73,6 +73,8 @@ class BaseCache(object):
         return decorator
 
     def cached_view(self, timeout=None, extra=None):
+        if callable(timeout):
+            return self.cached_view()(timeout)
         return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
-import os, time, gc, sys
+import os, time, gc, sys, shutil
 from funcy import re_tester
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
@@ -33,7 +33,7 @@ def bench_test(test):
     n = 1
     while total < 2:
         gc.disable()
-        durations = [bench_once(test, prepared) for i in range(n)]
+        durations = [bench_once(test, prepared) for _ in range(n)]
         gc.enable()
 
         if '1' in flags:
@@ -64,12 +64,8 @@ from django.core.management import call_command
 
 django.setup()
 
-# Create a test database.
-db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)
-# Import the fixture data into the test database.
-call_command('loaddata', *fixtures, **{'verbosity': verbosity})
 
-
+# Parse command line arguments
 flags = ''.join(arg[1:] for arg in sys.argv[1:] if arg.startswith('-'))
 args = [arg for arg in sys.argv[1:] if not arg.startswith('-')]
 selector = args[0] if args else ''
@@ -78,8 +74,15 @@ select = selector[1:].__eq__ if selector.startswith('=') else re_tester(selector
 if 'p' in flags:
     from profilehooks import profile
 
-from tests.bench import TESTS
+
+db_name = None
 try:
+    shutil.rmtree('tests/migrations', True)
+    call_command('makemigrations', 'tests', verbosity=0)
+    db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)
+    call_command('loaddata', *fixtures, **{'verbosity': verbosity})
+
+    from tests.bench import TESTS  # import is here because it executes queries
     if selector:
         tests = [(name, test) for name, test in TESTS if select(name)]
     else:
@@ -87,5 +90,7 @@ try:
     run_benchmarks(tests)
 except KeyboardInterrupt:
     pass
-
-connection.creation.destroy_test_db(db_name, verbosity=verbosity)
+finally:
+    if db_name:
+        connection.creation.destroy_test_db(db_name, verbosity=verbosity)
+    shutil.rmtree('tests/migrations')

@@ -1,41 +1,55 @@
-language: python
-python: 3.5
+dist: trusty
 sudo: false
+language: python
 cache: pip
 services:
   - redis-server
+  - postgresql
 addons:
-  postgresql: "9.3"
+  postgresql: "9.6"
+  apt:
+    packages:
+    - postgresql-9.6-postgis-2.3
+    - libgdal-dev
+python:
+  - 2.7
+  - 3.4
+  - 3.5
+  - pypy
 env:
-  - TOXENV=lint
-  - TOXENV=py27-dj17
-  - TOXENV=py27-dj18
-  - TOXENV=py27-dj19
-  - TOXENV=py27-dj110
-  - TOXENV=py27-djmaster
-  - TOXENV=py33-dj17
-  - TOXENV=py33-dj18
-  - TOXENV=py34-dj17
-  - TOXENV=py34-dj18
-  - TOXENV=py34-dj19
-  - TOXENV=py34-dj110
-  - TOXENV=py34-djmaster
-  - TOXENV=py35-dj18
-  - TOXENV=py35-dj19
-  - TOXENV=py35-dj110
-  - TOXENV=py35-djmaster
-  - TOXENV=pypy-dj17
-  - TOXENV=pypy-dj18
-  - TOXENV=pypy-dj19
-  - TOXENV=pypy-dj110
+  - DJANGO=1.8
+  - DJANGO=1.9
+  - DJANGO=1.10
+  - DJANGO=1.11
 matrix:
+  include:
+    - python: 3.5
+      env: TOXENV=lint
+    - python: 3.3
+      env: DJANGO=1.8
+    - python: 3.5
+      env: DJANGO=2.0
+    - python: 3.5
+      env: DJANGO=master
+    - python: 3.6
+      env: DJANGO=1.11
+    - python: 3.6
+      env: DJANGO=2.0
+    - python: 3.6
+      env: DJANGO=master
   allow_failures:
-    - env: "TOXENV=py27-djmaster"
-    - env: "TOXENV=py34-djmaster"
-    - env: "TOXENV=py35-djmaster"
+    - python: 3.5
+      env: DJANGO=master
+    - python: 3.6
+      env: DJANGO=master
 install:
-  - pip install tox
+  - pip install tox-travis
 before_script:
+  # check gis
+  - gdal-config --version
+  - gdal-config --cflags
+  - psql -U postgres -c "create extension postgis"
+  # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
   # postgis django backend requires these to exist
   - psql -U postgres -c "create database cacheops"
@@ -46,4 +60,4 @@ before_script:
   - mysql -e "create database cacheops"
   - mysql -e "create database cacheops_slave"
 script:
-  - tox
+  - GDAL_VERSION=1.10 tox

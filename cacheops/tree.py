@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from itertools import product
-# Use Python 2 map here for now
-from funcy.py2 import map, cat
+from funcy import group_by, join_with, memoize, any
+from funcy.py3 import lcat, lmap
 
+import django
+from django.apps import apps
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -14,20 +16,8 @@ try:
 except ImportError:
     class EverythingNode(object):
         pass
-# This thing existed in Django 1.7 and earlier
-try:
-    from django.db.models.sql.expressions import SQLEvaluator
-except ImportError:
-    class SQLEvaluator(object):
-        pass
-# A new thing in Django 1.8
-try:
-    from django.db.models.sql.datastructures import Join
-except ImportError:
-    class Join(object):
-        pass
 
-from .utils import NOT_SERIALIZED_FIELDS
+from .utils import model_profile, NOT_SERIALIZED_FIELDS
 
 
 LONG_DISJUNCTION = 8
@@ -62,7 +52,7 @@ def dnfs(qs):
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE
             # Don't bother with complex right hand side either
-            if isinstance(where.rhs, (QuerySet, Query, SQLEvaluator)):
+            if isinstance(where.rhs, (QuerySet, Query)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
@@ -86,7 +76,7 @@ def dnfs(qs):
         elif len(where) == 0:
             return [[]]
         else:
-            chilren_dnfs = map(_dnf, where.children)
+            chilren_dnfs = lmap(_dnf, where.children)
 
             if len(chilren_dnfs) == 0:
                 return [[]]
@@ -95,51 +85,65 @@ def dnfs(qs):
             else:
                 # Just unite children joined with OR
                 if where.connector == OR:
-                    result = cat(chilren_dnfs)
+                    result = lcat(chilren_dnfs)
                 # Use Cartesian product to AND children
                 else:
-                    result = map(cat, product(*chilren_dnfs))
+                    result = lmap(lcat, product(*chilren_dnfs))
 
             # Negating and expanding brackets
             if where.negated:
-                result = [map(negate, p) for p in product(*result)]
+                result = [lmap(negate, p) for p in product(*result)]
 
             return result
 
     def clean_conj(conj, for_alias):
-        # "SOME" conds, negated conds and conds for other aliases should be stripped
-        return [(attname, value) for alias, attname, value, negation in conj
-                                 if value is not SOME and negation and alias == for_alias]
+        conds = {}
+        for alias, attname, value, negation in conj:
+            # "SOME" conds, negated conds and conds for other aliases should be stripped
+            if value is not SOME and negation and alias == for_alias:
+                # Conjs with fields eq 2 different values will never cause invalidation
+                if attname in conds and conds[attname] != value:
+                    return None
+                conds[attname] = value
+        return conds
 
-    def clean_dnf(tree, for_alias):
-        cleaned = [clean_conj(conj, for_alias) for conj in tree]
+    def clean_dnf(tree, aliases):
+        cleaned = [clean_conj(conj, alias) for conj in tree for alias in aliases]
+        # Remove deleted conjunctions
+        cleaned = [conj for conj in cleaned if conj is not None]
         # Any empty conjunction eats up the rest
         # NOTE: a more elaborate DNF reduction is not really needed,
         #       just keep your querysets sane.
         if not all(cleaned):
             return [[]]
-        # To keep all schemes the same we sort conjunctions
-        return map(sorted, cleaned)
+        return cleaned
 
-    def table_for(alias):
-        if alias == main_alias:
-            return model._meta.db_table
-        # Django 1.7 and earlier used tuples to encode joins
-        join = qs.query.alias_map[alias]
-        return join.table_name if isinstance(join, Join) else join[0]
+    def query_dnf(query):
+        def table_for(alias):
+            if alias == main_alias:
+                return alias
+            return query.alias_map[alias].table_name
 
-    where = qs.query.where
-    model = qs.model
-    main_alias = model._meta.db_table
+        dnf = _dnf(query.where)
 
-    dnf = _dnf(where)
-    # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
-    aliases = {alias for alias, cnt in qs.query.alias_refcount.items() if cnt} \
-            | {main_alias} - {'django_content_type'}
-    return [(table_for(alias), clean_dnf(dnf, alias)) for alias in aliases]
+        # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
+        main_alias = query.model._meta.db_table
+        aliases = {alias for alias, join in query.alias_map.items()
+                   if query.alias_refcount[alias] and table_tracked(join.table_name)} \
+                | {main_alias} - {'django_content_type'}
+        tables = group_by(table_for, aliases)
+        return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
+
+    if django.VERSION >= (1, 11) and qs.query.combined_queries:
+        return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
+    else:
+        return query_dnf(qs.query)
 
 
-def attname_of(model, col, cache={}):
-    if model not in cache:
-        cache[model] = {f.db_column: f.attname for f in model._meta.fields}
-    return cache[model].get(col, col)
+@memoize
+def table_tracked(table):
+    models = [m for m in apps.get_models(include_auto_created=True) if m._meta.db_table == table]
+    # Unknown table, track it to be safe
+    if not models:
+        raise memoize.skip(True)
+    return any(model_profile, models)

@@ -10,16 +10,16 @@ filesystem for simple time-invalidated one.
 And there is more to it:
 
 - decorators to cache any user function or view as a queryset or by time
-- extensions for django and jinja2 templates to cache template fragments as querysets or by time
-- concurrent file cache with a decorator
+- extensions for django and jinja2 templates
+- transparent transaction support
+- dog-pile prevention mechanism
 - a couple of hacks to make django faster
 
 
 Requirements
 ------------
 
-| Python 2.7 or 3.3+, Django 1.7+ and Redis 2.6+.
-| **Note:** use cacheops 2.4.3 for older Djangos and Python.
+| Python 2.7 or 3.3+, Django 1.8+ and Redis 2.6+.
 
 
 Installation
@@ -32,7 +32,7 @@ Using pip::
 Or you can get latest one from github::
 
     $ git clone git://github.com/Suor/django-cacheops.git
-    $ ln -s `pwd`/django-cacheops/cacheops/ /somewhere/on/python/path/
+    $ pip install -e django-cacheops
 
 
 Setup
@@ -63,18 +63,27 @@ Setup redis connection and enable caching for desired models:
     # or with password (note a colon)
     CACHEOPS_REDIS = "redis://:password@localhost:6379/1"
 
+    # If you want to use sentinel, specify this variable
+    CACHEOPS_SENTINEL = {
+        'locations': [('localhost', 26379)], # sentinel locations, required
+        'service_name': 'mymaster',          # sentinel service name, required
+        'socket_timeout': 0.1,               # connection timeout in seconds, optional
+        'db': 0                              # redis database, default: 0
+    }
+
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
-        # This includes request.user or post.author access,
+        # This also includes .first() and .last() calls,
+        # as well as request.user or post.author access,
         # where Post.author is a foreign key to auth.User
         'auth.user': {'ops': 'get', 'timeout': 60*15},
 
         # Automatically cache all gets and queryset fetches
         # to other django.contrib.auth models for an hour
-        'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
+        'auth.*': {'ops': {'fetch', 'get'}, 'timeout': 60*60},
 
-        # Cache gets, fetches, counts and exists to Permission
-        # 'all' is just an alias for ('get', 'fetch', 'count', 'exists')
+        # Cache all queries to Permission
+        # 'all' is an alias for {'get', 'fetch', 'count', 'aggregate', 'exists'}
         'auth.permission': {'ops': 'all', 'timeout': 60*60},
 
         # Enable manual caching on all other models with default timeout of an hour
@@ -86,6 +95,9 @@ Setup redis connection and enable caching for desired models:
 
         # And since ops is empty by default you can rewrite last line as:
         '*.*': {'timeout': 60*60},
+
+        # NOTE: binding signals has its overhead, like preventing fast mass deletes,
+        #       you might want to only register whatever you cache and dependencies.
     }
 
 You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
@@ -159,8 +171,8 @@ Here you can specify which ops should be cached for queryset, for example, this 
 
 
 will cache count call in ``Paginator`` but not later articles fetch.
-There are four possible actions - ``get``, ``fetch``, ``count`` and ``exists``. You can
-pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
+There are five possible actions - ``get``, ``fetch``, ``count``, ``aggregate`` and ``exists``.
+You can pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
 There is, however, a shortcut for the latter:
 
 .. code:: python
@@ -172,8 +184,7 @@ There is, however, a shortcut for the latter:
 
 It is useful when you want to disable automatic caching on particular queryset.
 
-You can also override default timeout for particular queryset with ``.cache(timeout=...)``
-or make queryset only write cache, but don't try to fetch it with ``.cache(write_only=True)``.
+You can also override default timeout for particular queryset with ``.cache(timeout=...)``.
 
 
 | **Function caching**
@@ -342,37 +353,6 @@ In the case you actually want to perform the latter cacheops provides a shortcut
 Note that all the updated objects are fetched twice, prior and post the update.
 
 
-Using memory limit
-------------------
-
-If your cache never grows too large you may not bother. But if you do you have some options.
-Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will.
-For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
-So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
-
-First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
-Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
-one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
-You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
-
-Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
-However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
-
-
-Multiple database support
--------------------------
-
-By default cacheops considers query result is same for same query, not depending
-on database queried. That could be changed with ``db_agnostic`` cache profile option:
-
-.. code:: python
-
-    CACHEOPS = {
-        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
-    }
-
-
 Simple time-invalidated cache
 -----------------------------
 
@@ -480,6 +460,7 @@ First, it's safe against concurrent writes. Second, it's invalidation is done as
 you'll need to call this from crontab for that to work::
 
     /path/manage.py cleanfilecache
+    /path/manage.py cleanfilecache /path/to/non-default/cache/dir
 
 
 Django templates integration
@@ -500,7 +481,7 @@ and ``@cached`` decorators, however, they require explicit naming of each fragme
         ... some template code ...
     {% endcached %}
 
-You can use ``0`` for timeout in ``@cached_as`` to use it's default value for model.
+You can use ``None`` for timeout in ``@cached_as`` to use it's default value for model.
 
 To invalidate cached fragment use:
 
@@ -582,13 +563,109 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Transactions
+------------
+
+Cacheops transparently supports transactions. This is implemented by following simple rules:
+
+1. Once transaction is dirty (has changes) caching turns off. The reason is that the state of database at this point is only visible to current transaction and should not affect other users and vice versa.
+
+2. Any invalidating calls are scheduled to run on the outer commit of transaction.
+
+3. Savepoints and rollbacks are also handled appropriately.
+
+Mind that simple and file cache don't turn itself off in transactions but work as usual.
+
+
+Dog-pile effect prevention
+--------------------------
+
+There is optional locking mechanism to prevent several threads or processes simultaneously performing same heavy task. It works with ``@cached_as()`` and querysets:
+
+.. code:: python
+
+    @cached_as(qs, lock=True)
+    def heavy_func(...):
+        # ...
+
+    for item in qs.cache(lock=True):
+        # ...
+
+It is also possible to specify ``lock: True`` in ``CACHEOPS`` setting but that would probably be a waste. Locking has no overhead on cache hit though.
+
+
+Multiple database support
+-------------------------
+
+By default cacheops considers query result is same for same query, not depending
+on database queried. That could be changed with ``db_agnostic`` cache profile option:
+
+.. code:: python
+
+    CACHEOPS = {
+        'some.model': {'ops': 'get', 'db_agnostic': False, 'timeout': ...}
+    }
+
+
+Sharing redis instance
+----------------------
+
+Cacheops provides a way to share a redis instance by adding prefix to cache keys:
+
+.. code:: python
+
+    CACHEOPS_PREFIX = lambda query: ...
+    # or
+    CACHEOPS_PREFIX = 'some.module.cacheops_prefix'
+
+A most common usage would probably be a prefix by host name:
+
+.. code:: python
+
+    # get_request() returns current request saved to threadlocal by some middleware
+    cacheops_prefix = lambda _: get_request().get_host()
+
+A ``query`` object passed to callback also enables reflection on used databases and tables:
+
+.. code:: python
+
+    def cacheops_prefix(query):
+        query.dbs    # A list of databases queried
+        query.tables # A list of tables query is invalidated on
+
+        if set(query.tables) <= HELPER_TABLES:
+            return 'helper:'
+        if query.tables == ['blog_post']:
+            return 'blog:'
+
+
+Using memory limit
+------------------
+
+If your cache never grows too large you may not bother. But if you do you have some options.
+Cacheops stores cached data along with invalidation data,
+so you can't just set ``maxmemory`` and let redis evict at its will.
+For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
+So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
+
+First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
+Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
+one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
+You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
+
+Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
+However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
+
+
 Keeping stats
 -------------
 
-Cacheops provides ``cache_read`` signal for you to keep stats. Signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
+Cacheops provides ``cache_read`` and ``cache_invalidated`` signals for you to keep track.
+
+Cache read signal is emitted immediately after each cache lookup. Passed arguments are: ``sender`` - model class if queryset cache is fetched,
 ``func`` - decorated function and ``hit`` - fetch success as boolean value.
 
-Here is simple stats implementation:
+Here is a simple stats implementation:
 
 .. code:: python
 
@@ -601,6 +678,8 @@ Here is simple stats implementation:
 
     cache_read.connect(stats_collector)
 
+Cache invalidation signal is emitted after object, model or global invalidation passing ``sender`` and ``obj_dict`` args. Note that during normal operation cacheops only uses object invalidation, calling it once for each model create/delete and twice for update: passing old and new object dictionary.
+
 
 CAVEATS
 -------
@@ -610,22 +689,22 @@ CAVEATS
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
    One should not test on their equality anyway.
 3. Update of "selected_related" object does not invalidate cache for queryset.
-4. Mass updates don't trigger invalidation by default.
+   Use ``.prefetch_related()`` instead.
+4. Mass updates don't trigger invalidation by default. But see ``.invalidated_update()``.
 5. Sliced queries are invalidated as non-sliced ones.
 6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
 8. Doesn't work right with multi-table inheritance.
-9. Aggregates are not implemented yet.
 
 Here 1, 2, 3, 5 are part of the design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions,
-see, however, `.invalidated_update()`. 8 and 9 are postponed until they will gain
-more interest or a champion willing to implement any one of them emerge.
+see, however, `.invalidated_update()`. 8 is postponed until it will gain
+more interest or a champion willing to implement it emerges.
 
-All unsupported things could still be used easyly enough with the help of `@cached_as()`.
+All unsupported things could still be used easily enough with the help of ``@cached_as()``.
 
 
 Performance tips
@@ -659,11 +738,11 @@ Writing a test for an issue you are experiencing can speed up its resolution a l
 Here is how you do that. I suppose you have some application code causing it.
 
 1. Make a fork.
-2. Install all from ``test_requirements.txt``.
+2. Install all from ``requirements-test.txt``.
 3. Ensure you can run tests with ``./run_tests.py``.
 4. Copy relevant models code to ``tests/models.py``.
 5. Go to ``tests/tests.py`` and paste code causing exception to ``IssueTests.test_{issue_number}``.
-6. Execute ``./run_tests.py IssueTests.test_{issue_number}`` and see it failing.
+6. Execute ``./run_tests.py {issue_number}`` and see it failing.
 7. Cut down model and test code until error disappears and make a step back.
 8. Commit changes and make a pull request.
 

@@ -1,5 +1,5 @@
-VERSION = (3, 0)
-__version__ = '.'.join(map(str, VERSION if VERSION[-1] else VERSION[:2]))
+__version__ = '4.0.5'
+VERSION = tuple(map(int, __version__.split('.')))
 
 
 from django.apps import AppConfig

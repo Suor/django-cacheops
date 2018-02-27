@@ -10,7 +10,7 @@ class Command(LabelCommand):
     args = '(all | <app> | <app>.<model> | <app>.<model>.<pk>) +'
     label = 'app or model or object'
 
-    def handle_label(self, label, pk=None, **options):
+    def handle_label(self, label, **options):
         if label == 'all':
             self.handle_all()
         else:
