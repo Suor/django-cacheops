@@ -115,7 +115,7 @@ def dnfs(qs):
         # NOTE: a more elaborate DNF reduction is not really needed,
         #       just keep your querysets sane.
         if not all(cleaned):
-            return [[]]
+            return [{}]
         return cleaned
 
     def query_dnf(query):
