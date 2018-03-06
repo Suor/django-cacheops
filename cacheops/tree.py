@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from itertools import product
-from funcy import group_by, join_with, memoize, any
+from funcy import group_by, join_with
 from funcy.py3 import lcat, lmap
 
 import django
-from django.apps import apps
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -17,7 +16,7 @@ except ImportError:
     class EverythingNode(object):
         pass
 
-from .utils import model_profile, NOT_SERIALIZED_FIELDS
+from .utils import NOT_SERIALIZED_FIELDS
 
 
 LONG_DISJUNCTION = 8
@@ -129,7 +128,7 @@ def dnfs(qs):
         # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
         main_alias = query.model._meta.db_table
         aliases = {alias for alias, join in query.alias_map.items()
-                   if query.alias_refcount[alias] and table_tracked(join.table_name)} \
+                   if query.alias_refcount[alias]} \
                 | {main_alias} - {'django_content_type'}
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
@@ -138,12 +137,3 @@ def dnfs(qs):
         return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)
-
-
-@memoize
-def table_tracked(table):
-    models = [m for m in apps.get_models(include_auto_created=True) if m._meta.db_table == table]
-    # Unknown table, track it to be safe
-    if not models:
-        raise memoize.skip(True)
-    return any(model_profile, models)
