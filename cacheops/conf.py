@@ -76,6 +76,7 @@ def model_profile(model):
     """
     Returns cacheops profile for a model
     """
+    # Django migrations these fake models, we don't want to cache them
     if model.__module__ == '__fake__':
         return None
 

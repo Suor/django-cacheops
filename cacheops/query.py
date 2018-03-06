@@ -417,7 +417,7 @@ class ManagerMixin(object):
         if not hasattr(module, cls.__name__):
             setattr(module, cls.__name__, cls)
 
-    # TODO: check if this is still needed
+    # This is probably still needed if models are created dynamically
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
         # Django migrations create lots of fake models, just skip them
@@ -429,7 +429,7 @@ class ManagerMixin(object):
     def _pre_save(self, sender, instance, **kwargs):
         if not (instance.pk is None or instance._state.adding or no_invalidation.active):
             try:
-                _old_objs.__dict__[sender, instance.pk] = sender.objects.\
+                _old_objs.__dict__[sender, instance.pk] = sender.objects. \
                     using(instance._state.db).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
