@@ -1,3 +1,7 @@
+4.0.6
+- fixed m2m invalidation issue with certain configs
+- fixed catastrophic backtracking in template extensions
+
 4.0.5
 - fixed db selection in invalidation fetch and .invalidated_update() when router fails (M1ha Shvn)
 - fixed unlickely "_clone() unexpected keyword '_cacheprofile'" error
