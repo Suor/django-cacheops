@@ -2,12 +2,12 @@
 import sys
 import json
 import threading
-import six
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
 
 import django
+from django.utils import six
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager, Model

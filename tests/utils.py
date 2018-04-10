@@ -1,6 +1,7 @@
 import sys
-import six
 from threading import Thread
+
+from django.utils import six
 
 
 # Thread utilities

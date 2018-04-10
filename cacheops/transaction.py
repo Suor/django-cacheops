@@ -2,7 +2,7 @@
 import threading
 from collections import defaultdict
 
-import six
+from django.utils import six
 from django.db import DEFAULT_DB_ALIAS
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import Atomic, get_connection

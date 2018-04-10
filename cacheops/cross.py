@@ -1,4 +1,6 @@
-import six, hashlib
+import hashlib
+
+from django.utils import six
 
 # Use cPickle in python 2 and pickle in python 3
 try:

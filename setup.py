@@ -29,7 +29,6 @@ setup(
         'django>=1.8',
         'redis>=2.9.1',
         'funcy>=1.8,<2.0',
-        'six>=1.4.0',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
