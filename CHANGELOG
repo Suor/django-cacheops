@@ -1,3 +1,6 @@
+UNRELEASED
+- Package is now also distributed as a universal wheel.
+
 4.0.6
 - fixed m2m invalidation issue with certain configs
 - fixed catastrophic backtracking in template extensions
@@ -303,4 +306,3 @@ Backwards incompatible changes:
 
 
 ... lost in ancient history ...
-
