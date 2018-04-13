@@ -6,7 +6,7 @@ from cacheops import cached_as, no_invalidation, invalidate_obj, invalidate_mode
 from cacheops.conf import settings
 from cacheops.signals import cache_read, cache_invalidated
 
-from .tests import BaseTestCase, _make_inc
+from .utils import BaseTestCase, make_inc
 from .models import Post, Category, Local, DbAgnostic, DbBinded
 
 
@@ -58,7 +58,7 @@ class SignalsTests(BaseTestCase):
         self.assertEqual(self.signal_calls, [{'sender': Category, 'func': None, 'hit': False}])
 
     def test_cached_as(self):
-        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
+        get_calls = make_inc(cached_as(Category.objects.filter(title='test')))
         func = get_calls.__wrapped__
 
         # Miss

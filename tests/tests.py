@@ -4,35 +4,19 @@ import unittest
 
 import django
 from django.db import connection
-from django.test import TestCase
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
 from django.db.models import F, Count
 
-from cacheops import invalidate_all, invalidate_model, invalidate_obj, \
+from cacheops import invalidate_model, invalidate_obj, \
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
-from cacheops.transaction import transaction_states
 
 decorator_tag = register.decorator_tag
 from .models import *  # noqa
-
-
-class BaseTestCase(TestCase):
-    def setUp(self):
-        # Emulate not being in transaction by tricking system to ignore its pretest level.
-        # TestCase wraps each test into 1 or 2 transaction(s) altering cacheops behavior.
-        # The alternative is using TransactionTestCase, which is 10x slow.
-        from funcy import empty
-        transaction_states._states, self._states \
-            = empty(transaction_states._states), transaction_states._states
-
-        invalidate_all()
-
-    def tearDown(self):
-        transaction_states._states = self._states
+from .utils import BaseTestCase, make_inc
 
 
 class BasicTests(BaseTestCase):
@@ -209,7 +193,7 @@ class ValuesTests(BaseTestCase):
 
 class DecoratorTests(BaseTestCase):
     def test_cached_as_model(self):
-        get_calls = _make_inc(cached_as(Category))
+        get_calls = make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(), 1)      # miss
         self.assertEqual(get_calls(), 1)      # hit
@@ -217,7 +201,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_cond(self):
-        get_calls = _make_inc(cached_as(Category.objects.filter(title='test')))
+        get_calls = make_inc(cached_as(Category.objects.filter(title='test')))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
@@ -227,7 +211,7 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_as_obj(self):
         c = Category.objects.create(title='test')
-        get_calls = _make_inc(cached_as(c))
+        get_calls = make_inc(cached_as(c))
 
         self.assertEqual(get_calls(), 1)      # cache
         Category.objects.create(title='miss') # don't invalidate
@@ -237,14 +221,14 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(), 2)      # miss
 
     def test_cached_as_depends_on_args(self):
-        get_calls = _make_inc(cached_as(Category))
+        get_calls = make_inc(cached_as(Category))
 
         self.assertEqual(get_calls(1), 1)      # cache
         self.assertEqual(get_calls(1), 1)      # hit
         self.assertEqual(get_calls(2), 2)      # miss
 
     def test_cached_as_depends_on_two_models(self):
-        get_calls = _make_inc(cached_as(Category, Post))
+        get_calls = make_inc(cached_as(Category, Post))
         c = Category.objects.create(title='miss')
         p = Post.objects.create(title='New Post', category=c)
 
@@ -257,7 +241,7 @@ class DecoratorTests(BaseTestCase):
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
     def test_cached_view_as(self):
-        get_calls = _make_inc(cached_view_as(Category))
+        get_calls = make_inc(cached_view_as(Category))
 
         factory = RequestFactory()
         r1 = factory.get('/hi')
@@ -347,8 +331,8 @@ class TemplateTests(BaseTestCase):
         self.assertEqual(re.sub(r'\s+', '', s), result)
 
     def test_cached(self):
-        inc_a = _make_inc()
-        inc_b = _make_inc()
+        inc_a = make_inc()
+        inc_b = make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.a{{ a }}{% endcached %}
@@ -360,7 +344,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'a': inc_a, 'b': inc_b}, '.a1.a1.a2.b1')
 
     def test_invalidate_fragment(self):
-        inc = _make_inc()
+        inc = make_inc()
         t = Template("""
             {% load cacheops %}
             {% cached 60 'a' %}.{{ inc }}{% endcached %}
@@ -372,7 +356,7 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'inc': inc}, '.2')
 
     def test_cached_as(self):
-        inc = _make_inc()
+        inc = make_inc()
         qs = Post.objects.all()
         t = Template("""
             {% load cacheops %}
@@ -396,7 +380,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(flag):
             return cached(timeout=60) if flag else lambda x: x
 
-        inc = _make_inc()
+        inc = make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached 1 %}.{{ inc }}{% endmy_cached %}
@@ -412,7 +396,7 @@ class TemplateTests(BaseTestCase):
         def my_cached(context):
             return cached(timeout=60) if context['flag'] else lambda x: x
 
-        inc = _make_inc()
+        inc = make_inc()
         t = Template("""
             {% load cacheops %}
             {% my_cached %}.{{ inc }}{% endmy_cached %}
@@ -888,17 +872,3 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
-
-
-# Utilities
-
-def _make_inc(deco=lambda x: x):
-    calls = [0]
-
-    @deco
-    def inc(_=None, **kw):
-        calls[0] += 1
-        return calls[0]
-
-    inc.get = lambda: calls[0]
-    return inc

@@ -7,7 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 
 from .models import Category, Post, Extra
-from .tests import BaseTestCase
+from .utils import BaseTestCase
 
 
 class PrefixTests(BaseTestCase):
