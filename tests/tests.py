@@ -1042,16 +1042,6 @@ class LockingTests(BaseTestCase):
         self.assertEqual(results[0], results[1])
 
 
-class SettingsTests(TestCase):
-    def test_override(self):
-        from cacheops.conf import settings
-
-        self.assertTrue(settings.CACHEOPS_ENABLED)
-
-        with self.settings(CACHEOPS_ENABLED=False):
-            self.assertFalse(settings.CACHEOPS_ENABLED)
-
-
 # Utilities
 
 def _make_inc(deco=lambda x: x):
