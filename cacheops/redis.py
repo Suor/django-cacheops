@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 import warnings
 from contextlib import contextmanager
-import six
 
+from django.utils import six
 from django.core.exceptions import ImproperlyConfigured
 
 from funcy import decorator, identity, memoize, LazyObject

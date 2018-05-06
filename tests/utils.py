@@ -33,8 +33,9 @@ def make_inc(deco=lambda x: x):
 
 # Thread utilities
 import sys
-import six
 from threading import Thread
+
+from django.utils import six
 
 
 class ThreadWithReturnValue(Thread):

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import six
 from funcy import memoize, merge, namespace
 
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
+from django.utils import six
 from django.utils.module_loading import import_string
 
 
