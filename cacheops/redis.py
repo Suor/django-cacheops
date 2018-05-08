@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import six
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.module_loading import import_string
 
 from funcy import decorator, identity, memoize, LazyObject
 import redis
@@ -26,9 +27,13 @@ else:
 
 LOCK_TIMEOUT = 60
 
+client_class = redis.StrictRedis
+if settings.CACHEOPS_CLIENT_CLASS:
+    client_class = import_string(settings.CACHEOPS_CLIENT_CLASS)
 
-class CacheopsRedis(redis.StrictRedis):
-    get = handle_connection_failure(redis.StrictRedis.get)
+
+class CacheopsRedis(client_class):
+    get = handle_connection_failure(client_class.get)
 
     @contextmanager
     def getting(self, key, lock=False):
