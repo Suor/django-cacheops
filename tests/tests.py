@@ -8,6 +8,15 @@ from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
 from django.db.models import F, Count
+# These were added in Django 2.0
+try:
+    from django.db.models import Subquery
+except ImportError:
+    Subquery = None
+try:
+    from django.db.models.expressions import RawSQL
+except ImportError:
+    RawSQL = None
 
 from cacheops import invalidate_model, invalidate_obj, \
                      cached, cached_view, cached_as, cached_view_as
@@ -170,6 +179,15 @@ class BasicTests(BaseTestCase):
         with self.assertNumQueries(2):
             list(Post.objects.filter(category=1).cache())
             list(Post.objects.filter(category=2).cache())
+
+    @unittest.skipIf(Subquery is None, "Suquery added in Django 2.0")
+    def test_subquery(self):
+        categories = Category.objects.cache().filter(title='Django').only('id')
+        Post.objects.cache().filter(category__in=Subquery(categories)).count()
+
+    @unittest.skipIf(Subquery is None, "RawSQL added in Django 2.0")
+    def test_rawsql(self):
+        Post.objects.cache().filter(category__in=RawSQL("select 1", ())).count()
 
 
 class ValuesTests(BaseTestCase):

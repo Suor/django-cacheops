@@ -15,6 +15,17 @@ try:
 except ImportError:
     class EverythingNode(object):
         pass
+# These were added in Django 2.0
+try:
+    from django.db.models import Subquery
+except ImportError:
+    class Subquery(object):
+        pass
+try:
+    from django.db.models.expressions import RawSQL
+except ImportError:
+    class RawSQL(object):
+        pass
 
 from .utils import NOT_SERIALIZED_FIELDS
 
@@ -51,7 +62,7 @@ def dnfs(qs):
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE
             # Don't bother with complex right hand side either
-            if isinstance(where.rhs, (QuerySet, Query)):
+            if isinstance(where.rhs, (QuerySet, Query, Subquery, RawSQL)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
