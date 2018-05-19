@@ -18,6 +18,7 @@ class Defaults(namespace):
     CACHEOPS = {}
     CACHEOPS_PREFIX = lambda query: ''
     CACHEOPS_LRU = False
+    CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
     CACHEOPS_SENTINEL = {}
 
