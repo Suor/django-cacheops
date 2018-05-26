@@ -86,7 +86,7 @@ class RedisCache(BaseCache):
         self.conn = conn
 
     def get_with_lock(self, cache_key):
-        with self.conn.getting(cache_key, lock=lock) as data:
+        with self.conn.getting(cache_key, lock=True) as data:
             if data is None:
                 raise CacheMiss
             return pickle.loads(data)    
