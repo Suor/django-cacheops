@@ -36,7 +36,7 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
+    def cached(self, timeout=None, extra=None, key_func=func_cache_key, lock=False):
         """
         A decorator for caching function calls
         """
@@ -52,7 +52,10 @@ class BaseCache(object):
 
                 cache_key = 'c:' + key_func(func, args, kwargs, extra)
                 try:
-                    result = self.get(cache_key)
+                    if lock:
+                        result = self.get_with_lock(cache_key)
+                    else:
+                        result = self.get(cache_key)
                 except CacheMiss:
                     result = func(*args, **kwargs)
                     self.set(cache_key, result, timeout)
@@ -81,6 +84,12 @@ class BaseCache(object):
 class RedisCache(BaseCache):
     def __init__(self, conn):
         self.conn = conn
+
+    def get_with_lock(self, cache_key):
+        with self.conn.getting(cache_key, lock=lock) as data:
+            if data is None:
+                raise CacheMiss
+            return pickle.loads(data)    
 
     def get(self, cache_key):
         data = self.conn.get(cache_key)
