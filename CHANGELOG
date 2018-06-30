@@ -1,5 +1,7 @@
-UNRELEASED
-- Package is now also distributed as a universal wheel.
+4.0.7
+- fixed RawSQL() and Subquery() (thx to thakryptex)
+- made the Redis client class configurable (Nic Wolff)
+- package is now also distributed as a universal wheel (Jon Dufresne)
 
 4.0.6
 - fixed m2m invalidation issue with certain configs
