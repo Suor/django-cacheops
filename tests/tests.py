@@ -935,3 +935,23 @@ class MultiDBInvalidationTests(BaseTestCase):
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
         Category.objects.using('slave').invalidated_update(title='update')
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+
+    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
+    def test_post_save(self):
+        DbBinded.objects.cache().count()
+        DbBinded.objects.using('slave').cache().count()
+
+        obj = DbBinded()
+        obj.save(using='slave')
+        with self.assertNumQueries(0):
+            DbBinded.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            DbBinded.objects.cache().using('slave').count()
+
+    @mock.patch('cacheops.invalidation.invalidate_dict')
+    def test_post_save_call_invalidate(self, mock_invalidate_dict):
+        category = Category(title='update')
+        category.save()
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
+        category.save(using='slave')
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
