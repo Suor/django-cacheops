@@ -441,7 +441,7 @@ class ManagerMixin(object):
 
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
-        using = kwargs.get('using', DEFAULT_DB_ALIAS)
+        using = kwargs['using']
         if old:
             invalidate_obj(old, using=using)
         invalidate_obj(instance, using=using)
@@ -487,8 +487,7 @@ class ManagerMixin(object):
         """
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
-        using = kwargs.get('using', DEFAULT_DB_ALIAS)
-        invalidate_obj(instance, using=using)
+        invalidate_obj(instance, using=kwargs['using'])
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -527,7 +526,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         instance_column, model_column = model_column, instance_column
 
     # TODO: optimize several invalidate_objs/dicts at once
-    using = kwargs.get('using', DEFAULT_DB_ALIAS)
+    using = kwargs['using']
     if action == 'pre_clear':
         objects = sender.objects.filter(**{instance_column: instance.pk})
         for obj in objects:
