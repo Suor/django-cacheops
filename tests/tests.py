@@ -976,3 +976,15 @@ class MultiDBInvalidationTests(BaseTestCase):
         category = Category.objects.using('slave').create(title='update')
         category.delete(using='slave')
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+
+    @mock.patch('cacheops.invalidation.invalidate_dict')
+    def test_m2m_changed_call_invalidate(self, mock_invalidate_dict):
+        label = Label.objects.create()
+        brand = Brand.objects.create()
+        brand.labels.add(label)
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
+
+        label = Label.objects.using('slave').create()
+        brand = Brand.objects.using('slave').create()
+        brand.labels.add(label)
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
