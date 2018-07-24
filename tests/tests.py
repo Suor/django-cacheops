@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import re
 import unittest
+import mock
 
 import django
 from django.db import connection
+from django.db import DEFAULT_DB_ALIAS
+from django.test import override_settings
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
@@ -890,3 +893,45 @@ class GISTests(BaseTestCase):
         geom.save()
         # Raises ValueError if this doesn't work
         invalidate_obj(geom)
+
+
+class MultiDBInvalidationTests(BaseTestCase):
+
+    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
+    def test_bulk_create(self):
+        DbBinded.objects.cache().count()
+        DbBinded.objects.using('slave').cache().count()
+
+        db_binded = DbBinded()
+        DbBinded.objects.using('slave').bulk_create([db_binded])
+        with self.assertNumQueries(0):
+            DbBinded.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            DbBinded.objects.cache().using('slave').count()
+
+    @mock.patch('cacheops.invalidation.invalidate_dict')
+    def test_bulk_update_call_invalidate(self, mock_invalidate_dict):
+        category = Category(title='bulk')
+        Category.objects.bulk_create([category])
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
+        Category.objects.using('slave').bulk_create([category])
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+
+    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
+    def test_invalidated_update(self):
+        DbBinded.objects.cache().count()
+        DbBinded.objects.using('slave').cache().count()
+
+        DbBinded.objects.using('slave').invalidated_update(name='update')
+        with self.assertNumQueries(0):
+            DbBinded.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            DbBinded.objects.cache().using('slave').count()
+
+    @mock.patch('cacheops.invalidation.invalidate_dict')
+    def test_invalidated_update_call_invalidate(self, mock_invalidate_dict):
+        category = Category.objects.create(title='update')
+        Category.objects.invalidated_update(title='update')
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
+        Category.objects.using('slave').invalidated_update(title='update')
+        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
