@@ -193,8 +193,7 @@ class DbAgnostic(models.Model):
     pass
 
 class DbBinded(models.Model):
-    pass
-
+    name = models.CharField(max_length=32, default='')
 
 # contrib.postgis
 if os.environ.get('CACHEOPS_DB') == 'postgis':
