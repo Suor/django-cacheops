@@ -10,6 +10,7 @@ from .cross import pickle, md5
 import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
+from django.db import DEFAULT_DB_ALIAS
 from django.db.models import Manager, Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
@@ -375,7 +376,7 @@ class QuerySetMixin(object):
         objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
         if family_has_profile(self.model):
             for obj in objs:
-                invalidate_obj(obj)
+                invalidate_obj(obj, using=self.db)
         return objs
 
     def invalidated_update(self, **kwargs):
@@ -391,7 +392,7 @@ class QuerySetMixin(object):
         pks = {obj.pk for obj in objects}
         new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
         for obj in chain(objects, new_objects):
-            invalidate_obj(obj)
+            invalidate_obj(obj, using=self.db)
         return rows
 
 
@@ -440,9 +441,10 @@ class ManagerMixin(object):
 
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
+        using = kwargs.get('using', DEFAULT_DB_ALIAS)
         if old:
-            invalidate_obj(old)
-        invalidate_obj(instance)
+            invalidate_obj(old, using=using)
+        invalidate_obj(instance, using=using)
 
         # We run invalidations but skip caching if we are dirty
         if transaction_states[instance._state.db].is_dirty():
@@ -485,7 +487,8 @@ class ManagerMixin(object):
         """
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
-        invalidate_obj(instance)
+        using = kwargs.get('using', DEFAULT_DB_ALIAS)
+        invalidate_obj(instance, using=using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -524,10 +527,11 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         instance_column, model_column = model_column, instance_column
 
     # TODO: optimize several invalidate_objs/dicts at once
+    using = kwargs.get('using', DEFAULT_DB_ALIAS)
     if action == 'pre_clear':
         objects = sender.objects.filter(**{instance_column: instance.pk})
         for obj in objects:
-            invalidate_obj(obj)
+            invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
         # NOTE: we don't need to query through objects here,
         #       cause we already know all their meaningfull attributes.
@@ -535,7 +539,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
             invalidate_dict(sender, {
                 instance_column: instance.pk,
                 model_column: pk
-            })
+            }, using=using)
 
 
 @once
