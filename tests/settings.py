@@ -96,7 +96,7 @@ CACHEOPS_DEFAULTS = {
 CACHEOPS = {
     'tests.local': {'local_get': True},
     'tests.cacheonsavemodel': {'cache_on_save': True},
-    'tests.dbbinded': {'ops': 'count', 'db_agnostic': False},
+    'tests.dbbinded': {'db_agnostic': False},
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
