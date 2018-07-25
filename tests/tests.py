@@ -910,7 +910,7 @@ class MultiDBInvalidationTests(BaseTestCase):
             DbBinded.objects.cache().using('slave').count()
 
     @mock.patch('cacheops.invalidation.invalidate_dict')
-    def test_bulk_update_call_invalidate(self, mock_invalidate_dict):
+    def test_bulk_create_call_invalidate(self, mock_invalidate_dict):
         category = Category(title='bulk')
         Category.objects.bulk_create([category])
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
