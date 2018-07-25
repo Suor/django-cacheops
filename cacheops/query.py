@@ -435,13 +435,12 @@ class ManagerMixin(object):
             except sender.DoesNotExist:
                 pass
 
-    def _post_save(self, sender, instance, **kwargs):
+    def _post_save(self, sender, instance, using, **kwargs):
         if not settings.CACHEOPS_ENABLED:
             return
 
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
-        using = kwargs['using']
         if old:
             invalidate_obj(old, using=using)
         invalidate_obj(instance, using=using)
@@ -481,13 +480,13 @@ class ManagerMixin(object):
             # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)
 
-    def _post_delete(self, sender, instance, **kwargs):
+    def _post_delete(self, sender, instance, using, **kwargs):
         """
         Invalidation upon object deletion.
         """
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
-        invalidate_obj(instance, using=kwargs['using'])
+        invalidate_obj(instance, using=using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -503,7 +502,7 @@ class ManagerMixin(object):
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
-                   **kwargs):
+                   using=DEFAULT_DB_ALIAS, **kwargs):
     """
     Invoke invalidation on m2m changes.
     """
@@ -526,7 +525,6 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         instance_column, model_column = model_column, instance_column
 
     # TODO: optimize several invalidate_objs/dicts at once
-    using = kwargs['using']
     if action == 'pre_clear':
         objects = sender.objects.filter(**{instance_column: instance.pk})
         for obj in objects:
