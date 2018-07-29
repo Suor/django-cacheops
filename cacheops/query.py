@@ -526,7 +526,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
 
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        objects = sender.objects.filter(**{instance_column: instance.pk})
+        objects = sender.objects.using(using).filter(**{instance_column: instance.pk})
         for obj in objects:
             invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
