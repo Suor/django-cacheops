@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from contextlib import contextmanager
 import re
 import unittest
 import mock
@@ -898,51 +899,37 @@ class GISTests(BaseTestCase):
 # NOTE: overriding cache prefix to separate invalidation sets by db.
 @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
 class MultiDBInvalidationTests(BaseTestCase):
+    @contextmanager
+    def _control_counts(self):
+        Category.objects.cache().count()
+        Category.objects.using('slave').cache().count()
+
+        yield
+        with self.assertNumQueries(0):
+            Category.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            Category.objects.cache().using('slave').count()
+
     def test_save(self):
         # NOTE: not testing when old db != new db,
         #       how cacheops works in that situation is undefined at the moment
-        Category.objects.cache().count()
-        Category.objects.using('slave').cache().count()
-
-        obj = Category()
-        obj.save(using='slave')
-        with self.assertNumQueries(0):
-            Category.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            Category.objects.cache().using('slave').count()
+        with self._control_counts():
+            obj = Category()
+            obj.save(using='slave')
 
     def test_delete(self):
         obj = Category.objects.using('slave').create()
-        Category.objects.cache().count()
-        Category.objects.using('slave').cache().count()
-
-        obj.delete(using='slave')
-        with self.assertNumQueries(0):
-            Category.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            Category.objects.cache().using('slave').count()
+        with self._control_counts():
+            obj.delete(using='slave')
 
     def test_bulk_create(self):
-        Category.objects.cache().count()
-        Category.objects.using('slave').cache().count()
-
-        category = Category(title='New')
-        Category.objects.using('slave').bulk_create([category])
-        with self.assertNumQueries(0):
-            Category.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            Category.objects.cache().using('slave').count()
+        with self._control_counts():
+            Category.objects.using('slave').bulk_create([Category(title='New')])
 
     def test_invalidated_update(self):
         # NOTE: not testing router-based routing
-        Category.objects.cache().count()
-        Category.objects.using('slave').cache().count()
-
-        Category.objects.using('slave').invalidated_update(title='update')
-        with self.assertNumQueries(0):
-            Category.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            Category.objects.cache().using('slave').count()
+        with self._control_counts():
+            Category.objects.using('slave').invalidated_update(title='update')
 
     @mock.patch('cacheops.invalidation.invalidate_dict')
     def test_m2m_changed_call_invalidate(self, mock_invalidate_dict):
