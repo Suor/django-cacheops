@@ -474,7 +474,7 @@ class ManagerMixin(object):
 
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
-            qs = sender.objects.inplace().filter(**cond).order_by()
+            qs = sender.objects.inplace().using(using).filter(**cond).order_by()
             qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
