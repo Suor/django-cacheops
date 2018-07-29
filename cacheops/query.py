@@ -392,7 +392,7 @@ class QuerySetMixin(object):
         pks = {obj.pk for obj in objects}
         new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
         for obj in chain(objects, new_objects):
-            invalidate_obj(obj, using=self.db)
+            invalidate_obj(obj, using=clone.db)
         return rows
 
 
