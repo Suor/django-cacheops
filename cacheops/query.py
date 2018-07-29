@@ -427,11 +427,11 @@ class ManagerMixin(object):
         if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
-    def _pre_save(self, sender, instance, **kwargs):
+    def _pre_save(self, sender, instance, using, **kwargs):
         if not (instance.pk is None or instance._state.adding or no_invalidation.active):
             try:
-                _old_objs.__dict__[sender, instance.pk] = sender.objects. \
-                    using(instance._state.db).get(pk=instance.pk)
+                _old_objs.__dict__[sender, instance.pk] \
+                    = sender.objects.using(using).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
@@ -446,7 +446,7 @@ class ManagerMixin(object):
         invalidate_obj(instance, using=using)
 
         # We run invalidations but skip caching if we are dirty
-        if transaction_states[instance._state.db].is_dirty():
+        if transaction_states[using].is_dirty():
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
