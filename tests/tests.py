@@ -895,87 +895,54 @@ class GISTests(BaseTestCase):
         invalidate_obj(geom)
 
 
+# NOTE: overriding cache prefix to separate invalidation sets by db.
+@override_settings(CACHEOPS_PREFIX=lambda q: q.db)
 class MultiDBInvalidationTests(BaseTestCase):
+    def test_save(self):
+        # NOTE: not testing when old db != new db,
+        #       how cacheops works in that situation is undefined at the moment
+        Category.objects.cache().count()
+        Category.objects.using('slave').cache().count()
 
-    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
-    def test_bulk_create(self):
-        DbBinded.objects.cache().count()
-        DbBinded.objects.using('slave').cache().count()
-
-        db_binded = DbBinded()
-        DbBinded.objects.using('slave').bulk_create([db_binded])
-        with self.assertNumQueries(0):
-            DbBinded.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            DbBinded.objects.cache().using('slave').count()
-
-    @mock.patch('cacheops.invalidation.invalidate_dict')
-    def test_bulk_create_call_invalidate(self, mock_invalidate_dict):
-        category = Category(title='bulk')
-        Category.objects.bulk_create([category])
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
-        Category.objects.using('slave').bulk_create([category])
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
-
-    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
-    def test_invalidated_update(self):
-        DbBinded.objects.cache().count()
-        DbBinded.objects.using('slave').cache().count()
-
-        DbBinded.objects.using('slave').invalidated_update(name='update')
-        with self.assertNumQueries(0):
-            DbBinded.objects.cache().count()
-        with self.assertNumQueries(1, using='slave'):
-            DbBinded.objects.cache().using('slave').count()
-
-    @mock.patch('cacheops.invalidation.invalidate_dict')
-    def test_invalidated_update_call_invalidate(self, mock_invalidate_dict):
-        Category.objects.create(title='update')
-        Category.objects.invalidated_update(title='update')
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
-        Category.objects.using('slave').invalidated_update(title='update')
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
-
-    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
-    def test_post_save(self):
-        DbBinded.objects.cache().count()
-        DbBinded.objects.using('slave').cache().count()
-
-        obj = DbBinded()
+        obj = Category()
         obj.save(using='slave')
         with self.assertNumQueries(0):
-            DbBinded.objects.cache().count()
+            Category.objects.cache().count()
         with self.assertNumQueries(1, using='slave'):
-            DbBinded.objects.cache().using('slave').count()
+            Category.objects.cache().using('slave').count()
 
-    @mock.patch('cacheops.invalidation.invalidate_dict')
-    def test_post_save_call_invalidate(self, mock_invalidate_dict):
-        category = Category(title='update')
-        category.save()
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
-        category.save(using='slave')
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
-
-    @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
-    def test_post_delete(self):
-        obj = DbBinded.objects.using('slave').create()
-        DbBinded.objects.cache().count()
-        DbBinded.objects.using('slave').cache().count()
+    def test_delete(self):
+        obj = Category.objects.using('slave').create()
+        Category.objects.cache().count()
+        Category.objects.using('slave').cache().count()
 
         obj.delete(using='slave')
         with self.assertNumQueries(0):
-            DbBinded.objects.cache().count()
+            Category.objects.cache().count()
         with self.assertNumQueries(1, using='slave'):
-            DbBinded.objects.cache().using('slave').count()
+            Category.objects.cache().using('slave').count()
 
-    @mock.patch('cacheops.invalidation.invalidate_dict')
-    def test_post_delete_invalidate(self, mock_invalidate_dict):
-        category = Category.objects.create(title='update')
-        category.delete()
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using=DEFAULT_DB_ALIAS)
-        category = Category.objects.using('slave').create(title='update')
-        category.delete(using='slave')
-        mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+    def test_bulk_create(self):
+        Category.objects.cache().count()
+        Category.objects.using('slave').cache().count()
+
+        category = Category(title='New')
+        Category.objects.using('slave').bulk_create([category])
+        with self.assertNumQueries(0):
+            Category.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            Category.objects.cache().using('slave').count()
+
+    def test_invalidated_update(self):
+        # NOTE: not testing router-based routing
+        Category.objects.cache().count()
+        Category.objects.using('slave').cache().count()
+
+        Category.objects.using('slave').invalidated_update(title='update')
+        with self.assertNumQueries(0):
+            Category.objects.cache().count()
+        with self.assertNumQueries(1, using='slave'):
+            Category.objects.cache().using('slave').count()
 
     @mock.patch('cacheops.invalidation.invalidate_dict')
     def test_m2m_changed_call_invalidate(self, mock_invalidate_dict):
