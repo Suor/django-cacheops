@@ -71,6 +71,10 @@ Setup redis connection and enable caching for desired models:
         'db': 0                              # redis database, default: 0
     }
 
+    # To use your own redis client class,
+    # should be compatible or subclass cacheops.redis.CacheopsRedis
+    CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
+
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This also includes .first() and .last() calls,
