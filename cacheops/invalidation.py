@@ -18,10 +18,9 @@ __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidat
 
 
 @memoize
-def conj_del_fn():
+def redis_can_unlink():
     redis_version = redis_client.info()['redis_version']
-    redis_version_at_least_4 = StrictVersion(redis_version) >= StrictVersion('4.0')
-    return 'unlink' if redis_version_at_least_4 else 'del'
+    return StrictVersion(redis_version) >= StrictVersion('4.0')
 
 
 @queue_when_in_transaction
@@ -31,10 +30,9 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
         return
     model = model._meta.concrete_model
     prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
-    load_script('invalidate')(keys=[prefix], args=[
+    load_script('invalidate', strip=redis_can_unlink())(keys=[prefix], args=[
         model._meta.db_table,
-        json.dumps(obj_dict, default=str),
-        conj_del_fn()
+        json.dumps(obj_dict, default=str)
     ])
     cache_invalidated.send(sender=model, obj_dict=obj_dict)
 

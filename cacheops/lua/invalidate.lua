@@ -1,8 +1,11 @@
 local prefix = KEYS[1]
 local db_table = ARGV[1]
 local obj = cjson.decode(ARGV[2])
-local conj_del_fn = ARGV[3]
-
+local conj_del_fn = 'unlink'
+-- If Redis version < 4.0 we can't use UNLINK
+-- TOSTRIP
+conj_del_fn = 'del'
+-- /TOSTRIP
 
 -- Utility functions
 local conj_cache_key = function (db_table, scheme, obj)
