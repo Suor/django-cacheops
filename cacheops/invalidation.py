@@ -4,6 +4,7 @@ import threading
 from funcy import memoize, post_processing, ContextDecorator
 from django.db import DEFAULT_DB_ALIAS
 from django.db.models.expressions import F, Expression
+from distutils.version import StrictVersion
 
 from .conf import settings
 from .utils import NOT_SERIALIZED_FIELDS
@@ -16,6 +17,13 @@ from .transaction import queue_when_in_transaction
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
+@memoize
+def conj_del_fn():
+    redis_version = redis_client.info()['redis_version']
+    redis_version_at_least_4 = StrictVersion(redis_version) >= StrictVersion('4.0')
+    return 'unlink' if redis_version_at_least_4 else 'del'
+
+
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
@@ -25,7 +33,8 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
     prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
     load_script('invalidate')(keys=[prefix], args=[
         model._meta.db_table,
-        json.dumps(obj_dict, default=str)
+        json.dumps(obj_dict, default=str),
+        conj_del_fn()
     ])
     cache_invalidated.send(sender=model, obj_dict=obj_dict)
 
