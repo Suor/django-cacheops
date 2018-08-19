@@ -3,3 +3,4 @@ redis>=2.9.1
 funcy>=1.8,<2.0
 six>=1.4.0
 before_after==1.0.0
+jinja2>=2.10

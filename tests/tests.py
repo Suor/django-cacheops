@@ -428,6 +428,12 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'inc': inc, 'flag': True}, '.1.1')
         self.assertRendersTo(t, {'inc': inc, 'flag': False}, '.2.3')
 
+    def test_jinja2(self):
+        from jinja2 import Environment
+        env = Environment(extensions=['cacheops.jinja2.cache'])
+        t = env.from_string('Hello, {% cached %}{{ name }}{% endcached %}')
+        t.render(name='Alex')
+
 
 class IssueTests(BaseTestCase):
     fixtures = ['basic']

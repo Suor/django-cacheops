@@ -19,7 +19,7 @@ class CacheopsExtension(Extension):
         tag_name = parser.stream.current.value
         tag_location = '%s:%s' % (parser.name, lineno)
 
-        parser.stream.next()
+        next(parser.stream)
         args, kwargs = self.parse_args(parser)
         args = [nodes.Const(tag_name), nodes.Const(tag_location)] + args
 
