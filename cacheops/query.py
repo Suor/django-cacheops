@@ -180,6 +180,13 @@ class QuerySetMixin(object):
         cache_thing(self._prefix, cache_key, results,
                     self._cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
 
+    def _should_cache(self, op):
+        # If cache and op are enabled and not within write or dirty transaction
+        return settings.CACHEOPS_ENABLED \
+            and self._cacheprofile and op in self._cacheprofile['ops'] \
+            and not self._for_write \
+            and not transaction_states[self.db].is_dirty()
+
     def cache(self, ops=None, timeout=None, lock=None):
         """
         Enables caching for given ops
@@ -265,12 +272,8 @@ class QuerySetMixin(object):
             return clone
 
     def _fetch_all(self):
-        # If already fetched, cache not enabled, within write or in dirty transaction then fall back
-        if self._result_cache is not None \
-                or not settings.CACHEOPS_ENABLED \
-                or not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or self._for_write \
-                or transaction_states[self.db].is_dirty():
+        # If already fetched or should pass by then fall back
+        if self._result_cache is not None or not self._should_cache('fetch'):
             return self._no_monkey._fetch_all(self)
 
         cache_key = self._cache_key()
@@ -294,7 +297,7 @@ class QuerySetMixin(object):
         return self._no_monkey._fetch_all(self)
 
     def count(self):
-        if self._cacheprofile and 'count' in self._cacheprofile['ops']:
+        if self._should_cache('count'):
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
@@ -304,8 +307,8 @@ class QuerySetMixin(object):
             return self._no_monkey.count(self)
 
     def aggregate(self, *args, **kwargs):
-        if self._cacheprofile and 'aggregate' in self._cacheprofile['ops']:
-            # Annotate add all the same annotations, but doesn't run the query
+        if self._should_cache('aggregate'):
+            # Annotate adds all the same annotations, but doesn't run the query
             qs = self.clone().annotate(*args, **kwargs)
             return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
         else:
@@ -314,15 +317,13 @@ class QuerySetMixin(object):
     def get(self, *args, **kwargs):
         # .get() uses the same ._fetch_all() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+        if self._should_cache('get'):
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
             #
             # TODO: this checks are far from adequate, at least these are missed:
-            #       - settings.CACHEOPS_ENABLED
-            #       - self._for_write
             #       - self._fields (values, values_list)
             #       - annotations
             #       - ...
@@ -355,17 +356,17 @@ class QuerySetMixin(object):
         return qs._no_monkey.get(qs, *args, **kwargs)
 
     def first(self):
-        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+        if self._should_cache('get'):
             return self._no_monkey.first(self._clone().cache())
         return self._no_monkey.first(self)
 
     def last(self):
-        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+        if self._should_cache('get'):
             return self._no_monkey.last(self._clone().cache())
         return self._no_monkey.last(self)
 
     def exists(self):
-        if self._cacheprofile and 'exists' in self._cacheprofile['ops']:
+        if self._should_cache('exists'):
             if self._result_cache is not None:
                 return bool(self._result_cache)
             return cached_as(self)(lambda: self._no_monkey.exists(self))()
