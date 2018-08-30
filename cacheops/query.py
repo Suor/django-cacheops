@@ -283,7 +283,7 @@ class QuerySetMixin(object):
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
                 self._result_cache = pickle.loads(cache_data)
-            else:
+            if not self._result_cache:
                 # This thing appears in Django 1.9.
                 # In Djangos 1.9 and 1.10 both calls mean the same.
                 # Starting from Django 1.11 .iterator() uses chunked fetch
