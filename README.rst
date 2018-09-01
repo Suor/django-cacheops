@@ -102,6 +102,9 @@ Setup redis connection and enable caching for desired models:
 
         # NOTE: binding signals has its overhead, like preventing fast mass deletes,
         #       you might want to only register whatever you cache and dependencies.
+
+        # Finally you can explicitely forbid even manual caching with:
+        'some_app.*': None,
     }
 
 You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way you can rewrite the config above:
