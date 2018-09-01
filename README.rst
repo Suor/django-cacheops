@@ -121,6 +121,10 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
         '*.*': {},
     }
 
+Using ``'*.*'`` with non-empty ``ops`` is **not recommended**
+since it will easily cache something you don't intent to or even now about like migrations tables.
+The better approach will be restricting by app with ``'app_name.*'``.
+
 Besides ``ops`` and ``timeout`` options you can also use:
 
 ``local_get: True``
