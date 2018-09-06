@@ -93,12 +93,14 @@ def redis_client():
         if not {'locations', 'service_name'} <= set(settings.CACHEOPS_SENTINEL):
             raise ImproperlyConfigured("Specify locations and service_name for CACHEOPS_SENTINEL")
 
-        sentinel = Sentinel(settings.CACHEOPS_SENTINEL['locations'])
+        sentinel = Sentinel(settings.CACHEOPS_SENTINEL['locations'], **{
+            k: v for k, v in settings.CACHEOPS_SENTINEL.items()
+            if k not in ('locations', 'service_name', 'db')
+        })
         return sentinel.master_for(
             settings.CACHEOPS_SENTINEL['service_name'],
             redis_class=client_class,
-            db=settings.CACHEOPS_SENTINEL.get('db', 0),
-            socket_timeout=settings.CACHEOPS_SENTINEL.get('socket_timeout')
+            db=settings.CACHEOPS_SENTINEL.get('db', 0)
         )
 
     # Allow client connection settings to be specified by a URL.
