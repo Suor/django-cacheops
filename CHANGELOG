@@ -1,3 +1,14 @@
+4.1
+- use UNLINK instead of DEL when available, use Redis 4.0+ for that
+- request m2m objects for invalidation using correct db
+- fixed caching counts, aggregates and exists in writes,
+  dirty transactions and while cacheops is disabled
+- fixed various multidb/invalidation issues (Svan70)
+- fixed db in .invalidated_update()
+- fixed possible key disrepancy in cache_on_save with multidb
+- fixed jinja2 support in Python 3
+- documented CACHEOPS_CLIENT_CLASS
+
 4.0.7
 - fixed RawSQL() and Subquery() (thx to thakryptex)
 - made the Redis client class configurable (Nic Wolff)
