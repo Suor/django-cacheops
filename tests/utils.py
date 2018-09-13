@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from cacheops import invalidate_all
+from cacheops import invalidate_all, invalidate_obj
 from cacheops.transaction import transaction_states
 
 
@@ -29,6 +29,20 @@ def make_inc(deco=lambda x: x):
 
     inc.get = lambda: calls[0]
     return inc
+
+
+def make_invalidate_and_inc(deco, obj, invalidation_count):
+    calls = [0]
+
+    @deco
+    def invalidate_and_inc(_=None, **kw):
+        if calls[0] < invalidation_count:
+            invalidate_obj(obj)
+        calls[0] += 1
+        return calls[0]
+
+    invalidate_and_inc.get = lambda: calls[0]
+    return invalidate_and_inc
 
 
 # Thread utilities
