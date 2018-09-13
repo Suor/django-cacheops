@@ -3,6 +3,8 @@ import sys
 import json
 import threading
 import six
+from six.moves import range
+from random import random
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
@@ -21,7 +23,7 @@ from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, fa
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
+from .invalidation import invalidate_obj, invalidate_dict, no_invalidation, invalidate_keys
 from .transaction import transaction_states
 from .signals import cache_read
 
@@ -53,11 +55,19 @@ def cached_as(*samples, **kwargs):
     """
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.
+
+    If retry_until_valid is True, this will retry calling this function up to
+    max_retry_count times until the given querysets are not invalidated during
+    the function call. This ensures that the result is in a consistent state and
+    prevents caching stale data. If the retry count is reached, a runtime error
+    is raised to prevent infinite looping.
     """
     timeout = kwargs.pop('timeout', None)
     extra = kwargs.pop('extra', None)
     key_func = kwargs.pop('key_func', func_cache_key)
     lock = kwargs.pop('lock', None)
+    retry_until_valid = kwargs.pop('retry_until_valid', False)
+    max_retry_count = kwargs.pop('max_retry_count', 10)
     if not samples:
         raise TypeError('Pass a queryset, a model or an object to cache like')
     if kwargs:
@@ -103,10 +113,41 @@ def cached_as(*samples, **kwargs):
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
                     return pickle.loads(cache_data)
-                else:
+                elif not retry_until_valid:
                     result = func(*args, **kwargs)
                     cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
                     return result
+                else:
+                    # We call this "asp" for "as precall" because this key is
+                    # cached before the actual function is called. We randomize
+                    # the key to prevent falsely thinking the key was not
+                    # invalidated when in fact it was invalidated and the
+                    # function was called again in another process.
+                    precall_key = prefix + 'asp:' + key_func(func, args, kwargs, key_extra + [random()])
+                    for retry_count in range(max_retry_count):
+                        # Retry calling the function until we get a valid
+                        # result.
+                        #
+                        # Cache a precall_key to watch for invalidation during
+                        # the function call. Its value does not matter. If and
+                        # only if it remains valid before, during, and after the
+                        # call, the result can be cached and returned.
+                        cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
+
+                        result = func(*args, **kwargs)
+                        if redis_client.get(precall_key) is None:
+                            # Key was invalidated while calling function. Retry.
+                            continue
+
+                        cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
+                        if redis_client.get(precall_key) is None:
+                            # Key was invalidated while caching. Retry.
+                            invalidate_keys(cache_key)
+                            continue
+
+                        return result
+
+                    raise RuntimeError('Too many retries, aborting.')
 
         return wrapper
     return decorator
