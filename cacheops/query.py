@@ -123,7 +123,8 @@ def cached_as(*samples, **kwargs):
                     # the key to prevent falsely thinking the key was not
                     # invalidated when in fact it was invalidated and the
                     # function was called again in another process.
-                    precall_key = prefix + 'asp:' + key_func(func, args, kwargs, key_extra + [random()])
+                    suffix = key_func(func, args, kwargs, key_extra + [random()])
+                    precall_key = prefix + 'asp:' + suffix
                     for retry_count in range(max_retry_count):
                         # Retry calling the function until we get a valid
                         # result.
