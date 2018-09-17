@@ -6,7 +6,7 @@ import six
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
-from funcy import decorator, identity, memoize, LazyObject
+from funcy import decorator, identity, memoize, omit, LazyObject
 import redis
 from redis.sentinel import Sentinel
 from .conf import settings
@@ -93,10 +93,9 @@ def redis_client():
         if not {'locations', 'service_name'} <= set(settings.CACHEOPS_SENTINEL):
             raise ImproperlyConfigured("Specify locations and service_name for CACHEOPS_SENTINEL")
 
-        sentinel = Sentinel(settings.CACHEOPS_SENTINEL['locations'], **{
-            k: v for k, v in settings.CACHEOPS_SENTINEL.items()
-            if k not in ('locations', 'service_name', 'db')
-        })
+        sentinel = Sentinel(
+            settings.CACHEOPS_SENTINEL['locations'],
+            omit(settings.CACHEOPS_SENTINEL, ('locations', 'service_name', 'db')))
         return sentinel.master_for(
             settings.CACHEOPS_SENTINEL['service_name'],
             redis_class=client_class,
