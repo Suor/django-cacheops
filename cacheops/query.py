@@ -56,18 +56,15 @@ def cached_as(*samples, **kwargs):
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.
 
-    If retry_until_valid is True, this will retry calling this function up to
-    max_retry_count times until the given querysets are not invalidated during
-    the function call. This ensures that the result is in a consistent state and
-    prevents caching stale data. If the retry count is reached, a runtime error
-    is raised to prevent infinite looping.
+    If keep_fresh is True, this will prevent caching if the given querysets are
+    invalidated during the function call. This prevents prolonged caching of
+    stale data.
     """
     timeout = kwargs.pop('timeout', None)
     extra = kwargs.pop('extra', None)
     key_func = kwargs.pop('key_func', func_cache_key)
     lock = kwargs.pop('lock', None)
-    retry_until_valid = kwargs.pop('retry_until_valid', False)
-    max_retry_count = kwargs.pop('max_retry_count', 10)
+    keep_fresh = kwargs.pop('keep_fresh', False)
     if not samples:
         raise TypeError('Pass a queryset, a model or an object to cache like')
     if kwargs:
@@ -113,7 +110,7 @@ def cached_as(*samples, **kwargs):
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
                     return pickle.loads(cache_data)
-                elif not retry_until_valid:
+                elif not keep_fresh:
                     result = func(*args, **kwargs)
                     cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
                     return result
@@ -125,30 +122,21 @@ def cached_as(*samples, **kwargs):
                     # function was called again in another process.
                     suffix = key_func(func, args, kwargs, key_extra + [random()])
                     precall_key = prefix + 'asp:' + suffix
-                    for retry_count in range(max_retry_count):
-                        # Retry calling the function until we get a valid
-                        # result.
-                        #
-                        # Cache a precall_key to watch for invalidation during
-                        # the function call. Its value does not matter. If and
-                        # only if it remains valid before, during, and after the
-                        # call, the result can be cached and returned.
-                        cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
+                    # Cache a precall_key to watch for invalidation during
+                    # the function call. Its value does not matter. If and
+                    # only if it remains valid before, during, and after the
+                    # call, the result can be cached and returned.
+                    cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
 
-                        result = func(*args, **kwargs)
-                        if redis_client.get(precall_key) is None:
-                            # Key was invalidated while calling function. Retry.
-                            continue
-
+                    result = func(*args, **kwargs)
+                    if redis_client.get(precall_key) is not None:
+                        # Function result is still valid, cache it.
                         cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
                         if redis_client.get(precall_key) is None:
-                            # Key was invalidated while caching. Retry.
+                            # Key was invalidated while caching, invalidate it.
                             invalidate_keys(cache_key)
-                            continue
 
-                        return result
-
-                    raise RuntimeError('Too many retries, aborting.')
+                    return result
 
         return wrapper
     return decorator
