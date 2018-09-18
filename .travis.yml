@@ -8,6 +8,8 @@ services:
 addons:
   postgresql: "9.6"
   apt:
+    sources:
+      - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
     packages:
     - postgresql-9.6-postgis-2.3
     - libgdal-dev
