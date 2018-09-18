@@ -264,23 +264,16 @@ class DecoratorTests(BaseTestCase):
 
     def test_cached_as_retries_if_invalidated_during_func(self):
         c = Category.objects.create(title='test')
-        get_calls = make_invalidate_and_inc(cached_as(c, retry_until_valid=True), c, 1)
+        get_calls = make_invalidate_and_inc(cached_as(c, keep_fresh=True), c, 1)
 
-        self.assertEqual(get_calls(), 2)      # miss + retry once
-        Category.objects.create(title='miss') # don't invalidate
+        self.assertEqual(get_calls(), 1)      # miss, stale result not cached.
+        self.assertEqual(get_calls(), 2)      # miss and cache
         self.assertEqual(get_calls(), 2)      # hit
+        Category.objects.create(title='miss') # don't invalidate
         self.assertEqual(get_calls(), 2)      # hit
         c.title = 'new'
         c.save()                              # invalidate
         self.assertEqual(get_calls(), 3)      # miss
-
-    def test_cached_as_raises_exception_if_too_many_retries(self):
-        c = Category.objects.create(title='test')
-        get_calls = make_invalidate_and_inc(
-            cached_as(c, retry_until_valid=True, max_retry_count=5), c, 5)
-
-        with self.assertRaisesMessage(RuntimeError, 'Too many retries, aborting'):
-            get_calls()
 
     def test_cached_view_as(self):
         get_calls = make_inc(cached_view_as(Category))
