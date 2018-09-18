@@ -262,7 +262,7 @@ class DecoratorTests(BaseTestCase):
         p.save()                               # invalidate by Post
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
-    def test_cached_as_retries_if_invalidated_during_func(self):
+    def test_cached_as_not_cached_if_invalidated_during_func(self):
         c = Category.objects.create(title='test')
         get_calls = make_invalidate_and_inc(cached_as(c, keep_fresh=True), c, 1)
 
