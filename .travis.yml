@@ -10,6 +10,8 @@ addons:
   apt:
     sources:
       - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
+      - sourceline: 'deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main'
+        key_url: 'https://www.postgresql.org/media/keys/ACCC4CF8.asc'
     packages:
     - postgresql-9.6-postgis-2.3
     - libgdal-dev
