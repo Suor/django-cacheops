@@ -11,8 +11,8 @@ addons:
     sources:
       - sourceline: 'ppa:ubuntugis/ubuntugis-unstable'
     packages:
-      # - postgresql-9.6-postgis-2.3
       - libgdal-dev
+      - postgresql-9.6-postgis-2.3
       # - gdal-bin
       # - python-gdal
       # - python3-gdal
