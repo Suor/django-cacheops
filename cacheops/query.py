@@ -22,7 +22,7 @@ from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, fa
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict, no_invalidation, invalidate_keys
+from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import transaction_states
 from .signals import cache_read
 
