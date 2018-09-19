@@ -1,9 +1,15 @@
 local prefix = KEYS[1]
 local key = KEYS[2]
+local precall_key = KEYS[3]
 local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
 local timeout = tonumber(ARGV[3])
 
+if precall_key ~= '' and not redis.call('get', precall_key) then
+  -- Cached data was invalidated during the function call. The data is
+  -- stale and should not be cached.
+  return
+end
 
 -- Write data to cache
 redis.call('setex', key, timeout, data)

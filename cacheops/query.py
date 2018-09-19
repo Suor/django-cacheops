@@ -3,7 +3,6 @@ import sys
 import json
 import threading
 import six
-from six.moves import range
 from random import random
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
@@ -34,15 +33,18 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=()):
+def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key=''):
     """
     Writes data to cache and creates appropriate invalidators.
+
+    If precall_key is not the empty string, the data will only be cached if the
+    precall_key is set to avoid caching stale data.
     """
     # Could have changed after last check, sometimes superficially
     if transaction_states.is_dirty(dbs):
         return
     load_script('cache_thing', settings.CACHEOPS_LRU)(
-        keys=[prefix, cache_key],
+        keys=[prefix, cache_key, precall_key],
         args=[
             pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
@@ -110,32 +112,26 @@ def cached_as(*samples, **kwargs):
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
                     return pickle.loads(cache_data)
-                elif not keep_fresh:
-                    result = func(*args, **kwargs)
-                    cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
-                    return result
                 else:
-                    # We call this "asp" for "as precall" because this key is
-                    # cached before the actual function is called. We randomize
-                    # the key to prevent falsely thinking the key was not
-                    # invalidated when in fact it was invalidated and the
-                    # function was called again in another process.
-                    suffix = key_func(func, args, kwargs, key_extra + [random()])
-                    precall_key = prefix + 'asp:' + suffix
-                    # Cache a precall_key to watch for invalidation during
-                    # the function call. Its value does not matter. If and
-                    # only if it remains valid before, during, and after the
-                    # call, the result can be cached and returned.
-                    cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
+                    if keep_fresh:
+                        # We call this "asp" for "as precall" because this key is
+                        # cached before the actual function is called. We randomize
+                        # the key to prevent falsely thinking the key was not
+                        # invalidated when in fact it was invalidated and the
+                        # function was called again in another process.
+                        suffix = key_func(func, args, kwargs, key_extra + [random()])
+                        precall_key = prefix + 'asp:' + suffix
+                        # Cache a precall_key to watch for invalidation during
+                        # the function call. Its value does not matter. If and
+                        # only if it remains valid before, during, and after the
+                        # call, the result can be cached and returned.
+                        cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
+                    else:
+                        precall_key = ''
 
                     result = func(*args, **kwargs)
-                    if redis_client.get(precall_key) is not None:
-                        # Function result is still valid, cache it.
-                        cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs)
-                        if redis_client.get(precall_key) is None:
-                            # Key was invalidated while caching, invalidate it.
-                            invalidate_keys(cache_key)
-
+                    cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs,
+                                precall_key=precall_key)
                     return result
 
         return wrapper
