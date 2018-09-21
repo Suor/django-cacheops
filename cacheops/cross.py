@@ -26,7 +26,6 @@ def md5hex(s):
     return md5(s).hexdigest()
 
 
-# TODO: use django.utils.inspect.getargspec from Django 1.9
 import inspect
 
 if six.PY2:
