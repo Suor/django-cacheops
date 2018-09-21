@@ -29,7 +29,7 @@ from cacheops.templatetags.cacheops import register
 
 decorator_tag = register.decorator_tag
 from .models import *  # noqa
-from .utils import BaseTestCase, make_inc, make_invalidate_and_inc
+from .utils import BaseTestCase, make_inc
 
 
 class BasicTests(BaseTestCase):
@@ -262,18 +262,21 @@ class DecoratorTests(BaseTestCase):
         p.save()                               # invalidate by Post
         self.assertEqual(get_calls(1), 3)      # miss and cache
 
-    def test_cached_as_not_cached_if_invalidated_during_func(self):
+    def test_cached_as_keep_fresh(self):
         c = Category.objects.create(title='test')
-        get_calls = make_invalidate_and_inc(cached_as(c, keep_fresh=True), c, 1)
+        calls = [0]
+
+        @cached_as(c, keep_fresh=True)
+        def get_calls(_=None, **kw):
+            # Invalidate during first run
+            if calls[0] < 1:
+                invalidate_obj(c)
+            calls[0] += 1
+            return calls[0]
 
         self.assertEqual(get_calls(), 1)      # miss, stale result not cached.
         self.assertEqual(get_calls(), 2)      # miss and cache
         self.assertEqual(get_calls(), 2)      # hit
-        Category.objects.create(title='miss') # don't invalidate
-        self.assertEqual(get_calls(), 2)      # hit
-        c.title = 'new'
-        c.save()                              # invalidate
-        self.assertEqual(get_calls(), 3)      # miss
 
     def test_cached_view_as(self):
         get_calls = make_inc(cached_view_as(Category))

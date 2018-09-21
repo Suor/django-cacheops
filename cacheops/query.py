@@ -125,7 +125,7 @@ def cached_as(*samples, **kwargs):
                         # the function call. Its value does not matter. If and
                         # only if it remains valid before, during, and after the
                         # call, the result can be cached and returned.
-                        cache_thing(prefix, precall_key, True, cond_dnfs, timeout, dbs=dbs)
+                        cache_thing(prefix, precall_key, 'PRECALL', cond_dnfs, timeout, dbs=dbs)
                     else:
                         precall_key = ''
 

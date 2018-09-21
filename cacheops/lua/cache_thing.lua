@@ -5,7 +5,7 @@ local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
 local timeout = tonumber(ARGV[3])
 
-if precall_key ~= '' and not redis.call('get', precall_key) then
+if precall_key ~= '' and redis.call('exists', precall_key) == 0 then
   -- Cached data was invalidated during the function call. The data is
   -- stale and should not be cached.
   return
