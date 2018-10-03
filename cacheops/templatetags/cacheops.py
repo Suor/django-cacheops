@@ -33,9 +33,9 @@ __all__ = ['CacheopsLibrary', 'invalidate_fragment']
 
 
 class CacheopsLibrary(Library):
-    def decorator_tag(self, func=None, takes_context=False):
+    def tag(self, func=None, takes_context=False):
         if func is None:
-            return partial(self.decorator_tag, takes_context=takes_context)
+            return partial(self.tag, takes_context=takes_context)
 
         name = func.__name__
         params, varargs, varkw, defaults = getargspec(func)
@@ -51,7 +51,7 @@ class CacheopsLibrary(Library):
                                       takes_context=takes_context, name=name)
             return CachedNode(func, takes_context, args, kwargs, nodelist)
 
-        self.tag(name=name, compile_function=_compile)
+        super(CacheopsLibrary, self).tag(name=name, compile_function=_compile)
         return func
 
 register = CacheopsLibrary()
@@ -76,7 +76,7 @@ def _make_render(context, nodelist):
     return render
 
 
-@register.decorator_tag
+@register.tag
 def cached(timeout, fragment_name, *extra):
     return cacheops.cached(timeout=timeout, extra=(fragment_name,) + extra)
 
@@ -86,6 +86,6 @@ def invalidate_fragment(fragment_name, *extra):
     cached(None, fragment_name, *extra)(render).invalidate()
 
 
-@register.decorator_tag
+@register.tag
 def cached_as(queryset, timeout, fragment_name, *extra):
     return cacheops.cached_as(queryset, timeout=timeout, extra=(fragment_name,) + extra)
