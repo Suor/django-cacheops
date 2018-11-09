@@ -22,7 +22,7 @@ try:
 except ImportError:
     RawSQL = None
 
-from cacheops import invalidate_model, invalidate_obj, \
+from cacheops import invalidate_model, invalidate_obj, invalidate_objs, \
                      cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
 from cacheops.templatetags.cacheops import register
@@ -348,6 +348,14 @@ class WeirdTests(BaseTestCase):
 
     def test_custom_query(self):
         list(Weird.customs.cache())
+
+    def test_invalidate_objs_handles_empty_list(self):
+        invalidate_objs([])
+
+    def test_invalidate_objs(self):
+        obj1 = Weird.objects.create()
+        obj2 = Weird.objects.create()
+        invalidate_objs([obj1, obj2])
 
 
 @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
