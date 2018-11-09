@@ -14,7 +14,7 @@ from .signals import cache_invalidated
 from .transaction import queue_when_in_transaction
 
 
-__all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
+__all__ = ('invalidate_obj', 'invalidate_objs', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
 @memoize
@@ -50,6 +50,24 @@ def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
     """
     model = obj.__class__._meta.concrete_model
     invalidate_dict(model, get_obj_dict(model, obj), using=using)
+
+
+def invalidate_objs(objs, using=DEFAULT_DB_ALIAS):
+    """
+    Invalidates caches that can possibly be influenced by a list of objects.
+    All the objects provided should be from the same model
+
+    Raises ValueError if objects are from different models
+    """
+    if not objs:
+        return
+    try:
+        model, = set(obj.__class__._meta.concrete_model for obj in objs)
+    except ValueError:
+        raise ValueError(
+            "Can only call invalidate_objs with objects from the same model"
+        )
+    invalidate_dict(model, get_obj_dicts(model, objs), using=using)
 
 
 @queue_when_in_transaction
@@ -109,8 +127,8 @@ def serializable_fields(model):
     return tuple(f for f in model._meta.fields
                    if not isinstance(f, NOT_SERIALIZED_FIELDS))
 
-@post_processing(dict)
-def get_obj_dict(model, obj):
+
+def _get_obj_dict(model, obj):
     for field in serializable_fields(model):
         value = getattr(obj, field.attname)
         if value is None:
@@ -119,3 +137,16 @@ def get_obj_dict(model, obj):
             continue
         else:
             yield field.attname, field.get_prep_value(value)
+
+
+@post_processing(dict)
+def get_obj_dict(model, obj):
+    for d in _get_obj_dict(model, obj):
+        yield d
+
+
+@post_processing(dict)
+def get_obj_dicts(model, objs):
+    for obj in objs:
+        for d in _get_obj_dict(model, obj):
+            yield d
