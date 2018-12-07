@@ -15,4 +15,4 @@ class Command(BaseCommand):
         for path in options['path']:
             if path == 'default':
                 path = settings.FILE_CACHE_DIR
-            os.system('find %s -type f \! -iname "\." -mmin +0 -delete' % path)
+            os.system(r'find %s -type f \! -iname "\." -mmin +0 -delete' % path)
