@@ -216,7 +216,7 @@ class QuerySetMixin(object):
     def cache(self, ops=None, timeout=None, lock=None):
         """
         Enables caching for given ops
-            ops        - a subset of {'get', 'fetch', 'count', 'exists'},
+            ops        - a subset of {'get', 'fetch', 'count', 'exists', 'aggregate'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
             lock       - use lock to prevent dog-pile effect
