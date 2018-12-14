@@ -588,6 +588,20 @@ class IssueTests(BaseTestCase):
         Video.objects.using('slave').invalidated_update(title='test_265_3')
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_3').exists())
 
+    def test_312(self):
+        device = Device.objects.create()
+
+        # query by 32bytes uuid
+        d = Device.objects.cache().get(uid=device.uid.hex)
+
+        # test invalidation
+        d.model = 'new model'
+        d.save()
+
+        with self.assertNumQueries(1):
+            changed_device = Device.objects.cache().get(uid=device.uid.hex)
+            self.assertEqual(d.model, changed_device.model)
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']

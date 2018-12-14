@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import date, datetime, time
 
 from django.db import models
@@ -216,3 +217,9 @@ def set_boolean_true(sender, instance, created, **kwargs):
 
 from django.db.models.signals import post_save
 post_save.connect(set_boolean_true, sender=One)
+
+
+# 312
+class Device(models.Model):
+    uid = models.UUIDField(default=uuid.uuid4)
+    model = models.CharField(max_length=64)
