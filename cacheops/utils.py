@@ -22,7 +22,8 @@ NOT_SERIALIZED_FIELDS = (
 
 
 def get_concrete_model(model):
-    return next(b for b in model.__mro__ if issubclass(b, models.Model) and not b._meta.abstract)
+    return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
+                 and not b._meta.proxy and not b._meta.abstract), None)
 
 def model_family(model):
     """
@@ -35,7 +36,7 @@ def model_family(model):
     #       Cacheops doesn't support them anyway.
     # NOTE: when this is called in Manager.contribute_to_class()
     #       ._meta.concrete_model might still be None
-    return class_tree(model._meta.concrete_model or get_concrete_model(model))
+    return class_tree(model._meta.concrete_model or get_concrete_model(model) or model)
 
 
 @memoize
