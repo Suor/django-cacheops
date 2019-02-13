@@ -1,13 +1,15 @@
 from django.db import connections
 from django.test import TestCase
 from django.test import override_settings
+from django.db.models import Prefetch
 
 from cacheops import cached_as, no_invalidation, invalidate_obj, invalidate_model, invalidate_all
 from cacheops.conf import settings
 from cacheops.signals import cache_read, cache_invalidated
+from cacheops.utils import get_model_from_lookup
 
 from .utils import BaseTestCase, make_inc
-from .models import Post, Category, Local, DbAgnostic, DbBinded
+from .models import Post, Category, Local, DbAgnostic, DbBinded, Brand, Label
 
 
 class SettingsTests(TestCase):
@@ -177,3 +179,27 @@ class DbAgnosticTests(BaseTestCase):
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
+
+
+class CachedPrefetchTest(BaseTestCase):
+
+    def test_get_model_from_lookup(self):
+        assert get_model_from_lookup(Brand, 'labels') is Label
+
+    def test_cache_prefetch_related(self):
+        qs = Brand.objects.all().cache_prefetch_related('labels')
+
+        pf = qs._prefetch_related_lookups[0]
+
+        assert isinstance(pf, Prefetch)
+        assert pf.queryset.model is Label
+        assert pf.queryset._cacheprofile
+
+    def test_cache_prefetch_related_with_ops(self):
+        qs = Brand.objects.all().cache_prefetch_related('labels', ops=['get'])
+
+        pf = qs._prefetch_related_lookups[0]
+
+        self.assertEqual(pf.queryset._cacheprofile['ops'], {'get'})
+
+

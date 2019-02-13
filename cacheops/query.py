@@ -12,13 +12,13 @@ import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Manager, Model
+from django.db.models import Manager, Model, Prefetch
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, get_model_from_lookup
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
@@ -248,6 +248,37 @@ class QuerySetMixin(object):
             return self
         else:
             return self.cache(ops=[])
+
+    def cache_prefetch_related(self, *lookups, ops=None, timeout=None, lock=None):
+        """
+        Same as prefetch_related but attempts to pull relations from the cache instead
+
+            lookups    - same as for django's vanilla prefetch_related()
+            ops        - a subset of {'get', 'fetch', 'count', 'exists', 'aggregate'},
+                         ops caching to be turned on, all enabled by default
+            timeout    - override default cache timeout
+            lock       - use lock to prevent dog-pile effect
+        """
+
+        # If relations are already fetched there is no point to continuing
+        if self._prefetch_done:
+            return self
+
+        prefetches = []
+
+        for pf in lookups:
+            if isinstance(pf, Prefetch):
+                pf.queryset = pf.queryset.cache(ops=ops, timeout=timeout, lock=lock)
+                prefetches.append(pf)
+
+            if isinstance(pf, str):
+                model_class = get_model_from_lookup(self.model, pf)
+                prefetches.append(
+                    Prefetch(pf, model_class._default_manager.all().cache(ops=ops, timeout=timeout, lock=lock))
+                )
+
+        return self.prefetch_related(*prefetches)
+
 
     def cloning(self, cloning=1000):
         self._cloning = cloning
