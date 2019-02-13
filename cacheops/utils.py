@@ -141,6 +141,31 @@ def cached_view_fab(_cached):
     return cached_view
 
 
+def get_model_from_lookup(base_model, orm_lookup):
+    """
+    Given a base model and an ORM lookup, follow any relations and return
+    the final model class of the lookup.
+    """
+
+    result = base_model
+    for field_name in orm_lookup.split('__'):
+
+        if field_name.endswith('_set'):
+            field_name = field_name.split('_set')[0]
+
+        try:
+            field = result._meta.get_field(field_name)
+        except models.FieldDoesNotExist:
+            break
+
+        if hasattr(field, 'related_model'):
+            result = field.related_model
+        else:
+            break
+
+    return result
+
+
 ### Whitespace handling for template tags
 
 from django.utils.safestring import mark_safe
