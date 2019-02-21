@@ -255,10 +255,6 @@ class QuerySetMixin(object):
         Same as prefetch_related but attempts to pull relations from the cache instead
 
             lookups    - same as for django's vanilla prefetch_related()
-            ops        - a subset of {'get', 'fetch', 'count', 'exists', 'aggregate'},
-                         ops caching to be turned on, all enabled by default
-            timeout    - override default cache timeout
-            lock       - use lock to prevent dog-pile effect
         """
 
         # If relations are already fetched there is no point to continuing
