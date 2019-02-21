@@ -196,10 +196,10 @@ class CachedPrefetchTest(BaseTestCase):
         assert pf.queryset._cacheprofile
 
     def test_cache_prefetch_related_with_ops(self):
-        qs = Brand.objects.all().cache_prefetch_related('labels', ops=['get'])
+        qs = Brand.objects.all().cache_prefetch_related('labels')
 
         pf = qs._prefetch_related_lookups[0]
 
-        self.assertEqual(pf.queryset._cacheprofile['ops'], {'get'})
+        self.assertEqual(pf.queryset._cacheprofile['ops'], {'fetch'})
 
 

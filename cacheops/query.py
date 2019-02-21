@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import sys
 import json
 import threading
@@ -249,7 +250,7 @@ class QuerySetMixin(object):
         else:
             return self.cache(ops=[])
 
-    def cache_prefetch_related(self, *lookups, ops=None, timeout=None, lock=None):
+    def cache_prefetch_related(self, *lookups):
         """
         Same as prefetch_related but attempts to pull relations from the cache instead
 
@@ -268,13 +269,14 @@ class QuerySetMixin(object):
 
         for pf in lookups:
             if isinstance(pf, Prefetch):
-                pf.queryset = pf.queryset.cache(ops=ops, timeout=timeout, lock=lock)
-                prefetches.append(pf)
+                item = copy.copy(pf)
+                item.queryset = item.queryset.cache(ops=['fetch'])
+                prefetches.append(item)
 
             if isinstance(pf, str):
                 model_class = get_model_from_lookup(self.model, pf)
                 prefetches.append(
-                    Prefetch(pf, model_class._default_manager.all().cache(ops=ops, timeout=timeout, lock=lock))
+                    Prefetch(pf, model_class._default_manager.all().cache(ops=['fetch']))
                 )
 
         return self.prefetch_related(*prefetches)
