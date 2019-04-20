@@ -30,9 +30,6 @@ except ImportError:
 from .conf import settings
 
 
-LONG_DISJUNCTION = 8
-
-
 def dnfs(qs):
     """
     Converts query condition tree into a DNF of eq conds.
@@ -73,7 +70,7 @@ def dnfs(qs):
                 return [[(where.lhs.alias, attname, where.rhs, True)]]
             elif isinstance(where, IsNull):
                 return [[(where.lhs.alias, attname, None, where.rhs)]]
-            elif isinstance(where, In) and len(where.rhs) < LONG_DISJUNCTION:
+            elif isinstance(where, In) and len(where.rhs) < settings.CACHEOPS_LONG_DISJUNCTION:
                 return [[(where.lhs.alias, attname, v, True)] for v in where.rhs]
             else:
                 return SOME_TREE
