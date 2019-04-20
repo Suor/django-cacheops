@@ -23,6 +23,7 @@ class Defaults(namespace):
     CACHEOPS_DEGRADE_ON_FAILURE = False
     CACHEOPS_SENTINEL = {}
     CACHEOPS_NOT_SERIALIZED_FIELDS = models.FileField, models.TextField, models.BinaryField
+    CACHEOPS_LONG_DISJUNCTION = 8
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30
