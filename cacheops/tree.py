@@ -27,7 +27,7 @@ except ImportError:
     class RawSQL(object):
         pass
 
-from .utils import NOT_SERIALIZED_FIELDS
+from .conf import settings
 
 
 LONG_DISJUNCTION = 8
@@ -65,7 +65,7 @@ def dnfs(qs):
             if isinstance(where.rhs, (QuerySet, Query, Subquery, RawSQL)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
-            if isinstance(where.lhs.target, NOT_SERIALIZED_FIELDS):
+            if isinstance(where.lhs.target, settings.CACHEOPS_NOT_SERIALIZED_FIELDS):
                 return SOME_TREE
 
             attname = where.lhs.target.attname

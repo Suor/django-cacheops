@@ -12,15 +12,6 @@ from django.http import HttpRequest
 from .conf import model_profile
 
 
-# NOTE: we don't serialize this fields since their values could be very long
-#       and one should not filter by their equality anyway.
-NOT_SERIALIZED_FIELDS = (
-    models.FileField,
-    models.TextField, # One should not filter by long text equality
-    models.BinaryField,
-)
-
-
 def get_concrete_model(model):
     return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
                  and not b._meta.proxy and not b._meta.abstract), None)

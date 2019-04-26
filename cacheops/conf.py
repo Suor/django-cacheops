@@ -5,6 +5,7 @@ from funcy import memoize, merge, namespace
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
+from django.db import models
 from django.utils.module_loading import import_string
 
 
@@ -21,6 +22,7 @@ class Defaults(namespace):
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
     CACHEOPS_SENTINEL = {}
+    CACHEOPS_NOT_SERIALIZED_FIELDS = models.FileField, models.TextField, models.BinaryField
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30
