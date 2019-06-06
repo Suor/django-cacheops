@@ -373,8 +373,8 @@ class QuerySetMixin(object):
         else:
             return self._no_monkey.exists(self)
 
-    def bulk_create(self, objs, batch_size=None):
-        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+    def bulk_create(self, objs, *args, **kwargs):
+        objs = self._no_monkey.bulk_create(self, objs, *args, **kwargs)
         if family_has_profile(self.model):
             for obj in objs:
                 invalidate_obj(obj, using=self.db)
