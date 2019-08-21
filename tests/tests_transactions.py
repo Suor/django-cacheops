@@ -20,6 +20,7 @@ class IntentionalRollback(Exception):
 
 
 class TransactionSupportTests(TransactionTestCase):
+    databases = ('default', 'slave')
     fixtures = ['basic']
 
     def test_atomic(self):

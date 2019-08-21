@@ -161,6 +161,8 @@ class LocalGetTests(BaseTestCase):
 
 
 class DbAgnosticTests(BaseTestCase):
+    databases = ('default', 'slave')
+
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
 

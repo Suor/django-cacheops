@@ -11,6 +11,7 @@ from .utils import BaseTestCase
 
 
 class PrefixTests(BaseTestCase):
+    databases = ('default', 'slave')
     fixtures = ['basic']
 
     def test_context(self):

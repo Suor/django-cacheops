@@ -452,6 +452,7 @@ class TemplateTests(BaseTestCase):
 
 
 class IssueTests(BaseTestCase):
+    databases = ('default', 'slave')
     fixtures = ['basic']
 
     def setUp(self):
@@ -935,6 +936,9 @@ class GISTests(BaseTestCase):
 # NOTE: overriding cache prefix to separate invalidation sets by db.
 @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
 class MultiDBInvalidationTests(BaseTestCase):
+    databases = ('default', 'slave')
+    fixtures = ['basic']
+
     @contextmanager
     def _control_counts(self):
         Category.objects.cache().count()
