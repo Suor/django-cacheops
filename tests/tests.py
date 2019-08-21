@@ -589,6 +589,7 @@ class IssueTests(BaseTestCase):
         Video.objects.using('slave').invalidated_update(title='test_265_3')
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_3').exists())
 
+    @unittest.expectedFailure
     def test_312(self):
         device = Device.objects.create()
 
