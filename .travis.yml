@@ -3,8 +3,9 @@ sudo: false
 language: python
 cache: pip
 services:
-  - redis-server
+  - redis
   - postgresql
+  - mysql
 addons:
   postgresql: "10"
   apt:
