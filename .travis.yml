@@ -56,8 +56,8 @@ install:
   - pip install tox-travis
 before_script:
   # check gis
-  - gdal-config --version
-  - gdal-config --cflags
+  # - gdal-config --version
+  # - gdal-config --cflags
   - psql -U postgres -c "create extension postgis"
   # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
