@@ -66,8 +66,8 @@ before_script:
   - psql -U postgres -c "create database cacheops"
   - psql -U postgres -c "create database cacheops_slave"
   # mysql databases
-  - mysql -e "create user cacheops"
-  - mysql -u root -e "grant all on *.* to 'cacheops'@'localhost'"
+  - mysql -u root -e "create user cacheops@localhost"
+  - mysql -u root -e "grant all on *.* to cacheops@localhost"
   - mysql -e "create database cacheops"
   - mysql -e "create database cacheops_slave"
 script:
