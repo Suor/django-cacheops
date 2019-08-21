@@ -12,6 +12,7 @@ addons:
     packages:
     - postgresql-10
     - postgresql-10-postgis-2.4
+    - libgdal-dev
 
 python:
   - 2.7
@@ -57,8 +58,8 @@ install:
   - pip install tox-travis
 before_script:
   # check gis
-  # - gdal-config --version
-  # - gdal-config --cflags
+  - gdal-config --version
+  - gdal-config --cflags
   - psql -U postgres -c "create extension postgis"
   # set up postgresql
   - psql -U postgres -c "create role cacheops login superuser"
