@@ -22,7 +22,9 @@ class Defaults(namespace):
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
     CACHEOPS_SENTINEL = {}
-    CACHEOPS_NOT_SERIALIZED_FIELDS = models.FileField, models.TextField, models.BinaryField
+    # NOTE: we don't use this fields in invalidator conditions since their values could be very long
+    #       and one should not filter by their equality anyway.
+    CACHEOPS_SKIP_FIELDS = models.FileField, models.TextField, models.BinaryField
     CACHEOPS_LONG_DISJUNCTION = 8
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
