@@ -334,8 +334,17 @@ class QuerySetMixin(object):
 
     def aggregate(self, *args, **kwargs):
         if self._should_cache('aggregate'):
-            func = lambda: self._no_monkey.aggregate(self, *args, **kwargs)
-            return cached_as(self, extra=[args, kwargs])(func)()
+            # Apply all aggregates the same way original .aggregate(), but do not perform sql
+            kwargs = kwargs.copy()
+            for arg in args:
+                kwargs[arg.default_alias] = arg
+
+            qs = self._clone()
+            for (alias, aggregate_expr) in kwargs.items():
+                qs.query.add_annotation(aggregate_expr, alias, is_summary=True)
+
+            # Use resulting qs as a ref
+            return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
         else:
             return self._no_monkey.aggregate(self, *args, **kwargs)
 
