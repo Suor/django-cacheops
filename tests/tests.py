@@ -11,7 +11,7 @@ from django.test import override_settings
 from django.test.client import RequestFactory
 from django.contrib.auth.models import User
 from django.template import Context, Template
-from django.db.models import F, Count
+from django.db.models import F, Count, Sum
 # These were added in Django 2.0
 try:
     from django.db.models import Subquery
@@ -603,6 +603,9 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_device = Device.objects.cache().get(uid=device.uid.hex)
             self.assertEqual(d.model, changed_device.model)
+
+    def test_316(self):
+        Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
 
 class RelatedTests(BaseTestCase):
