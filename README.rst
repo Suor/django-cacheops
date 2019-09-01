@@ -69,6 +69,7 @@ Setup redis connection and enable caching for desired models:
         'service_name': 'mymaster',          # sentinel service name, required
         'socket_timeout': 0.1,               # connection timeout in seconds, optional
         'db': 0                              # redis database, default: 0
+        ...                                  # everything else is passed to Sentinel()
     }
 
     # To use your own redis client class,
