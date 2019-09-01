@@ -1,3 +1,15 @@
+4.2
+- support Django 2.1 and 2.2
+- added keep_fresh option to @cached_as (George Lee)
+- pass CACHEOPS_SENTINEL options through (David Fuentes Baldomir)
+- made SKIP_FIELDS and LONG_DISJUCTION configurable (Nic Wolff)
+- fixed .aggregate() over .annotate() fields in Django 2.2
+- fixed .bulk_create() in Django 2.2 (Grzegorz Szczepanczyk)
+- fixed test database to work in environments without /dev/shm (George Lee)
+- fixed proxy/abstract model bug
+- added test case for issue #312 (Andy Tzeng)
+- some warnings and doc-strings improvements
+
 4.1
 - use UNLINK instead of DEL when available, use Redis 4.0+ for that
 - request m2m objects for invalidation using correct db
