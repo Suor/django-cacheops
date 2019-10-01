@@ -4,6 +4,8 @@ import json
 import threading
 import six
 from random import random
+
+from django.db.models.manager import BaseManager
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
@@ -12,7 +14,7 @@ import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Manager, Model
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -579,7 +581,7 @@ def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
-    monkey_mix(Manager, ManagerMixin)
+    monkey_mix(BaseManager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
 
     # Use app registry to introspect used apps
@@ -588,7 +590,7 @@ def install_cacheops():
     # Install profile and signal handlers for any earlier created models
     for model in apps.get_models(include_auto_created=True):
         if family_has_profile(model):
-            if not isinstance(model._default_manager, Manager):
+            if not isinstance(model._default_manager, BaseManager):
                 raise ImproperlyConfigured("Can't install cacheops for %s.%s model:"
                                            " non-django model class or manager is used."
                                             % (model._meta.app_label, model._meta.model_name))

@@ -9,7 +9,6 @@ from django.db import connection
 from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User
 from django.template import Context, Template
 from django.db.models import F, Count, Sum
 # These were added in Django 2.0
@@ -606,6 +605,12 @@ class IssueTests(BaseTestCase):
 
     def test_316(self):
         Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
+
+    def test_333(self):
+        # ensure that we can use a manager not derived from Manger
+        # (i.e. using manager.BaseManager.from_queryset)
+        mgr = CustomFromQSModel.objects
+        assert isinstance(mgr, CustomFromQSManager)
 
 
 class RelatedTests(BaseTestCase):

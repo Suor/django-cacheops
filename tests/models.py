@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from django.db import models
 from django.db.models.query import QuerySet
-from django.db.models import sql
+from django.db.models import sql, manager
 from django.contrib.auth.models import User
 
 
@@ -223,3 +223,17 @@ post_save.connect(set_boolean_true, sender=One)
 class Device(models.Model):
     uid = models.UUIDField(default=uuid.uuid4)
     model = models.CharField(max_length=64)
+
+
+# 333
+class CustomeQuerySet(QuerySet):
+    pass
+
+
+class CustomFromQSManager(manager.BaseManager.from_queryset(CustomeQuerySet)):
+    use_for_related_fields = True
+
+
+class CustomFromQSModel(models.Model):
+    boolean = models.BooleanField(default=False)
+    objects = CustomFromQSManager()
