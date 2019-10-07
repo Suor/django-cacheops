@@ -606,12 +606,6 @@ class IssueTests(BaseTestCase):
     def test_316(self):
         Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
-    def test_333(self):
-        # ensure that we can use a manager not derived from Manger
-        # (i.e. using manager.BaseManager.from_queryset)
-        mgr = CustomFromQSModel.objects
-        assert isinstance(mgr, CustomFromQSManager)
-
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']

@@ -5,7 +5,6 @@ import threading
 import six
 from random import random
 
-from django.db.models.manager import BaseManager
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
@@ -15,6 +14,7 @@ from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
 from django.db.models import Model
+from django.db.models.manager import BaseManager
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
