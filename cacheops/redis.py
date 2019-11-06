@@ -12,7 +12,7 @@ from redis.sentinel import Sentinel
 from .conf import settings
 
 
-if settings.CACHEOPS_DEGRADE_ON_FAILURE:
+if settings.CACHEOPS_DEGRADE_ON_FAILURE and settings.CACHEOPS_ENABLED:
     @decorator
     def handle_connection_failure(call):
         try:
