@@ -473,7 +473,7 @@ class ManagerMixin(object):
                 pass
 
     def _post_save(self, sender, instance, using, **kwargs):
-        if not settings.CACHEOPS_ENABLED:
+        if not settings.CACHEOPS_ENABLED or no_invalidation.active:
             return
 
         # Invoke invalidations for both old and new versions of saved object
