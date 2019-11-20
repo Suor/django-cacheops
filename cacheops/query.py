@@ -568,7 +568,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
             invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
         # NOTE: we don't need to query through objects here,
-        #       cause we already know all their meaningfull attributes.
+        #       cause we already know all their meaningful attributes.
         for pk in pk_set:
             invalidate_dict(sender, {
                 instance_column: instance.pk,
