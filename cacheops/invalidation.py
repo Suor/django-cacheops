@@ -7,7 +7,6 @@ from django.db.models.expressions import F, Expression
 from distutils.version import StrictVersion
 
 from .conf import settings
-from .utils import NOT_SERIALIZED_FIELDS
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .signals import cache_invalidated
@@ -107,7 +106,7 @@ no_invalidation = _no_invalidation()
 @memoize
 def serializable_fields(model):
     return tuple(f for f in model._meta.fields
-                   if not isinstance(f, NOT_SERIALIZED_FIELDS))
+                   if not isinstance(f, settings.CACHEOPS_SKIP_FIELDS))
 
 @post_processing(dict)
 def get_obj_dict(model, obj):

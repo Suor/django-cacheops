@@ -1,19 +1,21 @@
-dist: trusty
+dist: xenial
 sudo: false
 language: python
 cache: pip
 services:
-  - redis-server
+  - redis
   - postgresql
+  - mysql
 addons:
-  postgresql: "9.6"
+  postgresql: "10"
   apt:
     packages:
-      - postgresql-9.6-postgis-2.3
-      - libgdal-dev
+    - postgresql-10
+    - postgresql-10-postgis-2.4
+    - libgdal-dev
+
 python:
   - 2.7
-  - 3.4
   - 3.5
   - pypy
 env:
@@ -29,8 +31,6 @@ matrix:
       env: DJANGO=2.0
     - python: 3.5
       env: DJANGO=2.1
-    - python: 3.5
-      env: DJANGO=master
     - python: 3.6
       env: DJANGO=1.11
     - python: 3.6
@@ -38,11 +38,37 @@ matrix:
     - python: 3.6
       env: DJANGO=2.1
     - python: 3.6
+      env: DJANGO=2.2
+    - python: 3.6
+      env: DJANGO=3.0
+    - python: 3.6
+      env: DJANGO=master
+    - python: 3.7
+      env: DJANGO=2.0
+    - python: 3.7
+      env: DJANGO=2.1
+    - python: 3.7
+      env: DJANGO=2.2
+    - python: 3.7
+      env: DJANGO=3.0
+    - python: 3.7
+      env: DJANGO=master
+    - python: 3.8
+      env: DJANGO=2.0
+    - python: 3.8
+      env: DJANGO=2.1
+    - python: 3.8
+      env: DJANGO=2.2
+    - python: 3.8
+      env: DJANGO=3.0
+    - python: 3.8
       env: DJANGO=master
   allow_failures:
-    - python: 3.5
-      env: DJANGO=master
     - python: 3.6
+      env: DJANGO=master
+    - python: 3.7
+      env: DJANGO=master
+    - python: 3.8
       env: DJANGO=master
 install:
   - pip install tox-travis
@@ -57,8 +83,8 @@ before_script:
   - psql -U postgres -c "create database cacheops"
   - psql -U postgres -c "create database cacheops_slave"
   # mysql databases
-  - mysql -e "create user cacheops"
-  - mysql -u root -e "grant all on *.* to 'cacheops'@'localhost'"
+  - mysql -u root -e "create user cacheops@localhost"
+  - mysql -u root -e "grant all on *.* to cacheops@localhost"
   - mysql -e "create database cacheops"
   - mysql -e "create database cacheops_slave"
 script:

@@ -9,9 +9,8 @@ from django.db import connection
 from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
-from django.contrib.auth.models import User
 from django.template import Context, Template
-from django.db.models import F, Count
+from django.db.models import F, Count, Sum
 # These were added in Django 2.0
 try:
     from django.db.models import Subquery
@@ -452,6 +451,7 @@ class TemplateTests(BaseTestCase):
 
 
 class IssueTests(BaseTestCase):
+    databases = ('default', 'slave')
     fixtures = ['basic']
 
     def setUp(self):
@@ -588,6 +588,7 @@ class IssueTests(BaseTestCase):
         Video.objects.using('slave').invalidated_update(title='test_265_3')
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_3').exists())
 
+    @unittest.expectedFailure
     def test_312(self):
         device = Device.objects.create()
 
@@ -601,6 +602,9 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             changed_device = Device.objects.cache().get(uid=device.uid.hex)
             self.assertEqual(d.model, changed_device.model)
+
+    def test_316(self):
+        Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
 
 class RelatedTests(BaseTestCase):
@@ -935,6 +939,9 @@ class GISTests(BaseTestCase):
 # NOTE: overriding cache prefix to separate invalidation sets by db.
 @override_settings(CACHEOPS_PREFIX=lambda q: q.db)
 class MultiDBInvalidationTests(BaseTestCase):
+    databases = ('default', 'slave')
+    fixtures = ['basic']
+
     @contextmanager
     def _control_counts(self):
         Category.objects.cache().count()

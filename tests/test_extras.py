@@ -1,4 +1,4 @@
-from django.db import connections
+from django.db import connections, transaction
 from django.test import TestCase
 from django.test import override_settings
 from django.db.models import Prefetch
@@ -152,6 +152,16 @@ class NoInvalidationTests(BaseTestCase):
                 invalidate_obj(post)
         self._template(invalidate)
 
+    def test_in_transaction(self):
+        with transaction.atomic():
+            post = Post.objects.cache().get(pk=1)
+
+            with no_invalidation:
+                post.save()
+
+        with self.assertNumQueries(0):
+            Post.objects.cache().get(pk=1)
+
 
 class LocalGetTests(BaseTestCase):
     def setUp(self):
@@ -163,6 +173,8 @@ class LocalGetTests(BaseTestCase):
 
 
 class DbAgnosticTests(BaseTestCase):
+    databases = ('default', 'slave')
+
     def test_db_agnostic_by_default(self):
         list(DbAgnostic.objects.cache())
 

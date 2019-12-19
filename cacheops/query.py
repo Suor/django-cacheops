@@ -5,6 +5,7 @@ import json
 import threading
 import six
 from random import random
+
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
 from .cross import pickle, md5
@@ -13,7 +14,8 @@ import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Manager, Model, Prefetch
+from django.db.models import Model, Prefetch
+from django.db.models.manager import BaseManager
 from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -363,8 +365,16 @@ class QuerySetMixin(object):
 
     def aggregate(self, *args, **kwargs):
         if self._should_cache('aggregate'):
-            # Annotate adds all the same annotations, but doesn't run the query
-            qs = self.clone().annotate(*args, **kwargs)
+            # Apply all aggregates the same way original .aggregate(), but do not perform sql
+            kwargs = kwargs.copy()
+            for arg in args:
+                kwargs[arg.default_alias] = arg
+
+            qs = self._clone()
+            for (alias, aggregate_expr) in kwargs.items():
+                qs.query.add_annotation(aggregate_expr, alias, is_summary=True)
+
+            # Use resulting qs as a ref
             return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
         else:
             return self._no_monkey.aggregate(self, *args, **kwargs)
@@ -428,8 +438,8 @@ class QuerySetMixin(object):
         else:
             return self._no_monkey.exists(self)
 
-    def bulk_create(self, objs, batch_size=None):
-        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+    def bulk_create(self, objs, *args, **kwargs):
+        objs = self._no_monkey.bulk_create(self, objs, *args, **kwargs)
         if family_has_profile(self.model):
             for obj in objs:
                 invalidate_obj(obj, using=self.db)
@@ -492,7 +502,7 @@ class ManagerMixin(object):
                 pass
 
     def _post_save(self, sender, instance, using, **kwargs):
-        if not settings.CACHEOPS_ENABLED:
+        if not settings.CACHEOPS_ENABLED or no_invalidation.active:
             return
 
         # Invoke invalidations for both old and new versions of saved object
@@ -587,7 +597,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
             invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
         # NOTE: we don't need to query through objects here,
-        #       cause we already know all their meaningfull attributes.
+        #       cause we already know all their meaningful attributes.
         for pk in pk_set:
             invalidate_dict(sender, {
                 instance_column: instance.pk,
@@ -600,7 +610,7 @@ def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
-    monkey_mix(Manager, ManagerMixin)
+    monkey_mix(BaseManager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
 
     # Use app registry to introspect used apps
@@ -609,7 +619,7 @@ def install_cacheops():
     # Install profile and signal handlers for any earlier created models
     for model in apps.get_models(include_auto_created=True):
         if family_has_profile(model):
-            if not isinstance(model._default_manager, Manager):
+            if not isinstance(model._default_manager, BaseManager):
                 raise ImproperlyConfigured("Can't install cacheops for %s.%s model:"
                                            " non-django model class or manager is used."
                                             % (model._meta.app_label, model._meta.model_name))
