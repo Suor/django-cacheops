@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 language: python
 cache: pip
 services:
