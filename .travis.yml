@@ -57,4 +57,4 @@ before_script:
   - mysql -e "create database cacheops"
   - mysql -e "create database cacheops_slave"
 script:
-  - GDAL_VERSION=1.10 tox
+  - GDAL_VERSION=`gdal-config --version` tox
