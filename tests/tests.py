@@ -588,7 +588,7 @@ class IssueTests(BaseTestCase):
         Video.objects.using('slave').invalidated_update(title='test_265_3')
         self.assertTrue(Video.objects.using('slave').filter(title='test_265_3').exists())
 
-    @unittest.expectedFailure
+    @unittest.skipIf(django.VERSION < (3, 0), "Fixed in Django 3.0")
     def test_312(self):
         device = Device.objects.create()
 

@@ -19,6 +19,13 @@ from django.db.models.query import QuerySet
 from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
+# This thing reappeared in Django 3.0
+try:
+    from django.db.models.query import MAX_GET_RESULTS
+    from django.db import connections
+except ImportError:
+    MAX_GET_RESULTS = None
+
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .sharding import get_prefix
@@ -512,6 +519,11 @@ class ManagerMixin(object):
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
             qs = sender.objects.inplace().using(using).filter(**cond).order_by()
+            # Mimic Django 3.0 .get() logic
+            if MAX_GET_RESULTS and (
+                    not qs.query.select_for_update
+                    or connections[qs.db].features.supports_select_for_update_with_limit):
+                qs.query.set_limits(high=MAX_GET_RESULTS)
             qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
