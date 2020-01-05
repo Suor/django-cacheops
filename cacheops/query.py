@@ -1,15 +1,12 @@
-# -*- coding: utf-8 -*-
 import sys
 import json
 import threading
-import six
+import pickle
 from random import random
 
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
-from funcy.py3 import lmap, map, lcat, join_with
-from .cross import pickle, md5
+from funcy import lmap, map, lcat, join_with
 
-import django
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
@@ -27,6 +24,7 @@ except ImportError:
 
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
@@ -191,13 +189,9 @@ class QuerySetMixin(object):
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
-        # Thing only appeared in Django 1.9
-        it_class = getattr(self, '_iterable_class', None)
-        if it_class:
-            md.update('%s.%s' % (it_class.__module__, it_class.__name__))
-        # 'flat' attribute changes results formatting for values_list() in Django 1.8 and earlier
-        if hasattr(self, 'flat'):
-            md.update(str(self.flat))
+        # Iterable class pack results diffrently
+        it_class = self._iterable_class
+        md.update('%s.%s' % (it_class.__module__, it_class.__name__))
 
         cache_key = 'q:%s' % md.hexdigest()
         return self._prefix + cache_key if prefix else cache_key
@@ -264,46 +258,20 @@ class QuerySetMixin(object):
     def inplace(self):
         return self.cloning(0)
 
-    if django.VERSION >= (1, 9):
-        def _clone(self, **kwargs):
-            if self._cloning:
-                return self.clone(**kwargs)
-            else:
-                self.__dict__.update(kwargs)
-                return self
+    def _clone(self, **kwargs):
+        if self._cloning:
+            return self.clone(**kwargs)
+        else:
+            self.__dict__.update(kwargs)
+            return self
 
-        def clone(self, **kwargs):
-            clone = self._no_monkey._clone(self, **kwargs)
-            clone._cloning = self._cloning - 1 if self._cloning else 0
-            # NOTE: need to copy profile so that clone changes won't affect this queryset
-            if self.__dict__.get('_cacheprofile'):
-                clone._cacheprofile = self._cacheprofile.copy()
-            return clone
-    else:
-        def _clone(self, klass=None, setup=False, **kwargs):
-            if self._cloning:
-                return self.clone(klass, setup, **kwargs)
-            elif klass is not None:
-                # HACK: monkey patch self.query.clone for single call
-                #       to return itself instead of cloning
-                original_query_clone = self.query.clone
-
-                def query_clone():
-                    self.query.clone = original_query_clone
-                    return self.query
-                self.query.clone = query_clone
-                return self.clone(klass, setup, **kwargs)
-            else:
-                self.__dict__.update(kwargs)
-                return self
-
-        def clone(self, klass=None, setup=False, **kwargs):
-            clone = self._no_monkey._clone(self, klass, setup, **kwargs)
-            clone._cloning = self._cloning - 1 if self._cloning else 0
-            # NOTE: need to copy profile so that clone changes won't affect this queryset
-            if self.__dict__.get('_cacheprofile'):
-                clone._cacheprofile = self._cacheprofile.copy()
-            return clone
+    def clone(self, **kwargs):
+        clone = self._no_monkey._clone(self, **kwargs)
+        clone._cloning = self._cloning - 1 if self._cloning else 0
+        # NOTE: need to copy profile so that clone changes won't affect this queryset
+        if self.__dict__.get('_cacheprofile'):
+            clone._cacheprofile = self._cacheprofile.copy()
+        return clone
 
     def _fetch_all(self):
         # If already fetched or should pass by then fall back
@@ -318,14 +286,7 @@ class QuerySetMixin(object):
             if cache_data is not None:
                 self._result_cache = pickle.loads(cache_data)
             else:
-                # This thing appears in Django 1.9.
-                # In Djangos 1.9 and 1.10 both calls mean the same.
-                # Starting from Django 1.11 .iterator() uses chunked fetch
-                # while ._fetch_all() stays with bare _iterable_class.
-                if hasattr(self, '_iterable_class'):
-                    self._result_cache = list(self._iterable_class(self))
-                else:
-                    self._result_cache = list(self.iterator())
+                self._result_cache = list(self._iterable_class(self))
                 self._cache_results(cache_key, self._result_cache)
 
         return self._no_monkey._fetch_all(self)
@@ -561,13 +522,8 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if action not in ('pre_clear', 'post_add', 'pre_remove'):
         return
 
-    # NOTE: .rel moved to .remote_field in Django 1.9
-    if django.VERSION >= (1, 9):
-        get_remote = lambda f: f.remote_field
-    else:
-        get_remote = lambda f: f.rel
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
-                   if get_remote(m2m).through == sender)
+                   if m2m.remote_field.through == sender)
     instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
     if reverse:
         instance_column, model_column = model_column, instance_column
@@ -608,10 +564,9 @@ def install_cacheops():
             model._default_manager._install_cacheops(model)
 
             # Bind m2m changed handlers
-            rel_attr = 'remote_field' if django.VERSION >= (1, 9) else 'rel'
             m2ms = (f for f in model._meta.get_fields(include_hidden=True) if f.many_to_many)
             for m2m in m2ms:
-                rel = m2m if hasattr(m2m, 'through') else getattr(m2m, rel_attr, m2m)
+                rel = m2m if hasattr(m2m, 'through') else m2m.remote_field
                 opts = rel.through._meta
                 m2m_changed.connect(invalidate_m2m, sender=rel.through,
                                     dispatch_uid=(opts.app_label, opts.model_name))
@@ -625,12 +580,8 @@ def install_cacheops():
             return get_queryset.original(self, request).nocache()
 
     # Make buffers/memoryviews pickleable to serialize binary field data
-    if six.PY2:
-        import copy_reg
-        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))  # noqa
-    if six.PY3:
-        import copyreg
-        copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
+    import copyreg
+    copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
 
     # Fix random ordered dict keys producing different SQL for same QuerySet
     if (3, 3) <= sys.version_info < (3, 6):

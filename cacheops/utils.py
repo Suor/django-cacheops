@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any, any_fn, select_values
-from funcy.py3 import lmapcat
-from .cross import md5hex
+from funcy import memoize, compose, wraps, any, any_fn, select_values, lmapcat
 
 from django.db import models
 from django.http import HttpRequest
@@ -144,3 +141,25 @@ def carefully_strip_whitespace(text):
         return NEWLINE_BETWEEN_TAGS if '\n' in m.group(0) else SPACE_BETWEEN_TAGS
     text = re.sub(r'>\s{2,}<', repl, text)
     return text
+
+
+### hashing helpers
+
+import hashlib
+
+
+class md5:
+    def __init__(self, s=None):
+        self.md5 = hashlib.md5()
+        if s is not None:
+            self.update(s)
+
+    def update(self, s):
+        return self.md5.update(s.encode('utf-8'))
+
+    def hexdigest(self):
+        return self.md5.hexdigest()
+
+
+def md5hex(s):
+    return md5(s).hexdigest()

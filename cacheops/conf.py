@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-import six
-from funcy import memoize, merge, namespace
+from funcy import memoize, merge
 
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
@@ -12,7 +10,7 @@ from django.utils.module_loading import import_string
 ALL_OPS = {'get', 'fetch', 'count', 'aggregate', 'exists'}
 
 
-class Defaults(namespace):
+class Defaults:
     CACHEOPS_ENABLED = True
     CACHEOPS_REDIS = {}
     CACHEOPS_DEFAULTS = {}
@@ -67,7 +65,7 @@ def prepare_profiles():
         if mp['ops'] == 'all':
             mp['ops'] = ALL_OPS
         # People will do that anyway :)
-        if isinstance(mp['ops'], six.string_types):
+        if isinstance(mp['ops'], str):
             mp['ops'] = {mp['ops']}
         mp['ops'] = set(mp['ops'])
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from contextlib import contextmanager
 import re
 import unittest
@@ -10,16 +9,8 @@ from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.template import Context, Template
-from django.db.models import F, Count, Sum
-# These were added in Django 2.0
-try:
-    from django.db.models import Subquery
-except ImportError:
-    Subquery = None
-try:
-    from django.db.models.expressions import RawSQL
-except ImportError:
-    RawSQL = None
+from django.db.models import F, Count, Sum, Subquery
+from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
                      cached, cached_view, cached_as, cached_view_as
@@ -158,7 +149,6 @@ class BasicTests(BaseTestCase):
             qs.first()
             qs.last()
 
-    @unittest.skipIf(django.VERSION < (1, 11), 'Union added in Django 1.11')
     def test_union(self):
         qs = Post.objects.filter(category=1).values('id', 'title').union(
                 Category.objects.filter(title='Perl').values('id', 'title')).cache()
@@ -183,12 +173,10 @@ class BasicTests(BaseTestCase):
             list(Post.objects.filter(category=1).cache())
             list(Post.objects.filter(category=2).cache())
 
-    @unittest.skipIf(Subquery is None, "Suquery added in Django 2.0")
     def test_subquery(self):
         categories = Category.objects.cache().filter(title='Django').only('id')
         Post.objects.cache().filter(category__in=Subquery(categories)).count()
 
-    @unittest.skipIf(Subquery is None, "RawSQL added in Django 2.0")
     def test_rawsql(self):
         Post.objects.cache().filter(category__in=RawSQL("select 1", ())).count()
 
@@ -357,7 +345,6 @@ class PostgresTests(BaseTestCase):
     def test_array_len(self):
         list(TaggedPost.objects.filter(tags__len=42).cache())
 
-    @unittest.skipIf(django.VERSION < (1, 9), "JSONField added in Django 1.9")
     def test_json(self):
         list(TaggedPost.objects.filter(meta__author='Suor'))
 

@@ -112,5 +112,4 @@ ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'
 
-# Required in Django 1.9
 TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates'}]
