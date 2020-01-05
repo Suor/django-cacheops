@@ -11,12 +11,11 @@ from .cross import pickle, md5
 
 import django
 from django.utils.encoding import smart_str, force_text
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
 from django.db.models import Model
 from django.db.models.manager import BaseManager
 from django.db.models.query import QuerySet
-from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
 # This thing reappeared in Django 3.0
