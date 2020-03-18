@@ -1,45 +1,11 @@
-# -*- coding: utf-8 -*-
-from threading import Thread
-import six
-
+from django.db import connection
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
 
+from cacheops.transaction import queue_when_in_transaction
+
 from .models import Category
-
-
-class ThreadWithReturnValue(Thread):
-    def __init__(self, *args, **kwargs):
-        super(ThreadWithReturnValue, self).__init__(*args, **kwargs)
-        self._return = None
-        self._exc = None
-
-    def run(self):
-        try:
-            if six.PY3:
-                self._return = self._target(*self._args, **self._kwargs)
-            else:
-                self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
-        except Exception as e:
-            self._exc = e
-        finally:
-            # Django does not drop postgres connections opened in new threads.
-            # This leads to postgres complaining about db accessed when we try to destory it.
-            # See https://code.djangoproject.com/ticket/22420#comment:18
-            from django.db import connection
-            connection.close()
-
-    def join(self, *args, **kwargs):
-        super(ThreadWithReturnValue, self).join(*args, **kwargs)
-        if self._exc:
-            raise self._exc
-        return self._return
-
-
-def run_in_thread(target):
-    t = ThreadWithReturnValue(target=target)
-    t.start()
-    return t.join()
+from .utils import run_in_thread
 
 
 def get_category():
@@ -51,6 +17,7 @@ class IntentionalRollback(Exception):
 
 
 class TransactionSupportTests(TransactionTestCase):
+    databases = ('default', 'slave')
     fixtures = ['basic']
 
     def test_atomic(self):
@@ -106,3 +73,47 @@ class TransactionSupportTests(TransactionTestCase):
             self.assertEqual('Django', run_in_thread(get_category).title)
         self.assertEqual('Django', get_category().title)
         self.assertEqual('Django', run_in_thread(get_category).title)
+
+    def test_smart_transactions(self):
+        with atomic():
+            get_category()
+            with self.assertNumQueries(0):
+                get_category()
+            with atomic():
+                with self.assertNumQueries(0):
+                    get_category()
+
+            obj = get_category()
+            obj.title += ' changed'
+            obj.save()
+
+            get_category()
+            with self.assertNumQueries(1):
+                get_category()
+
+    def test_call_cacheops_cbs_before_on_commit_cbs(self):
+        calls = []
+
+        with atomic():
+            def django_commit_handler():
+                calls.append('django')
+            connection.on_commit(django_commit_handler)
+
+            @queue_when_in_transaction
+            def cacheops_commit_handler(using):
+                calls.append('cacheops')
+            cacheops_commit_handler('default')
+
+        self.assertEqual(calls, ['cacheops', 'django'])
+
+    def test_multidb(self):
+        try:
+            with atomic('slave'):
+                with atomic():
+                    obj = get_category()
+                    obj.title = 'Changed'
+                    obj.save()
+                raise IntentionalRollback()
+        except IntentionalRollback:
+            pass
+        self.assertEqual('Changed', get_category().title)

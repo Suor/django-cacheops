@@ -2,6 +2,6 @@
 dist
 *.egg-info
 build
-sqlite.db
+sqlite*.db
 .tox
 .cache

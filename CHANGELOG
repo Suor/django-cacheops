@@ -1,3 +1,144 @@
+4.2
+- support Django 2.1 and 2.2
+- added keep_fresh option to @cached_as (George Lee)
+- pass CACHEOPS_SENTINEL options through (David Fuentes Baldomir)
+- made SKIP_FIELDS and LONG_DISJUCTION configurable (Nic Wolff)
+- fixed .aggregate() over .annotate() fields in Django 2.2
+- fixed .bulk_create() in Django 2.2 (Grzegorz Szczepanczyk)
+- fixed test database to work in environments without /dev/shm (George Lee)
+- fixed proxy/abstract model bug
+- added test case for issue #312 (Andy Tzeng)
+- some warnings and doc-strings improvements
+
+4.1
+- use UNLINK instead of DEL when available, use Redis 4.0+ for that
+- request m2m objects for invalidation using correct db
+- fixed caching counts, aggregates and exists in writes,
+  dirty transactions and while cacheops is disabled
+- fixed various multidb/invalidation issues (Svan70)
+- fixed db in .invalidated_update()
+- fixed possible key disrepancy in cache_on_save with multidb
+- fixed jinja2 support in Python 3
+- documented CACHEOPS_CLIENT_CLASS
+
+4.0.7
+- fixed RawSQL() and Subquery() (thx to thakryptex)
+- made the Redis client class configurable (Nic Wolff)
+- package is now also distributed as a universal wheel (Jon Dufresne)
+
+4.0.6
+- fixed m2m invalidation issue with certain configs
+- fixed catastrophic backtracking in template extensions
+
+4.0.5
+- fixed db selection in invalidation fetch and .invalidated_update() when router fails (M1ha Shvn)
+- fixed unlickely "_clone() unexpected keyword '_cacheprofile'" error
+- fixed LookupError bug
+- fixed .meta.concrete_model not set bug
+- fixed docs on template tags
+
+4.0.4
+- fixed caching while app registry not ready
+- fixed random ordered dicts producing varying SQL for same query
+
+4.0.3
+- configure via Sentinel (Tapo4ek)
+
+4.0.2
+- fixed caching django migrations
+
+4.0.1
+- do not prevent fast path deletes on not cached models
+- minor optimization
+
+4.0
+- added cache key prefix function
+- added .aggregate() caching
+- support QuerySet.union() and friends
+- added cache_invalidated signal (thx to Kimmo Kiiski)
+- cache .first() and .last() on 'get' op
+- correctly skip or show nice error message on non-django models/managers
+- allow cleaning file cache in non default place
+- cache keys no longer change on fields reorder
+- fixed .invalidated_update() on updated object versions
+- fixed template tags in Django 2.0
+- fixed deprecation warnings in Python 3
+- use module global CACHEOPS_DEBUG to cache evolving code
+- minor optimizations
+Backwards incompatible changes:
+- dropped Django 1.7 support
+- dropped write_only flag
+- dropped implicit write_only in .get_or_create(), .select_for_update() and friends
+- .iterator() is never cached now
+- invalidate_all() works immediately even in transaction
+- @cached_as(timeout=0) no longer means timeout is ignored/derived from querysets,
+  user timeout=None instead.
+
+3.2.1
+- fixed CACHEOPS_DEGRADE_ON_FAILURE=True
+
+3.2
+- support Django 1.11
+- support Python 3.6
+- preliminary support for Django 2.0
+- support multidb nested transactions
+- fixed pk with default (leonardo orozco)
+
+3.1.3
+- better dirty sql heuristic
+- fixed on commit sequence issue (thx to Irae Hueck Costa)
+- fixed dup field__eq queries (Michał Ochman)
+
+3.1.2
+- fixed querysets with custom .iterator() (like django-polymorphic)
+- support no argument @cached_view
+- check that sample is passed into @cached_as()
+
+3.1.1
+- fixed unexpected dirty transaction
+- fixed a bug with destroying manager
+- fixed CACHEOPS setting and upper-case app labels
+
+3.1
+- added locking to combat dog-pile effect
+- handle transactions smarter (ihucos)
+- handle functions in @cached_as() and @cached() args
+- do not allow unknown kwargs in @cached_as()
+
+3.0.1
+- support Django 1.10 (worked before, but now it's official)
+- accept empty CACHEOPS_REDIS setting
+- fixed ImportError in cleanfilecache command (Roman)
+
+3.0
+- support PyPy
+- support Python 3.5
+- support Django 1.9
+- added transparent transaction handling (Joel Hillacre)
+- added .invalidated_update()
+- added cache_read signal (Joona Pääkkönen)
+- added CACHEOPS_ENABLED setting
+- invalidate on intermediate tables in long joins
+- support settings override
+- made CACHEOPS keys case insensitive
+- allow redis connection settings to be specified by a URL (Tim Savage)
+- fixed router support
+- fixed clone cache settings affecting original queryset
+- more fixes for non-ascii in str params
+- calc func cache keys smarter
+- no_invalidation optimizations
+Backwards incompatible changes:
+- Django 1.6 and earlier no longer supported
+- dropped old CACHEOPS setting format
+- removed CACHEOPS_FAKE setting
+- removed .cached_call() from basic and file caches
+- disabled cacheops for fake migration models
+
+2.4.5
+- backport: disabled cacheops for fake migration models
+- disabled cacheops for south models
+- fixed get_queryset() on custom qs rename bug
+
 2.4.3
 - fixed .get() on reverse fk related manager
 - fixed memory leak on migrations
@@ -187,3 +328,6 @@ Backwards incompatible changes:
 - many other bug fixes
 - minor optimizations
 - better docs, including PERFORMANCE section
+
+
+... lost in ancient history ...

@@ -1,11 +1,12 @@
-from __future__ import absolute_import
 import warnings
-import six
+from contextlib import contextmanager
 
-from funcy import decorator, identity, memoize
-import redis
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.module_loading import import_string
 
+from funcy import decorator, identity, memoize, omit, LazyObject
+import redis
+from redis.sentinel import Sentinel
 from .conf import settings
 
 
@@ -22,34 +23,88 @@ else:
     handle_connection_failure = identity
 
 
-class SafeRedis(redis.StrictRedis):
+LOCK_TIMEOUT = 60
+
+
+class CacheopsRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
 
-
-class LazyRedis(object):
-    def _setup(self):
-        if not settings.CACHEOPS_REDIS:
-            raise ImproperlyConfigured('You must specify CACHEOPS_REDIS setting to use cacheops')
-
-        Redis = SafeRedis if settings.CACHEOPS_DEGRADE_ON_FAILURE else redis.StrictRedis
-        # Allow client connection settings to be specified by a URL.
-        if isinstance(settings.CACHEOPS_REDIS, six.string_types):
-            client = Redis.from_url(settings.CACHEOPS_REDIS)
+    @contextmanager
+    def getting(self, key, lock=False):
+        if not lock:
+            yield self.get(key)
         else:
-            client = Redis(**settings.CACHEOPS_REDIS)
+            locked = False
+            try:
+                data = self._get_or_lock(key)
+                locked = data is None
+                yield data
+            finally:
+                if locked:
+                    self._release_lock(key)
 
-        object.__setattr__(self, '__class__', client.__class__)
-        object.__setattr__(self, '__dict__', client.__dict__)
+    @handle_connection_failure
+    def _get_or_lock(self, key):
+        self._lock = getattr(self, '_lock', self.register_script("""
+            local locked = redis.call('set', KEYS[1], 'LOCK', 'nx', 'ex', ARGV[1])
+            if locked then
+                redis.call('del', KEYS[2])
+            end
+            return locked
+        """))
+        signal_key = key + ':signal'
 
-    def __getattr__(self, name):
-        self._setup()
-        return getattr(self, name)
+        while True:
+            data = self.get(key)
+            if data is None:
+                if self._lock(keys=[key, signal_key], args=[LOCK_TIMEOUT]):
+                    return None
+            elif data != b'LOCK':
+                return data
 
-    def __setattr__(self, name, value):
-        self._setup()
-        return setattr(self, name, value)
+            # No data and not locked, wait
+            self.brpoplpush(signal_key, signal_key, timeout=LOCK_TIMEOUT)
 
-redis_client = LazyRedis()
+    @handle_connection_failure
+    def _release_lock(self, key):
+        self._unlock = getattr(self, '_unlock', self.register_script("""
+            if redis.call('get', KEYS[1]) == 'LOCK' then
+                redis.call('del', KEYS[1])
+            end
+            redis.call('lpush', KEYS[2], 1)
+            redis.call('expire', KEYS[2], 1)
+        """))
+        signal_key = key + ':signal'
+        self._unlock(keys=[key, signal_key])
+
+
+@LazyObject
+def redis_client():
+    if settings.CACHEOPS_REDIS and settings.CACHEOPS_SENTINEL:
+        raise ImproperlyConfigured("CACHEOPS_REDIS and CACHEOPS_SENTINEL are mutually exclusive")
+
+    client_class = CacheopsRedis
+    if settings.CACHEOPS_CLIENT_CLASS:
+        client_class = import_string(settings.CACHEOPS_CLIENT_CLASS)
+
+    if settings.CACHEOPS_SENTINEL:
+        if not {'locations', 'service_name'} <= set(settings.CACHEOPS_SENTINEL):
+            raise ImproperlyConfigured("Specify locations and service_name for CACHEOPS_SENTINEL")
+
+        sentinel = Sentinel(
+            settings.CACHEOPS_SENTINEL['locations'],
+            **omit(settings.CACHEOPS_SENTINEL, ('locations', 'service_name', 'db')))
+        return sentinel.master_for(
+            settings.CACHEOPS_SENTINEL['service_name'],
+            redis_class=client_class,
+            db=settings.CACHEOPS_SENTINEL.get('db', 0)
+        )
+
+    # Allow client connection settings to be specified by a URL.
+    if isinstance(settings.CACHEOPS_REDIS, str):
+        return client_class.from_url(settings.CACHEOPS_REDIS)
+    else:
+        return client_class(**settings.CACHEOPS_REDIS)
 
 
 ### Lua script loader

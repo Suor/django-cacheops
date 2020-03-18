@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any
-from funcy.py2 import mapcat
-from .cross import md5hex
+from funcy import memoize, compose, wraps, any, any_fn, select_values, lmapcat
 
 from django.db import models
 from django.http import HttpRequest
@@ -12,33 +9,22 @@ from django.http import HttpRequest
 from .conf import model_profile
 
 
-# NOTE: we don't serialize this fields since their values could be very long
-#       and one should not filter by their equality anyway.
-NOT_SERIALIZED_FIELDS = (
-    models.FileField,
-    models.TextField, # One should not filter by long text equality
-    models.BinaryField,
-)
-
-
-@memoize
-def non_proxy(model):
-    while model._meta.proxy:
-        # Every proxy model has exactly one non abstract parent model
-        model = next(b for b in model.__bases__
-                       if issubclass(b, models.Model) and not b._meta.abstract)
-    return model
+def get_concrete_model(model):
+    return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
+                 and not b._meta.proxy and not b._meta.abstract), None)
 
 def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
     """
     def class_tree(cls):
-        return [cls] + mapcat(class_tree, cls.__subclasses__())
+        return [cls] + lmapcat(class_tree, cls.__subclasses__())
 
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
-    return class_tree(non_proxy(model))
+    # NOTE: when this is called in Manager.contribute_to_class()
+    #       ._meta.concrete_model might still be None
+    return class_tree(model._meta.concrete_model or get_concrete_model(model) or model)
 
 
 @memoize
@@ -47,13 +33,9 @@ def family_has_profile(cls):
 
 
 class MonkeyProxy(object):
-    def __init__(self, cls):
-        monkey_bases = [b._no_monkey for b in cls.__bases__ if hasattr(b, '_no_monkey')]
-        for monkey_base in monkey_bases:
-            self.__dict__.update(monkey_base.__dict__)
+    pass
 
-
-def monkey_mix(cls, mixin, methods=None):
+def monkey_mix(cls, mixin):
     """
     Mixes a mixin into existing class.
     Does not use actual multi-inheritance mixins, just monkey patches methods.
@@ -65,15 +47,13 @@ def monkey_mix(cls, mixin, methods=None):
             self._no_monkey.do_smth(self, arg)
             ... do smth else after
     """
-    assert '_no_monkey' not in cls.__dict__, 'Multiple monkey mix not supported'
-    cls._no_monkey = MonkeyProxy(cls)
+    assert not hasattr(cls, '_no_monkey'), 'Multiple monkey mix not supported'
+    cls._no_monkey = MonkeyProxy()
 
-    if methods is None:
-        methods = [(name, m) for name, m in mixin.__dict__.items() if inspect.isfunction(m)]
-    else:
-        methods = [(m, mixin.__dict__[m]) for m in methods]
+    test = any_fn(inspect.isfunction, inspect.ismethoddescriptor)
+    methods = select_values(test, mixin.__dict__)
 
-    for name, method in methods:
+    for name, method in methods.items():
         if hasattr(cls, name):
             setattr(cls._no_monkey, name, getattr(cls, name))
         setattr(cls, name, method)
@@ -84,7 +64,7 @@ def stamp_fields(model):
     """
     Returns serialized description of model fields.
     """
-    stamp = str([(f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields])
+    stamp = str(sorted((f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields))
     return md5hex(stamp)
 
 
@@ -93,6 +73,12 @@ def stamp_fields(model):
 def obj_key(obj):
     if isinstance(obj, models.Model):
         return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
+    elif inspect.isfunction(obj):
+        factors = [obj.__module__, obj.__name__]
+        # Really useful to ignore this while code still in development
+        if hasattr(obj, '__code__') and not obj.__globals__.get('CACHEOPS_DEBUG'):
+            factors.append(obj.__code__.co_firstlineno)
+        return factors
     else:
         return str(obj)
 
@@ -100,17 +86,7 @@ def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
     """
-    factors = [func.__module__, func.__name__, args, kwargs, extra]
-    if hasattr(func, '__code__'):
-        factors.append(func.__code__.co_firstlineno)
-    return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
-
-def debug_cache_key(func, args, kwargs, extra=None):
-    """
-    Same as func_cache_key(), but doesn't take into account function line.
-    Handy to use when editing code.
-    """
-    factors = [func.__module__, func.__name__, args, kwargs, extra]
+    factors = [func, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
 
 def view_cache_key(func, args, kwargs, extra=None):
@@ -161,6 +137,29 @@ NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
 SPACE_BETWEEN_TAGS = mark_safe('> <')
 
 def carefully_strip_whitespace(text):
-    text = re.sub(r'>\s*\n\s*<', NEWLINE_BETWEEN_TAGS, text)
-    text = re.sub(r'>\s{2,}<', SPACE_BETWEEN_TAGS, text)
+    def repl(m):
+        return NEWLINE_BETWEEN_TAGS if '\n' in m.group(0) else SPACE_BETWEEN_TAGS
+    text = re.sub(r'>\s{2,}<', repl, text)
     return text
+
+
+### hashing helpers
+
+import hashlib
+
+
+class md5:
+    def __init__(self, s=None):
+        self.md5 = hashlib.md5()
+        if s is not None:
+            self.update(s)
+
+    def update(self, s):
+        return self.md5.update(s.encode('utf-8'))
+
+    def hexdigest(self):
+        return self.md5.hexdigest()
+
+
+def md5hex(s):
+    return md5(s).hexdigest()

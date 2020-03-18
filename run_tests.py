@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os, sys, re, shutil
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'
 
@@ -8,8 +8,12 @@ try:
     import psycopg2  # noqa
 except ImportError:
     # Fall back to psycopg2cffi
-    from psycopg2cffi import compat
-    compat.register()
+    try:
+        from psycopg2cffi import compat
+        compat.register()
+    except ImportError:
+        # Hope we are not testing against PostgreSQL :)
+        pass
 
 
 # Set up Django
@@ -35,4 +39,4 @@ try:
     call_command('makemigrations', 'tests', verbosity=2 if '-v' in sys.argv else 0)
     call_command('test', names, failfast='-x' in sys.argv, verbosity=2 if '-v' in sys.argv else 1)
 finally:
-    shutil.rmtree('tests/migrations')
+    shutil.rmtree('tests/migrations', True)

@@ -1,31 +1,35 @@
-# -*- coding: utf-8 -*-
 import sys
 import json
 import threading
-import six
-from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk
-from funcy.py2 import mapcat, map
-from .cross import pickle, md5
+import pickle
+from random import random
 
-import django
+from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
+from funcy import lmap, map, lcat, join_with
+
 from django.utils.encoding import smart_str, force_text
-from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Manager, Model
+from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
+from django.db import DEFAULT_DB_ALIAS
+from django.db.models import Model
+from django.db.models.manager import BaseManager
 from django.db.models.query import QuerySet
-from django.db.models.sql.datastructures import EmptyResultSet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
-# This thing was removed in Django 1.8
+
+# This thing reappeared in Django 3.0
 try:
     from django.db.models.query import MAX_GET_RESULTS
+    from django.db import connections
 except ImportError:
     MAX_GET_RESULTS = None
 
-from .conf import model_profile, model_is_fake, settings, ALL_OPS
+from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import md5
+from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
-from .transaction import in_transaction
+from .transaction import transaction_states
 from .signals import cache_read
 
 
@@ -35,13 +39,18 @@ _local_get_cache = {}
 
 
 @handle_connection_failure
-def cache_thing(cache_key, data, cond_dnfs, timeout):
+def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key=''):
     """
     Writes data to cache and creates appropriate invalidators.
+
+    If precall_key is not the empty string, the data will only be cached if the
+    precall_key is set to avoid caching stale data.
     """
-    assert not in_transaction()
+    # Could have changed after last check, sometimes superficially
+    if transaction_states.is_dirty(dbs):
+        return
     load_script('cache_thing', settings.CACHEOPS_LRU)(
-        keys=[cache_key],
+        keys=[prefix, cache_key, precall_key],
         args=[
             pickle.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
@@ -52,12 +61,22 @@ def cache_thing(cache_key, data, cond_dnfs, timeout):
 
 def cached_as(*samples, **kwargs):
     """
-    Caches results of a function and invalidates them same way as given queryset.
-    NOTE: Ignores queryset cached ops settings, just caches.
+    Caches results of a function and invalidates them same way as given queryset(s).
+    NOTE: Ignores queryset cached ops settings, always caches.
+
+    If keep_fresh is True, this will prevent caching if the given querysets are
+    invalidated during the function call. This prevents prolonged caching of
+    stale data.
     """
-    timeout = kwargs.get('timeout')
-    extra = kwargs.get('extra')
-    key_func = kwargs.get('key_func', func_cache_key)
+    timeout = kwargs.pop('timeout', None)
+    extra = kwargs.pop('extra', None)
+    key_func = kwargs.pop('key_func', func_cache_key)
+    lock = kwargs.pop('lock', None)
+    keep_fresh = kwargs.pop('keep_fresh', False)
+    if not samples:
+        raise TypeError('Pass a queryset, a model or an object to cache like')
+    if kwargs:
+        raise TypeError('Unexpected keyword arguments %s' % ', '.join(kwargs))
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -76,29 +95,50 @@ def cached_as(*samples, **kwargs):
 
         return queryset
 
-    querysets = map(_get_queryset, samples)
-    cond_dnfs = mapcat(dnfs, querysets)
-    key_extra = [qs._cache_key() for qs in querysets]
+    querysets = lmap(_get_queryset, samples)
+    dbs = list({qs.db for qs in querysets})
+    cond_dnfs = join_with(lcat, map(dnfs, querysets))
+    key_extra = [qs._cache_key(prefix=False) for qs in querysets]
     key_extra.append(extra)
-    if not timeout:
+    if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
+    if lock is None:
+        lock = any(qs._cacheprofile['lock'] for qs in querysets)
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if in_transaction() or not settings.CACHEOPS_ENABLED:
+            if not settings.CACHEOPS_ENABLED or transaction_states.is_dirty(dbs):
                 return func(*args, **kwargs)
 
-            cache_key = 'as:' + key_func(func, args, kwargs, key_extra)
+            prefix = get_prefix(func=func, _cond_dnfs=cond_dnfs, dbs=dbs)
+            cache_key = prefix + 'as:' + key_func(func, args, kwargs, key_extra)
 
-            cache_data = redis_client.get(cache_key)
-            cache_read.send(sender=None, func=func, hit=cache_data is not None)
-            if cache_data is not None:
-                return pickle.loads(cache_data)
+            with redis_client.getting(cache_key, lock=lock) as cache_data:
+                cache_read.send(sender=None, func=func, hit=cache_data is not None)
+                if cache_data is not None:
+                    return pickle.loads(cache_data)
+                else:
+                    if keep_fresh:
+                        # We call this "asp" for "as precall" because this key is
+                        # cached before the actual function is called. We randomize
+                        # the key to prevent falsely thinking the key was not
+                        # invalidated when in fact it was invalidated and the
+                        # function was called again in another process.
+                        suffix = key_func(func, args, kwargs, key_extra + [random()])
+                        precall_key = prefix + 'asp:' + suffix
+                        # Cache a precall_key to watch for invalidation during
+                        # the function call. Its value does not matter. If and
+                        # only if it remains valid before, during, and after the
+                        # call, the result can be cached and returned.
+                        cache_thing(prefix, precall_key, 'PRECALL', cond_dnfs, timeout, dbs=dbs)
+                    else:
+                        precall_key = ''
 
-            result = func(*args, **kwargs)
-            cache_thing(cache_key, result, cond_dnfs, timeout)
-            return result
+                    result = func(*args, **kwargs)
+                    cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs,
+                                precall_key=precall_key)
+                    return result
 
         return wrapper
     return decorator
@@ -126,7 +166,7 @@ class QuerySetMixin(object):
                 'you can configure it with empty ops.'
                     % (self.model._meta.app_label, self.model._meta.model_name))
 
-    def _cache_key(self):
+    def _cache_key(self, prefix=True):
         """
         Compute a cache key for this queryset
         """
@@ -149,27 +189,39 @@ class QuerySetMixin(object):
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
-        # Thing only appeared in Django 1.9
-        it_class = getattr(self, '_iterable_class', None)
-        if it_class:
-            md.update('%s.%s' % (it_class.__module__, it_class.__name__))
-        # 'flat' attribute changes results formatting for values_list() in Django 1.8 and earlier
-        if hasattr(self, 'flat'):
-            md.update(str(self.flat))
+        # Iterable class pack results diffrently
+        it_class = self._iterable_class
+        md.update('%s.%s' % (it_class.__module__, it_class.__name__))
 
-        return 'q:%s' % md.hexdigest()
+        cache_key = 'q:%s' % md.hexdigest()
+        return self._prefix + cache_key if prefix else cache_key
+
+    @cached_property
+    def _prefix(self):
+        return get_prefix(_queryset=self)
+
+    @cached_property
+    def _cond_dnfs(self):
+        return dnfs(self)
 
     def _cache_results(self, cache_key, results):
-        cond_dnfs = dnfs(self)
-        cache_thing(cache_key, results, cond_dnfs, self._cacheprofile['timeout'])
+        cache_thing(self._prefix, cache_key, results,
+                    self._cond_dnfs, self._cacheprofile['timeout'], dbs=[self.db])
 
-    def cache(self, ops=None, timeout=None, write_only=None):
+    def _should_cache(self, op):
+        # If cache and op are enabled and not within write or dirty transaction
+        return settings.CACHEOPS_ENABLED \
+            and self._cacheprofile and op in self._cacheprofile['ops'] \
+            and not self._for_write \
+            and not transaction_states[self.db].is_dirty()
+
+    def cache(self, ops=None, timeout=None, lock=None):
         """
         Enables caching for given ops
-            ops        - a subset of {'get', 'fetch', 'count', 'exists'},
+            ops        - a subset of {'get', 'fetch', 'count', 'exists', 'aggregate'},
                          ops caching to be turned on, all enabled by default
             timeout    - override default cache timeout
-            write_only - don't try fetching from cache, still write result there
+            lock       - use lock to prevent dog-pile effect
 
         NOTE: you actually can disable caching by omiting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
@@ -184,8 +236,8 @@ class QuerySetMixin(object):
 
         if timeout is not None:
             self._cacheprofile['timeout'] = timeout
-        if write_only is not None:
-            self._cacheprofile['write_only'] = write_only
+        if lock is not None:
+            self._cacheprofile['lock'] = lock
 
         return self
 
@@ -206,75 +258,41 @@ class QuerySetMixin(object):
     def inplace(self):
         return self.cloning(0)
 
-    if django.VERSION >= (1, 9):
-        def _clone(self, **kwargs):
-            if self._cloning:
-                return self.clone(**kwargs)
-            else:
-                self.__dict__.update(kwargs)
-                return self
+    def _clone(self, **kwargs):
+        if self._cloning:
+            return self.clone(**kwargs)
+        else:
+            self.__dict__.update(kwargs)
+            return self
 
-        def clone(self, **kwargs):
-            # NOTE: need to copy profile so that clone changes won't affect this queryset
-            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
-                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
+    def clone(self, **kwargs):
+        clone = self._no_monkey._clone(self, **kwargs)
+        clone._cloning = self._cloning - 1 if self._cloning else 0
+        # NOTE: need to copy profile so that clone changes won't affect this queryset
+        if self.__dict__.get('_cacheprofile'):
+            clone._cacheprofile = self._cacheprofile.copy()
+        return clone
 
-            clone = self._no_monkey._clone(self, **kwargs)
-            clone._cloning = self._cloning - 1 if self._cloning else 0
-            return clone
-    else:
-        def _clone(self, klass=None, setup=False, **kwargs):
-            if self._cloning:
-                return self.clone(klass, setup, **kwargs)
-            elif klass is not None:
-                # HACK: monkey patch self.query.clone for single call
-                #       to return itself instead of cloning
-                original_query_clone = self.query.clone
-
-                def query_clone():
-                    self.query.clone = original_query_clone
-                    return self.query
-                self.query.clone = query_clone
-                return self.clone(klass, setup, **kwargs)
-            else:
-                self.__dict__.update(kwargs)
-                return self
-
-        def clone(self, klass=None, setup=False, **kwargs):
-            if '_cacheprofile' in self.__dict__ and self._cacheprofile:
-                kwargs.setdefault('_cacheprofile', self._cacheprofile.copy())
-
-            clone = self._no_monkey._clone(self, klass, setup, **kwargs)
-            clone._cloning = self._cloning - 1 if self._cloning else 0
-            return clone
-
-    def iterator(self):
-        # If cache is not enabled or in transaction just fall back
-        if not self._cacheprofile or 'fetch' not in self._cacheprofile['ops'] \
-                or in_transaction() or not settings.CACHEOPS_ENABLED:
-            return self._no_monkey.iterator(self)
+    def _fetch_all(self):
+        # If already fetched or should pass by then fall back
+        if self._result_cache is not None or not self._should_cache('fetch'):
+            return self._no_monkey._fetch_all(self)
 
         cache_key = self._cache_key()
-        if not self._cacheprofile['write_only'] and not self._for_write:
-            # Trying get data from cache
-            cache_data = redis_client.get(cache_key)
+        lock = self._cacheprofile['lock']
+
+        with redis_client.getting(cache_key, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
-                return iter(pickle.loads(cache_data))
+                self._result_cache = pickle.loads(cache_data)
+            else:
+                self._result_cache = list(self._iterable_class(self))
+                self._cache_results(cache_key, self._result_cache)
 
-        # Cache miss - fetch data from overriden implementation
-        def iterate():
-            # NOTE: we are using self._result_cache to avoid fetching-while-fetching bug #177
-            self._result_cache = []
-            for obj in self._no_monkey.iterator(self):
-                self._result_cache.append(obj)
-                yield obj
-            self._cache_results(cache_key, self._result_cache)
-
-        return iterate()
+        return self._no_monkey._fetch_all(self)
 
     def count(self):
-        if self._cacheprofile and 'count' in self._cacheprofile['ops']:
+        if self._should_cache('count'):
             # Optmization borrowed from overriden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
@@ -283,14 +301,37 @@ class QuerySetMixin(object):
         else:
             return self._no_monkey.count(self)
 
+    def aggregate(self, *args, **kwargs):
+        if self._should_cache('aggregate'):
+            # Apply all aggregates the same way original .aggregate(), but do not perform sql
+            kwargs = kwargs.copy()
+            for arg in args:
+                kwargs[arg.default_alias] = arg
+
+            qs = self._clone()
+            for (alias, aggregate_expr) in kwargs.items():
+                qs.query.add_annotation(aggregate_expr, alias, is_summary=True)
+
+            # Use resulting qs as a ref
+            return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
+        else:
+            return self._no_monkey.aggregate(self, *args, **kwargs)
+
     def get(self, *args, **kwargs):
-        # .get() uses the same .iterator() method to fetch data,
+        # .get() uses the same ._fetch_all() method to fetch data,
         # so here we add 'fetch' to ops
-        if self._cacheprofile and 'get' in self._cacheprofile['ops']:
+        if self._should_cache('get'):
             # NOTE: local_get=True enables caching of simple gets in local memory,
             #       which is very fast, but not invalidated.
             # Don't bother with Q-objects, select_related and previous filters,
             # simple gets - thats what we are really up to here.
+            #
+            # TODO: this checks are far from adequate, at least these are missed:
+            #       - self._fields (values, values_list)
+            #       - annotations
+            #       - ...
+            # TODO: don't distinguish between pk, pk__exaxt, id, id__exact
+            # TOOD: work with .filter(**kwargs).get() ?
             if self._cacheprofile['local_get']        \
                     and not args                      \
                     and not self.query.select_related \
@@ -317,37 +358,52 @@ class QuerySetMixin(object):
 
         return qs._no_monkey.get(qs, *args, **kwargs)
 
+    def first(self):
+        if self._should_cache('get'):
+            return self._no_monkey.first(self._clone().cache())
+        return self._no_monkey.first(self)
+
+    def last(self):
+        if self._should_cache('get'):
+            return self._no_monkey.last(self._clone().cache())
+        return self._no_monkey.last(self)
+
     def exists(self):
-        if self._cacheprofile and 'exists' in self._cacheprofile['ops']:
+        if self._should_cache('exists'):
             if self._result_cache is not None:
                 return bool(self._result_cache)
             return cached_as(self)(lambda: self._no_monkey.exists(self))()
         else:
             return self._no_monkey.exists(self)
 
-    def bulk_create(self, objs, batch_size=None):
-        objs = self._no_monkey.bulk_create(self, objs, batch_size=batch_size)
+    def bulk_create(self, objs, *args, **kwargs):
+        objs = self._no_monkey.bulk_create(self, objs, *args, **kwargs)
         if family_has_profile(self.model):
             for obj in objs:
-                invalidate_obj(obj)
+                invalidate_obj(obj, using=self.db)
         return objs
 
     def invalidated_update(self, **kwargs):
         clone = self._clone().nocache()
         clone._for_write = True  # affects routing
 
-        objects = list(clone.iterator())  # bypass queryset cache
+        objects = list(clone)
         rows = clone.update(**kwargs)
-        objects.extend(clone.iterator())
-        for obj in objects:
-            invalidate_obj(obj)
+
+        # TODO: do not refetch objects but update with kwargs in simple cases?
+        # We use clone database to fetch new states, as this is the db they were written to.
+        # Using router with new_objects may fail, using self may return slave during lag.
+        pks = {obj.pk for obj in objects}
+        new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+        for obj in chain(objects, new_objects):
+            invalidate_obj(obj, using=clone.db)
         return rows
 
 
 def connect_first(signal, receiver, sender):
     old_receivers = signal.receivers
     signal.receivers = []
-    signal.connect(receiver, sender=sender)
+    signal.connect(receiver, sender=sender, weak=False)
     signal.receivers += old_receivers
 
 # We need to stash old object before Model.save() to invalidate on its properties
@@ -356,40 +412,45 @@ _old_objs = threading.local()
 class ManagerMixin(object):
     @once_per('cls')
     def _install_cacheops(self, cls):
-        if family_has_profile(cls):
-            # Set up signals
-            connect_first(pre_save, self._pre_save, sender=cls)
-            connect_first(post_save, self._post_save, sender=cls)
-            connect_first(post_delete, self._post_delete, sender=cls)
+        # Set up signals
+        connect_first(pre_save, self._pre_save, sender=cls)
+        connect_first(post_save, self._post_save, sender=cls)
+        connect_first(post_delete, self._post_delete, sender=cls)
 
-            # Install auto-created models as their module attributes to make them picklable
-            module = sys.modules[cls.__module__]
-            if not hasattr(module, cls.__name__):
-                setattr(module, cls.__name__, cls)
+        # Install auto-created models as their module attributes to make them picklable
+        module = sys.modules[cls.__module__]
+        if not hasattr(module, cls.__name__):
+            setattr(module, cls.__name__, cls)
 
+    # This is probably still needed if models are created dynamically
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
-        # Django 1.7+ migrations create lots of fake models, just skip them
+        # Django migrations create lots of fake models, just skip them
         # NOTE: we make it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
-        if not model_is_fake(cls):
+        if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
-    def _pre_save(self, sender, instance, **kwargs):
-        if instance.pk is not None and not no_invalidation.active:
+    def _pre_save(self, sender, instance, using, **kwargs):
+        if not (instance.pk is None or instance._state.adding or no_invalidation.active):
             try:
-                _old_objs.__dict__[sender, instance.pk] = sender.objects.get(pk=instance.pk)
+                _old_objs.__dict__[sender, instance.pk] \
+                    = sender.objects.using(using).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
-    def _post_save(self, sender, instance, **kwargs):
+    def _post_save(self, sender, instance, using, **kwargs):
+        if not settings.CACHEOPS_ENABLED or no_invalidation.active:
+            return
+
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
-            invalidate_obj(old)
-        invalidate_obj(instance)
+            invalidate_obj(old, using=using)
+        invalidate_obj(instance, using=using)
 
-        if in_transaction() or not settings.CACHEOPS_ENABLED:
+        # We run invalidations but skip caching if we are dirty
+        if transaction_states[using].is_dirty():
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
@@ -417,21 +478,24 @@ class ManagerMixin(object):
 
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
-            qs = sender.objects.inplace().filter(**cond).order_by()
-            if MAX_GET_RESULTS:
-                qs = qs[:MAX_GET_RESULTS + 1]
+            qs = sender.objects.inplace().using(using).filter(**cond).order_by()
+            # Mimic Django 3.0 .get() logic
+            if MAX_GET_RESULTS and (
+                    not qs.query.select_for_update
+                    or connections[qs.db].features.supports_select_for_update_with_limit):
+                qs.query.set_limits(high=MAX_GET_RESULTS)
             qs._cache_results(qs._cache_key(), [instance])
 
             # Reverting stripped attributes
             instance.__dict__.update(unwanted_dict)
 
-    def _post_delete(self, sender, instance, **kwargs):
+    def _post_delete(self, sender, instance, using, **kwargs):
         """
         Invalidation upon object deletion.
         """
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
-        invalidate_obj(instance)
+        invalidate_obj(instance, using=using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -447,7 +511,7 @@ class ManagerMixin(object):
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
-                   **kwargs):
+                   using=DEFAULT_DB_ALIAS, **kwargs):
     """
     Invoke invalidation on m2m changes.
     """
@@ -459,26 +523,24 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         return
 
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
-                   if m2m.rel.through == sender)
+                   if m2m.remote_field.through == sender)
+    instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
+    if reverse:
+        instance_column, model_column = model_column, instance_column
 
     # TODO: optimize several invalidate_objs/dicts at once
     if action == 'pre_clear':
-        # TODO: always use column names here once Django 1.3 is dropped
-        instance_field = m2m.m2m_reverse_field_name() if reverse else m2m.m2m_field_name()
-        objects = sender.objects.filter(**{instance_field: instance.pk})
+        objects = sender.objects.using(using).filter(**{instance_column: instance.pk})
         for obj in objects:
-            invalidate_obj(obj)
+            invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
-        instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
-        if reverse:
-            instance_column, model_column = model_column, instance_column
         # NOTE: we don't need to query through objects here,
-        #       cause we already know all their meaningfull attributes.
+        #       cause we already know all their meaningful attributes.
         for pk in pk_set:
             invalidate_dict(sender, {
                 instance_column: instance.pk,
                 model_column: pk
-            })
+            }, using=using)
 
 
 @once
@@ -486,25 +548,28 @@ def install_cacheops():
     """
     Installs cacheops by numerous monkey patches
     """
-    monkey_mix(Manager, ManagerMixin)
+    monkey_mix(BaseManager, ManagerMixin)
     monkey_mix(QuerySet, QuerySetMixin)
-    QuerySet._cacheprofile = QuerySetMixin._cacheprofile
-    QuerySet._cloning = QuerySetMixin._cloning
-
-    # DateQuerySet existed in Django 1.7 and earlier
-    # Values*QuerySet existed in Django 1.8 and earlier
-    from django.db.models import query
-    for cls_name in ('ValuesQuerySet', 'ValuesListQuerySet', 'DateQuerySet'):
-        if hasattr(query, cls_name):
-            cls = getattr(query, cls_name)
-            monkey_mix(cls, QuerySetMixin, ['iterator'])
 
     # Use app registry to introspect used apps
     from django.apps import apps
 
     # Install profile and signal handlers for any earlier created models
     for model in apps.get_models(include_auto_created=True):
-        model._default_manager._install_cacheops(model)
+        if family_has_profile(model):
+            if not isinstance(model._default_manager, BaseManager):
+                raise ImproperlyConfigured("Can't install cacheops for %s.%s model:"
+                                           " non-django model class or manager is used."
+                                            % (model._meta.app_label, model._meta.model_name))
+            model._default_manager._install_cacheops(model)
+
+            # Bind m2m changed handlers
+            m2ms = (f for f in model._meta.get_fields(include_hidden=True) if f.many_to_many)
+            for m2m in m2ms:
+                rel = m2m if hasattr(m2m, 'through') else m2m.remote_field
+                opts = rel.through._meta
+                m2m_changed.connect(invalidate_m2m, sender=rel.through,
+                                    dispatch_uid=(opts.app_label, opts.model_name))
 
     # Turn off caching in admin
     if apps.is_installed('django.contrib.admin'):
@@ -514,13 +579,14 @@ def install_cacheops():
         def get_queryset(self, request):
             return get_queryset.original(self, request).nocache()
 
-    # Bind m2m changed handler
-    m2m_changed.connect(invalidate_m2m)
-
     # Make buffers/memoryviews pickleable to serialize binary field data
-    if six.PY2:
-        import copy_reg
-        copy_reg.pickle(buffer, lambda b: (buffer, (bytes(b),)))  # noqa
-    if six.PY3:
-        import copyreg
-        copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
+    import copyreg
+    copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
+
+    # Fix random ordered dict keys producing different SQL for same QuerySet
+    if (3, 3) <= sys.version_info < (3, 6):
+        from django.db.models.query_utils import Q
+
+        def Q__init__(self, *args, **kwargs):  # noqa
+            super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
+        Q.__init__ = Q__init__

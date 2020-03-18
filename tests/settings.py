@@ -75,7 +75,7 @@ else:
             # Make in memory sqlite test db to work with threads
             # See https://code.djangoproject.com/ticket/12118
             'TEST': {
-                'NAME': '/dev/shm/cacheops_sqlite.db'
+                'NAME': ':memory:cache=shared'
             }
         },
         'slave': {
@@ -97,13 +97,14 @@ CACHEOPS = {
     'tests.local': {'local_get': True},
     'tests.cacheonsavemodel': {'cache_on_save': True},
     'tests.dbbinded': {'db_agnostic': False},
-    'tests.genericcontainer': {'ops': ('fetch', 'get', 'count')},
-    'tests.All': {'ops': 'all'},
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
-    'auth.*': {}
+    'auth.*': {},
 }
+
+if os.environ.get('CACHEOPS_PREFIX'):
+    CACHEOPS_PREFIX = lambda q: 'p:'
 
 CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
 CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE'))
@@ -111,5 +112,4 @@ ALLOWED_HOSTS = ['testserver']
 
 SECRET_KEY = 'abc'
 
-# Required in Django 1.9
 TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates'}]

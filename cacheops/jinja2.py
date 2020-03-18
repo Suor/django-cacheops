@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 from jinja2 import nodes
 from jinja2.ext import Extension
 
 import cacheops
 from cacheops.utils import carefully_strip_whitespace
+
+
+__all__ = ['cache']
 
 
 class CacheopsExtension(Extension):
@@ -16,7 +16,7 @@ class CacheopsExtension(Extension):
         tag_name = parser.stream.current.value
         tag_location = '%s:%s' % (parser.name, lineno)
 
-        parser.stream.next()
+        next(parser.stream)
         args, kwargs = self.parse_args(parser)
         args = [nodes.Const(tag_name), nodes.Const(tag_location)] + args
 

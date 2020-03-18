@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
-import os, time
-from .cross import pickle, md5hex
+import os
+import pickle
+import time
 
 from funcy import wraps
 
 from .conf import settings
-from .utils import func_cache_key, cached_view_fab
+from .utils import func_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
 
 
@@ -73,6 +73,8 @@ class BaseCache(object):
         return decorator
 
     def cached_view(self, timeout=None, extra=None):
+        if callable(timeout):
+            return self.cached_view()(timeout)
         return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
 
