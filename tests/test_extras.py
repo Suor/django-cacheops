@@ -1,4 +1,4 @@
-from django.db import connections, transaction
+from django.db import transaction
 from django.db.models import Prefetch
 from django.test import TestCase, override_settings
 
@@ -207,5 +207,3 @@ class CachedPrefetchTest(BaseTestCase):
         pf = qs._prefetch_related_lookups[0]
 
         self.assertEqual(pf.queryset._cacheprofile['ops'], {'fetch'})
-
-

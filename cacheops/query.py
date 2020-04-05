@@ -25,7 +25,8 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile, get_model_from_lookup
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, \
+    family_has_profile, get_model_from_lookup
 from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
@@ -279,7 +280,6 @@ class QuerySetMixin(object):
                 )
 
         return self.prefetch_related(*prefetches)
-
 
     def cloning(self, cloning=1000):
         self._cloning = cloning
