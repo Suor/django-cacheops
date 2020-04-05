@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import json
 import threading
 from funcy import memoize, post_processing, ContextDecorator

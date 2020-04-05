@@ -54,7 +54,7 @@ class CustomField(models.Field):
             return value
         return CustomValue(value)
 
-    def from_db_value(self, value, expession, conn, context):
+    def from_db_value(self, value, expession, conn):
         return self.to_python(value)
 
     def get_prep_value(self, value):
@@ -84,7 +84,7 @@ class IntegerArrayField(models.Field):
             return value
         return [int(v) for v in value.split(',')]
 
-    def from_db_value(self, value, expession, conn, context):
+    def from_db_value(self, value, expession, conn):
         return self.to_python(value)
 
     def get_prep_value(self, value):

@@ -1,6 +1,7 @@
+import pickle
+
 from cacheops import invalidate_obj, invalidate_model
 from cacheops.redis import redis_client
-from cacheops.cross import pickle
 from cacheops.tree import dnfs
 
 from .models import Category, Post, Extra

@@ -1,31 +1,13 @@
-# -*- coding: utf-8 -*-
 from itertools import product
-from funcy import group_by, join_with
-from funcy.py3 import lcat, lmap
+from funcy import group_by, join_with, lcat, lmap
 
-import django
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
-# This thing existed in Django 1.8 and earlier
-try:
-    from django.db.models.sql.where import EverythingNode
-except ImportError:
-    class EverythingNode(object):
-        pass
-# These were added in Django 2.0
-try:
-    from django.db.models import Subquery
-except ImportError:
-    class Subquery(object):
-        pass
-try:
-    from django.db.models.expressions import RawSQL
-except ImportError:
-    class RawSQL(object):
-        pass
+from django.db.models import Subquery
+from django.db.models.expressions import RawSQL
 
 from .conf import settings
 
@@ -74,8 +56,6 @@ def dnfs(qs):
                 return [[(where.lhs.alias, attname, v, True)] for v in where.rhs]
             else:
                 return SOME_TREE
-        elif isinstance(where, EverythingNode):
-            return [[]]
         elif isinstance(where, NothingNode):
             return []
         elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
@@ -141,7 +121,7 @@ def dnfs(qs):
         tables = group_by(table_for, aliases)
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
-    if django.VERSION >= (1, 11) and qs.query.combined_queries:
+    if qs.query.combined_queries:
         return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
         return query_dnf(qs.query)

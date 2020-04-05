@@ -1,5 +1,4 @@
-dist: xenial
-sudo: false
+dist: bionic
 language: python
 cache: pip
 services:
@@ -15,57 +14,27 @@ addons:
     - libgdal-dev
 
 python:
-  - 2.7
   - 3.5
-  - pypy
+  - 3.6
+  - 3.7
+  - 3.8
+  - pypy3
 env:
-  - DJANGO=1.8
-  - DJANGO=1.9
-  - DJANGO=1.10
-  - DJANGO=1.11
+  - DJANGO=2.1
+  - DJANGO=2.2
+  - DJANGO=3.0
 matrix:
+  exclude:
+    - python: 3.5
+      env: DJANGO=3.0
   include:
-    - python: 3.5
+    - python: 3.7
       env: TOXENV=lint
-    - python: 3.5
-      env: DJANGO=2.0
-    - python: 3.5
-      env: DJANGO=2.1
-    - python: 3.6
-      env: DJANGO=1.11
-    - python: 3.6
-      env: DJANGO=2.0
-    - python: 3.6
-      env: DJANGO=2.1
-    - python: 3.6
-      env: DJANGO=2.2
-    - python: 3.6
-      env: DJANGO=3.0
-    - python: 3.6
-      env: DJANGO=master
-    - python: 3.7
-      env: DJANGO=2.0
-    - python: 3.7
-      env: DJANGO=2.1
-    - python: 3.7
-      env: DJANGO=2.2
-    - python: 3.7
-      env: DJANGO=3.0
     - python: 3.7
       env: DJANGO=master
-    - python: 3.8
-      env: DJANGO=2.0
-    - python: 3.8
-      env: DJANGO=2.1
-    - python: 3.8
-      env: DJANGO=2.2
-    - python: 3.8
-      env: DJANGO=3.0
     - python: 3.8
       env: DJANGO=master
   allow_failures:
-    - python: 3.6
-      env: DJANGO=master
     - python: 3.7
       env: DJANGO=master
     - python: 3.8
@@ -88,4 +57,4 @@ before_script:
   - mysql -e "create database cacheops"
   - mysql -e "create database cacheops_slave"
 script:
-  - GDAL_VERSION=1.10 tox
+  - GDAL_VERSION=`gdal-config --version` tox
