@@ -226,14 +226,31 @@ class Device(models.Model):
 
 
 # 333
-class CustomeQuerySet(QuerySet):
+class CustomQuerySet(QuerySet):
     pass
 
 
-class CustomFromQSManager(manager.BaseManager.from_queryset(CustomeQuerySet)):
+class CustomFromQSManager(manager.BaseManager.from_queryset(CustomQuerySet)):
     use_for_related_fields = True
 
 
 class CustomFromQSModel(models.Model):
     boolean = models.BooleanField(default=False)
     objects = CustomFromQSManager()
+
+
+# 352
+class CombinedField(models.CharField):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.another_field = models.CharField(*args, **kwargs)
+
+    def contribute_to_class(self, cls, name, **kwargs):
+        super().contribute_to_class(cls, name, private_only=True)
+
+        self.another_field.contribute_to_class(cls, name, **kwargs)
+
+
+class CombinedFieldModel(models.Model):
+    text = CombinedField(max_length=8, default='example')

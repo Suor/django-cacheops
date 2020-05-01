@@ -593,6 +593,10 @@ class IssueTests(BaseTestCase):
     def test_316(self):
         Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
+    def test_352(self):
+        CombinedFieldModel.objects.create()
+        list(CombinedFieldModel.objects.cache().all())
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
