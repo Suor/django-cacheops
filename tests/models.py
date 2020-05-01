@@ -243,12 +243,10 @@ class CustomFromQSModel(models.Model):
 class CombinedField(models.CharField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.another_field = models.CharField(*args, **kwargs)
 
     def contribute_to_class(self, cls, name, **kwargs):
         super().contribute_to_class(cls, name, private_only=True)
-
         self.another_field.contribute_to_class(cls, name, **kwargs)
 
 
