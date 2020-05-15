@@ -19,7 +19,7 @@ And there is more to it:
 Requirements
 ------------
 
-| Python 3.5+, Django 2.1+ and Redis 2.6+ (4.0+ recommended)
+| Python 3.5+, Django 2.1+ and Redis 4.0+
 
 
 Installation
