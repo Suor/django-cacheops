@@ -1,3 +1,12 @@
+5.0
+- support Python 3.8 and Django 3.0 (thx to Misha Kalyna)
+- improve model fields stamping (Alex Lokhman)
+- disabled postponed invalidation when no_invalidation is applied (Vladimir)
+- fixed custom manager derived from BaseManager (Eric Plaster)
+Backwards incompatible changes:
+- dropped Python 2.7 and Djangos before 2.1
+- Redis 4.0+ required
+
 4.2
 - support Django 2.1 and 2.2
 - added keep_fresh option to @cached_as (George Lee)
