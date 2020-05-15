@@ -252,3 +252,19 @@ class CombinedField(models.CharField):
 
 class CombinedFieldModel(models.Model):
     text = CombinedField(max_length=8, default='example')
+
+
+# 353
+class Foo(models.Model):
+    uid = models.UUIDField(default=uuid.uuid4)
+
+
+class Bar(models.Model):
+    uid = models.UUIDField(default=uuid.uuid4)
+    foo = models.OneToOneField(
+        to="Foo",
+        on_delete=models.SET_NULL,
+        related_name='related_foo',
+        blank=True,
+        null=True
+    )

@@ -597,6 +597,16 @@ class IssueTests(BaseTestCase):
         CombinedFieldModel.objects.create()
         list(CombinedFieldModel.objects.cache().all())
 
+    def test_353(self):
+        foo = Foo.objects.create()
+
+        bar = Bar.objects.create()
+
+        self.assertEqual(Foo.objects.cache().filter(related_foo__isnull=True).count(), 1)
+        bar.foo = foo
+        bar.save()
+        self.assertEqual(Foo.objects.cache().filter(related_foo__isnull=True).count(), 0)
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
