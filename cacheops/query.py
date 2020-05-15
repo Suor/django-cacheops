@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+import copy
 import sys
 import json
 import threading
@@ -10,7 +12,7 @@ from funcy import lmap, map, lcat, join_with
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Model
+from django.db.models import Model, Prefetch
 from django.db.models.manager import BaseManager
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
@@ -23,7 +25,8 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, \
+    family_has_profile, get_model_from_lookup
 from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
@@ -250,6 +253,33 @@ class QuerySetMixin(object):
             return self
         else:
             return self.cache(ops=[])
+
+    def cache_prefetch_related(self, *lookups):
+        """
+        Same as prefetch_related but attempts to pull relations from the cache instead
+
+            lookups    - same as for django's vanilla prefetch_related()
+        """
+
+        # If relations are already fetched there is no point to continuing
+        if self._prefetch_done:
+            return self
+
+        prefetches = []
+
+        for pf in lookups:
+            if isinstance(pf, Prefetch):
+                item = copy.copy(pf)
+                item.queryset = item.queryset.cache(ops=['fetch'])
+                prefetches.append(item)
+
+            if isinstance(pf, str):
+                model_class = get_model_from_lookup(self.model, pf)
+                prefetches.append(
+                    Prefetch(pf, model_class._default_manager.all().cache(ops=['fetch']))
+                )
+
+        return self.prefetch_related(*prefetches)
 
     def cloning(self, cloning=1000):
         self._cloning = cloning
