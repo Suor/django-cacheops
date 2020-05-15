@@ -123,7 +123,7 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     }
 
 Using ``'*.*'`` with non-empty ``ops`` is **not recommended**
-since it will easily cache something you don't intent to or even now about like migrations tables.
+since it will easily cache something you don't intent to or even know about like migrations tables.
 The better approach will be restricting by app with ``'app_name.*'``.
 
 Besides ``ops`` and ``timeout`` options you can also use:
@@ -166,14 +166,14 @@ It's automatic you just need to set it up.
 
 | **Manual caching**
 
-You can force any queryset to use cache by calling it's ``.cache()`` method:
+You can force any queryset to use cache by calling its ``.cache()`` method:
 
 .. code:: python
 
     Article.objects.filter(tag=2).cache()
 
 
-Here you can specify which ops should be cached for queryset, for example, this code:
+Here you can specify which ops should be cached for the queryset, for example, this code:
 
 .. code:: python
 
