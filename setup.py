@@ -30,6 +30,7 @@ setup(
         'redis>=2.9.1',
         'funcy>=1.8,<2.0',
         'six>=1.4.0',
+        'dill==0.3.2',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
