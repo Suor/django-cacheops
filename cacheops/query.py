@@ -2,11 +2,13 @@
 import sys
 import json
 import threading
+
+import dill
 import six
 from random import random
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
-from .cross import pickle, md5
+from .cross import md5
 
 import django
 from django.utils.encoding import smart_str, force_text
@@ -46,7 +48,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
-            pickle.dumps(data, -1),
+            dill.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
             timeout
         ]
@@ -111,7 +113,7 @@ def cached_as(*samples, **kwargs):
             with redis_client.getting(cache_key, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
-                    return pickle.loads(cache_data)
+                    return dill.loads(cache_data)
                 else:
                     if keep_fresh:
                         # We call this "asp" for "as precall" because this key is
@@ -308,7 +310,7 @@ class QuerySetMixin(object):
         with redis_client.getting(cache_key, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
-                self._result_cache = pickle.loads(cache_data)
+                self._result_cache = dill.loads(cache_data)
             else:
                 # This thing appears in Django 1.9.
                 # In Djangos 1.9 and 1.10 both calls mean the same.
