@@ -599,13 +599,12 @@ class IssueTests(BaseTestCase):
 
     def test_353(self):
         foo = Foo.objects.create()
-
         bar = Bar.objects.create()
 
-        self.assertEqual(Foo.objects.cache().filter(related_foo__isnull=True).count(), 1)
+        self.assertEqual(Foo.objects.cache().filter(bar__isnull=True).count(), 1)
         bar.foo = foo
         bar.save()
-        self.assertEqual(Foo.objects.cache().filter(related_foo__isnull=True).count(), 0)
+        self.assertEqual(Foo.objects.cache().filter(bar__isnull=True).count(), 0)
 
 
 class RelatedTests(BaseTestCase):

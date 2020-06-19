@@ -10,9 +10,8 @@ from funcy import lmap, map, lcat, join_with
 from django.utils.encoding import smart_str, force_text
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Model
+from django.db import models
 from django.db.models.manager import BaseManager
-from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 
 # This thing reappeared in Django 3.0
@@ -84,9 +83,9 @@ def cached_as(*samples, **kwargs):
         return lambda func: func
 
     def _get_queryset(sample):
-        if isinstance(sample, Model):
+        if isinstance(sample, models.Model):
             queryset = sample.__class__.objects.filter(pk=sample.pk)
-        elif isinstance(sample, type) and issubclass(sample, Model):
+        elif isinstance(sample, type) and issubclass(sample, models.Model):
             queryset = sample.objects.all()
         else:
             queryset = sample
@@ -449,6 +448,8 @@ class ManagerMixin(object):
             invalidate_obj(old, using=using)
         invalidate_obj(instance, using=using)
 
+        invalidate_o2o(sender, old, instance, using=using)
+
         # We run invalidations but skip caching if we are dirty
         if transaction_states[using].is_dirty():
             return
@@ -510,6 +511,19 @@ class ManagerMixin(object):
         return self.get_queryset().inplace().invalidated_update(**kwargs)
 
 
+def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
+    """Invoke invalidation for o2o reverse queries"""
+    o2o_fields = [f for f in sender._meta.fields if isinstance(f, models.OneToOneField)]
+    for f in o2o_fields:
+        old_value = getattr(old, f.attname, None)
+        value = getattr(instance, f.attname)
+        if old_value != value:
+            rmodel, rfield = f.related_model, f.remote_field.field_name
+            if old:
+                invalidate_dict(rmodel, {rfield: old_value}, using=using)
+            invalidate_dict(rmodel, {rfield: value}, using=using)
+
+
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
                    using=DEFAULT_DB_ALIAS, **kwargs):
     """
@@ -549,7 +563,7 @@ def install_cacheops():
     Installs cacheops by numerous monkey patches
     """
     monkey_mix(BaseManager, ManagerMixin)
-    monkey_mix(QuerySet, QuerySetMixin)
+    monkey_mix(models.QuerySet, QuerySetMixin)
 
     # Use app registry to introspect used apps
     from django.apps import apps

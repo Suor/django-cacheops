@@ -256,15 +256,14 @@ class CombinedFieldModel(models.Model):
 
 # 353
 class Foo(models.Model):
-    uid = models.UUIDField(default=uuid.uuid4)
+    pass
 
 
 class Bar(models.Model):
-    uid = models.UUIDField(default=uuid.uuid4)
     foo = models.OneToOneField(
         to="Foo",
         on_delete=models.SET_NULL,
-        related_name='related_foo',
+        related_name='bar',
         blank=True,
         null=True
     )
