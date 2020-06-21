@@ -58,7 +58,8 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     )
 
 
-def cached_as(*samples, **kwargs):
+def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
+                        key_func=func_cache_key):
     """
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.
@@ -67,15 +68,8 @@ def cached_as(*samples, **kwargs):
     invalidated during the function call. This prevents prolonged caching of
     stale data.
     """
-    timeout = kwargs.pop('timeout', None)
-    extra = kwargs.pop('extra', None)
-    key_func = kwargs.pop('key_func', func_cache_key)
-    lock = kwargs.pop('lock', None)
-    keep_fresh = kwargs.pop('keep_fresh', False)
     if not samples:
         raise TypeError('Pass a queryset, a model or an object to cache like')
-    if kwargs:
-        raise TypeError('Unexpected keyword arguments %s' % ', '.join(kwargs))
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
