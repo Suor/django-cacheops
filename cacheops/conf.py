@@ -72,6 +72,9 @@ def prepare_profiles():
         if 'timeout' not in mp:
             raise ImproperlyConfigured(
                 'You must specify "timeout" option in "%s" CACHEOPS profile' % app_model)
+        if not isinstance(mp['timeout'], int):
+            raise ImproperlyConfigured(
+                '"timeout" option in "%s" CACHEOPS profile should be an integer' % app_model)
 
     return model_profiles
 
