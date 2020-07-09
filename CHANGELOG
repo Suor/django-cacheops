@@ -1,3 +1,8 @@
+5.0.1
+- fixed reverse o2o invalidation (thx to John Anderson)
+- fixed unstable cache key when field validors are used
+- guard against non-integer timeouts
+
 5.0
 - support Python 3.8 and Django 3.0 (thx to Misha Kalyna)
 - improve model fields stamping (Alex Lokhman)
