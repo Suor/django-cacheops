@@ -25,7 +25,9 @@ Python 3.5+, Django 2.1+ and Redis 4.0+.
 Installation
 ------------
 
-Using pip::
+Using pip:
+
+.. code:: bash
 
     $ pip install django-cacheops
 
