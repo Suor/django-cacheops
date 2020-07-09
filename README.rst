@@ -19,7 +19,7 @@ And there is more to it:
 Requirements
 ------------
 
-| Python 3.5+, Django 2.1+ and Redis 4.0+
+Python 3.5+, Django 2.1+ and Redis 4.0+.
 
 
 Installation
@@ -29,10 +29,8 @@ Using pip::
 
     $ pip install django-cacheops
 
-Or you can get latest one from github::
-
-    $ git clone git://github.com/Suor/django-cacheops.git
-    $ pip install -e django-cacheops
+    # Or from github directly
+    $ pip install git+https://github.com/Suor/django-cacheops.git@master
 
 
 Setup
