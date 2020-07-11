@@ -7,7 +7,7 @@ from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
 from django.db.models import Subquery
-from django.db.models.expressions import RawSQL
+from django.db.models.expressions import RawSQL, Exists
 
 from .conf import settings
 
@@ -58,7 +58,7 @@ def dnfs(qs):
                 return SOME_TREE
         elif isinstance(where, NothingNode):
             return []
-        elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
+        elif isinstance(where, (ExtraWhere, SubqueryConstraint, Exists)):
             return SOME_TREE
         elif len(where) == 0:
             return [[]]
