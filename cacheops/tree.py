@@ -6,8 +6,7 @@ from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
-from django.db.models import Subquery
-from django.db.models.expressions import RawSQL, Exists
+from django.db.models.expressions import BaseExpression, Exists
 
 from .conf import settings
 
@@ -41,7 +40,7 @@ def dnfs(qs):
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE
             # Don't bother with complex right hand side either
-            if isinstance(where.rhs, (QuerySet, Query, Subquery, RawSQL)):
+            if isinstance(where.rhs, (QuerySet, Query, BaseExpression)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
             if isinstance(where.lhs.target, settings.CACHEOPS_SKIP_FIELDS):
