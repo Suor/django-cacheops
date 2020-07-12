@@ -606,6 +606,7 @@ class IssueTests(BaseTestCase):
         bar.save()
         self.assertEqual(Foo.objects.cache().filter(bar__isnull=True).count(), 0)
 
+    @unittest.skipIf(django.VERSION < (3, 0), "Supported from Django 3.0")
     def test_359(self):
         post_filter = Exists(Post.objects.all())
         len(Category.objects.filter(post_filter).cache())
