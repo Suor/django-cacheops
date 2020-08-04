@@ -13,6 +13,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.db import models
 from django.db.models.manager import BaseManager
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
+from django.db.transaction import atomic
 
 # This thing reappeared in Django 3.0
 try:
@@ -380,16 +381,19 @@ class QuerySetMixin(object):
         clone = self._clone().nocache()
         clone._for_write = True  # affects routing
 
-        objects = list(clone)
-        rows = clone.update(**kwargs)
+        with atomic(using=clone.db):
+            objects = list(clone.select_for_update())
+            rows = clone.update(**kwargs)
 
-        # TODO: do not refetch objects but update with kwargs in simple cases?
-        # We use clone database to fetch new states, as this is the db they were written to.
-        # Using router with new_objects may fail, using self may return slave during lag.
-        pks = {obj.pk for obj in objects}
-        new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+            # TODO: do not refetch objects but update with kwargs in simple cases?
+            # We use clone database to fetch new states, as this is the db they were written to.
+            # Using router with new_objects may fail, using self may return slave during lag.
+            pks = {obj.pk for obj in objects}
+            new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+
         for obj in chain(objects, new_objects):
             invalidate_obj(obj, using=clone.db)
+
         return rows
 
 
