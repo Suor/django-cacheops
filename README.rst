@@ -701,7 +701,7 @@ CAVEATS
 1. Conditions other than ``__exact``, ``__in`` and ``__isnull=True`` don't make invalidation
    more granular.
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
-   One should not test on their equality anyway.
+   One should not test on their equality anyway. See `CACHEOPS_SKIP_FIELDS` though.
 3. Update of "selected_related" object does not invalidate cache for queryset.
    Use ``.prefetch_related()`` instead.
 4. Mass updates don't trigger invalidation by default. But see ``.invalidated_update()``.
