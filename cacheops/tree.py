@@ -1,6 +1,7 @@
 from itertools import product
 from funcy import group_by, join_with, lcat, lmap
 
+from django.db.models import Subquery
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
@@ -121,6 +122,15 @@ def dnfs(qs):
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
     if qs.query.combined_queries:
-        return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
+        dnfs_ = join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
-        return query_dnf(qs.query)
+        dnfs_ = query_dnf(qs.query)
+
+    # Add any subqueries used for annotation
+    if qs.query.annotations:
+        subqueries = (
+            query_dnf(q.query) for q in qs.query.annotations.values() if type(q) is Subquery
+        )
+        dnfs_.update(join_with(lcat, subqueries))
+
+    return dnfs_
