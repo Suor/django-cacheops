@@ -378,7 +378,7 @@ class QuerySetMixin(object):
         return objs
 
     def invalidated_update(self, **kwargs):
-        clone = self._clone().nocache()
+        clone = self._clone().nocache().select_related(None)
         clone._for_write = True  # affects routing
 
         with atomic(using=clone.db):
