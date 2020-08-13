@@ -9,7 +9,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.template import Context, Template
-from django.db.models import F, Count, Sum, Subquery, Exists
+from django.db.models import F, Count, OuterRef, Sum, Subquery, Exists
 from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
@@ -610,6 +610,22 @@ class IssueTests(BaseTestCase):
     def test_359(self):
         post_filter = Exists(Post.objects.all())
         len(Category.objects.filter(post_filter).cache())
+
+    def test_365(self):
+        """
+        Check that an annotated Subquery is automatically invalidated.
+        """
+        # Retrieve all Categories and annotate the ID of the most recent Post for each
+        newest_post = Post.objects.filter(category=OuterRef('pk')).order_by('-pk').values('pk')
+        categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
+
+        # Create a new Post in the first Category
+        post = Post(category=categories[0], title='Foo')
+        post.save()
+
+        # Retrieve Categories again, and check that the newest post ID is correct
+        categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
+        self.assertEqual(categories[0].newest_post, post.pk)
 
 
 class RelatedTests(BaseTestCase):
