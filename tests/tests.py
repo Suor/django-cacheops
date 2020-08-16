@@ -546,6 +546,13 @@ class IssueTests(BaseTestCase):
     def test_232(self):
         list(Post.objects.cache().filter(category__in=[None, 1]).filter(category=1))
 
+    def test_348(self):
+        category = Category.objects.create()
+        Post.objects.create(category=category)
+        Post.objects.create(category=category)
+        objs = Post.objects.all().only("pk", "title").select_for_update()
+        objs.filter(pk__in=Post.objects.all().values("pk")).delete()
+
     @unittest.skipIf(connection.vendor == 'mysql', 'In MySQL DDL is not transaction safe')
     def test_265(self):
         # Databases must have different structure,
