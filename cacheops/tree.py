@@ -130,7 +130,8 @@ def dnfs(qs):
     if qs.query.annotations:
         subqueries = (
             # Django 3.0+ sets Subquery.query
-            query_dnf(getattr(q, 'query', q.queryset.query)) for q in qs.query.annotations.values()
+            query_dnf(getattr(q, 'query', None) or getattr(q, 'queryset').query)
+            for q in qs.query.annotations.values()
             if type(q) is Subquery
         )
         dnfs_.update(join_with(lcat, subqueries))
