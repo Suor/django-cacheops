@@ -1,3 +1,12 @@
+5.1
+- support subqueries in annotations (Jeremy Stretch)
+- included tests into distro (John Vandenberg)
+- fixed .invalidated_update(), if updated QuerySet had related fields selected (M1hacka)
+- fixed possible deadlock in .invalidated_update() (M1hacka)
+- fixed filtering with expressions
+- fixed queries filtering in Exists (thx to Axel Wegener)
+- updated min redis-py to 3.0.0
+
 5.0.1
 - fixed reverse o2o invalidation (thx to John Anderson)
 - fixed unstable cache key when field validors are used
