@@ -593,6 +593,17 @@ class IssueTests(BaseTestCase):
     def test_316(self):
         Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
+    @unittest.expectedFailure
+    def test_348(self):
+        foo = Foo.objects.create()
+        bar = Bar.objects.create(foo=foo)
+
+        bar = Bar.objects.cache().get(pk=bar.pk)
+        bar.foo.delete()
+
+        bar = Bar.objects.cache().get(pk=bar.pk)
+        bar.foo  # fails here since we try to fetch Foo instance by cached id
+
     def test_352(self):
         CombinedFieldModel.objects.create()
         list(CombinedFieldModel.objects.cache().all())
