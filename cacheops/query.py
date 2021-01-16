@@ -1,7 +1,6 @@
 import sys
 import json
 import threading
-import pickle
 from random import random
 
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
@@ -31,6 +30,13 @@ from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import transaction_states
 from .signals import cache_read
+
+if settings.CACHEOPS_PICKLE_LIB == 'pickle':
+    import pickle
+elif settings.CACHEOPS_PICKLE_LIB == 'dill':
+    import dill as pickle
+else:
+    raise ValueError('settings.CACHEOPS_PICKLE_LIB invalid value (use pickle or dill)')
 
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')

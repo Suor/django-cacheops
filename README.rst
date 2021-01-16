@@ -76,6 +76,9 @@ Setup redis connection and enable caching for desired models:
     # should be compatible or subclass cacheops.redis.CacheopsRedis
     CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
 
+    # You can use two pickling libs: pickle or dill
+    CACHEOPS_PICKLE_LIB = 'pickle'
+
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This also includes .first() and .last() calls,

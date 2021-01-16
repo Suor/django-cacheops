@@ -24,6 +24,7 @@ class Defaults:
     #       and one should not filter by their equality anyway.
     CACHEOPS_SKIP_FIELDS = models.FileField, models.TextField, models.BinaryField
     CACHEOPS_LONG_DISJUNCTION = 8
+    CACHEOPS_PICKLE_LIB = 'pickle'
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30

@@ -1,11 +1,16 @@
-import pickle
-
 from cacheops import invalidate_obj, invalidate_model
+from cacheops.conf import settings
 from cacheops.redis import redis_client
 from cacheops.tree import dnfs
 
 from .models import Category, Post, Extra
 
+if settings.CACHEOPS_PICKLE_LIB == 'pickle':
+    import pickle
+elif settings.CACHEOPS_PICKLE_LIB == 'dill':
+    import dill as pickle
+else:
+    raise ValueError('settings.CACHEOPS_PICKLE_LIB invalid value (use pickle or dill)')
 
 posts = list(Post.objects.cache().all())
 posts_pickle = pickle.dumps(posts, -1)

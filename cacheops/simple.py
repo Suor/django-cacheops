@@ -1,5 +1,4 @@
 import os
-import pickle
 import time
 
 from funcy import wraps
@@ -7,6 +6,13 @@ from funcy import wraps
 from .conf import settings
 from .utils import func_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
+
+if settings.CACHEOPS_PICKLE_LIB == 'pickle':
+    import pickle
+elif settings.CACHEOPS_PICKLE_LIB == 'dill':
+    import dill as pickle
+else:
+    raise ValueError('settings.CACHEOPS_PICKLE_LIB invalid value (use pickle or dill)')
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
