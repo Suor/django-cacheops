@@ -24,7 +24,7 @@ class Defaults:
     #       and one should not filter by their equality anyway.
     CACHEOPS_SKIP_FIELDS = models.FileField, models.TextField, models.BinaryField
     CACHEOPS_LONG_DISJUNCTION = 8
-    CACHEOPS_PICKLE_LIB = 'pickle'
+    CACHEOPS_SERIALIZER = 'cacheops.serializers.PickleSerializer'
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30
@@ -33,7 +33,7 @@ class Defaults:
 class Settings(object):
     def __getattr__(self, name):
         res = getattr(base_settings, name, getattr(Defaults, name))
-        if name == 'CACHEOPS_PREFIX':
+        if name in ['CACHEOPS_PREFIX', 'CACHEOPS_SERIALIZER']:
             res = res if callable(res) else import_string(res)
         # Save to dict to speed up next access, __getattr__ won't be called
         self.__dict__[name] = res

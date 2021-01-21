@@ -76,8 +76,22 @@ Setup redis connection and enable caching for desired models:
     # should be compatible or subclass cacheops.redis.CacheopsRedis
     CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
 
-    # You can use two pickling libs: pickle or dill
-    CACHEOPS_PICKLE_LIB = 'pickle'
+    # To use your own serializer class,
+    # should be compatible or subclass cacheops.serializers.PickleSerializer
+    CACHEOPS_SERIALIZER = 'your.serializers.ClientClass'
+
+.. code:: python
+
+    import pickle
+
+    class PickleSerializer:
+        # properties
+        PickleError = pickle.PickleError
+        HIGHEST_PROTOCOL = pickle.HIGHEST_PROTOCOL
+
+        # methods
+        dumps = pickle.dumps
+        loads = pickle.loads
 
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes

@@ -31,13 +31,6 @@ from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
 from .transaction import transaction_states
 from .signals import cache_read
 
-if settings.CACHEOPS_PICKLE_LIB == 'pickle':
-    import pickle
-elif settings.CACHEOPS_PICKLE_LIB == 'dill':
-    import dill as pickle
-else:
-    raise ValueError('settings.CACHEOPS_PICKLE_LIB invalid value (use pickle or dill)')
-
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
@@ -58,7 +51,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
-            pickle.dumps(data, -1),
+            settings.CACHEOPS_SERIALIZER.dumps(data, -1),
             json.dumps(cond_dnfs, default=str),
             timeout
         ]
@@ -117,7 +110,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
             with redis_client.getting(cache_key, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
-                    return pickle.loads(cache_data)
+                    return settings.CACHEOPS_SERIALIZER.loads(cache_data)
                 else:
                     if keep_fresh:
                         # We call this "asp" for "as precall" because this key is
@@ -284,7 +277,7 @@ class QuerySetMixin(object):
         with redis_client.getting(cache_key, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
-                self._result_cache = pickle.loads(cache_data)
+                self._result_cache = settings.CACHEOPS_SERIALIZER.loads(cache_data)
             else:
                 self._result_cache = list(self._iterable_class(self))
                 self._cache_results(cache_key, self._result_cache)

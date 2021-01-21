@@ -639,8 +639,6 @@ class IssueTests(BaseTestCase):
         self.assertEqual(categories[0].newest_post, post.pk)
 
     def test_385(self):
-        # case with settings.CACHEOPS_PICKLE_LIB == 'pickle' (by default)
-
         Client.objects.create(name='Client Name')
 
         with self.assertRaises(AttributeError) as e:
@@ -650,10 +648,7 @@ class IssueTests(BaseTestCase):
 
         invalidate_model(Client)
 
-        # case with settings.CACHEOPS_PICKLE_LIB == 'dill'
-        import dill
-        with mock.patch('pickle.loads', new=dill.loads), \
-             mock.patch('pickle.dumps', new=dill.dumps):
+        with override_settings(CACHEOPS_SERIALIZER='tests.serializers.DillSerializer'):
             with self.assertNumQueries(1):
                 Client.objects.filter(name='Client Name').cache().first()
                 Client.objects.filter(name='Client Name').cache().first()

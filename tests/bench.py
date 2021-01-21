@@ -5,21 +5,15 @@ from cacheops.tree import dnfs
 
 from .models import Category, Post, Extra
 
-if settings.CACHEOPS_PICKLE_LIB == 'pickle':
-    import pickle
-elif settings.CACHEOPS_PICKLE_LIB == 'dill':
-    import dill as pickle
-else:
-    raise ValueError('settings.CACHEOPS_PICKLE_LIB invalid value (use pickle or dill)')
 
 posts = list(Post.objects.cache().all())
-posts_pickle = pickle.dumps(posts, -1)
+posts_pickle = settings.CACHEOPS_SERIALIZER.dumps(posts, -1)
 
 def do_pickle():
-    pickle.dumps(posts, -1)
+    settings.CACHEOPS_SERIALIZER.dumps(posts, -1)
 
 def do_unpickle():
-    pickle.loads(posts_pickle)
+    settings.CACHEOPS_SERIALIZER.loads(posts_pickle)
 
 
 get_key = Category.objects.filter(pk=1).order_by()._cache_key()
