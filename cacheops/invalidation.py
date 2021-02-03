@@ -96,6 +96,10 @@ def serializable_fields(model):
 @post_processing(dict)
 def get_obj_dict(model, obj):
     for field in serializable_fields(model):
+        # Skip deferred fields, in post_delete trying to fetch them results in error anyway
+        if field.attname not in obj.__dict__:
+            continue
+
         value = getattr(obj, field.attname)
         if value is None:
             yield field.attname, None

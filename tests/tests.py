@@ -638,6 +638,10 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
         self.assertEqual(categories[0].newest_post, post.pk)
 
+    def test_387(self):
+        post = Post.objects.defer("visible").last()
+        post.delete()
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
