@@ -93,7 +93,7 @@ def redis_client():
 
         sentinel = Sentinel(
             settings.CACHEOPS_SENTINEL['locations'],
-            **omit(settings.CACHEOPS_SENTINEL, ('locations', 'service_name', 'db')))
+            **omit(settings.CACHEOPS_SENTINEL, ('locations', 'service_name', 'db', 'password')))
         return sentinel.master_for(
             settings.CACHEOPS_SENTINEL['service_name'],
             redis_class=client_class,
