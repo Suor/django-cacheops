@@ -97,8 +97,8 @@ no_invalidation = _no_invalidation()
 
 @memoize
 def serializable_fields(model):
-    return tuple(f for f in model._meta.fields
-                   if not isinstance(f, settings.CACHEOPS_SKIP_FIELDS))
+    return {f for f in model._meta.fields
+              if f.get_internal_type() not in settings.CACHEOPS_SKIP_FIELDS}
 
 @post_processing(dict)
 def get_obj_dict(model, obj):

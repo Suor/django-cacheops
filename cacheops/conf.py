@@ -3,7 +3,6 @@ from funcy import memoize, merge
 from django.conf import settings as base_settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.signals import setting_changed
-from django.db import models
 from django.utils.module_loading import import_string
 
 
@@ -22,7 +21,7 @@ class Defaults:
     CACHEOPS_SENTINEL = {}
     # NOTE: we don't use this fields in invalidator conditions since their values could be very long
     #       and one should not filter by their equality anyway.
-    CACHEOPS_SKIP_FIELDS = models.FileField, models.TextField, models.BinaryField
+    CACHEOPS_SKIP_FIELDS = "FileField", "TextField", "BinaryField", "JSONField"
     CACHEOPS_LONG_DISJUNCTION = 8
 
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
@@ -34,6 +33,11 @@ class Settings(object):
         res = getattr(base_settings, name, getattr(Defaults, name))
         if name == 'CACHEOPS_PREFIX':
             res = res if callable(res) else import_string(res)
+
+        # Convert old list of classes to list of strings
+        if name == 'CACHEOPS_SKIP_FIELDS':
+            [f if isinstance(f, str) else f.get_internal_type(res) for f in res]
+
         # Save to dict to speed up next access, __getattr__ won't be called
         self.__dict__[name] = res
         return res

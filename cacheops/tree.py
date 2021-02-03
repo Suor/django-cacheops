@@ -10,6 +10,7 @@ from django.db.models.lookups import Lookup, Exact, In, IsNull
 from django.db.models.expressions import BaseExpression, Exists
 
 from .conf import settings
+from .invalidation import serializable_fields
 
 
 def dnfs(qs):
@@ -44,7 +45,7 @@ def dnfs(qs):
             if isinstance(where.rhs, (QuerySet, Query, BaseExpression)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
-            if isinstance(where.lhs.target, settings.CACHEOPS_SKIP_FIELDS):
+            if where.lhs.target not in serializable_fields(where.lhs.target.model):
                 return SOME_TREE
 
             attname = where.lhs.target.attname
