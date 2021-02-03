@@ -28,7 +28,7 @@ from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
+from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidation
 from .transaction import transaction_states
 from .signals import cache_read
 
@@ -428,18 +428,18 @@ class ManagerMixin(object):
         if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
+    @skip_on_no_invalidation
     def _pre_save(self, sender, instance, using, **kwargs):
-        if not (instance.pk is None or instance._state.adding or no_invalidation.active):
+        if instance.pk is not None and not instance._state.adding:
             try:
+                # TODO: do not fetch non-serializable fields
                 _old_objs.__dict__[sender, instance.pk] \
                     = sender.objects.using(using).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
+    @skip_on_no_invalidation
     def _post_save(self, sender, instance, using, **kwargs):
-        if not settings.CACHEOPS_ENABLED or no_invalidation.active:
-            return
-
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
