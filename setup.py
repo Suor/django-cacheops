@@ -9,9 +9,9 @@ README = open('README.rst').read()    \
 
 
 setup(
-    name='django-cacheops',
+    name='pp-django-cacheops',
     version='5.1',
-    author='Alexander Schepanovski',
+    author='Parcel Perform',
     author_email='suor.web@gmail.com',
 
     description='A slick ORM cache with automatic granular event-driven invalidation for Django.',
@@ -28,9 +28,10 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'django>=2.1',
-        'redis>=3.0.0',
+        'redis==2.10.6',
         'funcy>=1.8,<2.0',
         'six>=1.4.0',
+        'redis-py-cluster==1.3.6',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',

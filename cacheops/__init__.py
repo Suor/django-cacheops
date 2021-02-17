@@ -6,7 +6,7 @@ from django.apps import AppConfig
 
 from .simple import *
 from .query import *
-from .invalidation import *
+from .invalidator import *
 from .templatetags.cacheops import *
 from .transaction import install_cacheops_transaction_support
 

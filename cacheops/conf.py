@@ -14,7 +14,7 @@ class Defaults:
     CACHEOPS_REDIS = {}
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
-    CACHEOPS_PREFIX = lambda query: ''
+    CACHEOPS_PREFIX = None
     CACHEOPS_LRU = False
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
@@ -24,6 +24,11 @@ class Defaults:
     CACHEOPS_SKIP_FIELDS = "FileField", "TextField", "BinaryField", "JSONField"
     CACHEOPS_LONG_DISJUNCTION = 8
 
+    # pp_django_cacheops exclusive
+    CACHEOPS_CLUSTER_ENABLED = False
+    CACHEOPS_TIMEOUT_HANDLER = None
+    CACHEOPS_REDIS_CONNECTION_TIMEOUT = 10
+
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30
 
@@ -31,7 +36,16 @@ class Defaults:
 class Settings(object):
     def __getattr__(self, name):
         res = getattr(base_settings, name, getattr(Defaults, name))
-        if name == 'CACHEOPS_PREFIX':
+        # pp_django_cacheops exclusive
+        if name == 'CACHEOPS_PREFIX' and not res:
+            if self.CACHEOPS_CLUSTER_ENABLED:
+                # prevent circular import
+                from cacheops.cluster.prefix import cluster_prefix
+                res = cluster_prefix
+            else:
+                res = lambda query: ''
+
+        if name == 'CACHEOPS_PREFIX' and res:
             res = res if callable(res) else import_string(res)
 
         # Convert old list of classes to list of strings
