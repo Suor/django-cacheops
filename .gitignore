@@ -5,3 +5,5 @@ build
 sqlite*.db
 .tox
 .cache
+.vscode
+.idea
