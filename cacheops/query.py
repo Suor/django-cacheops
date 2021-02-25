@@ -26,9 +26,9 @@ from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
 from .utils import md5
 from .sharding import get_prefix
-from .redis import redis_client, handle_connection_failure, load_script
+from .redis import redis_client, handle_connection_failure, load_script, load_script_cluster
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidation
+from .invalidator import invalidator
 from .transaction import transaction_states
 from .signals import cache_read
 
@@ -49,6 +49,19 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     # Could have changed after last check, sometimes superficially
     if transaction_states.is_dirty(dbs):
         return
+
+    if settings.CACHEOPS_CLUSTER_ENABLED:
+        load_script_cluster('cache_thing', settings.CACHEOPS_LRU)(
+            keys=[prefix, cache_key],
+            args=[
+                precall_key,
+                pickle.dumps(data, -1),
+                json.dumps(cond_dnfs, default=str),
+                timeout
+            ]
+        )
+        return
+    
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
@@ -374,7 +387,7 @@ class QuerySetMixin(object):
         objs = self._no_monkey.bulk_create(self, objs, *args, **kwargs)
         if family_has_profile(self.model):
             for obj in objs:
-                invalidate_obj(obj, using=self.db)
+                invalidator.invalidate_obj(obj, using=self.db)
         return objs
 
     def invalidated_update(self, **kwargs):
@@ -392,7 +405,7 @@ class QuerySetMixin(object):
             new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
 
         for obj in chain(objects, new_objects):
-            invalidate_obj(obj, using=clone.db)
+            invalidator.invalidate_obj(obj, using=clone.db)
 
         return rows
 
@@ -428,7 +441,7 @@ class ManagerMixin(object):
         if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
-    @skip_on_no_invalidation
+    @invalidator.skip_on_no_invalidation
     def _pre_save(self, sender, instance, using, **kwargs):
         if instance.pk is not None and not instance._state.adding:
             try:
@@ -438,13 +451,13 @@ class ManagerMixin(object):
             except sender.DoesNotExist:
                 pass
 
-    @skip_on_no_invalidation
+    @invalidator.skip_on_no_invalidation
     def _post_save(self, sender, instance, using, **kwargs):
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
-            invalidate_obj(old, using=using)
-        invalidate_obj(instance, using=using)
+            invalidator.invalidate_obj(old, using=using)
+        invalidator.invalidate_obj(instance, using=using)
 
         invalidate_o2o(sender, old, instance, using=using)
 
@@ -494,7 +507,7 @@ class ManagerMixin(object):
         """
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
-        invalidate_obj(instance, using=using)
+        invalidator.invalidate_obj(instance, using=using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -518,8 +531,8 @@ def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
         if old_value != value:
             rmodel, rfield = f.related_model, f.remote_field.field_name
             if old:
-                invalidate_dict(rmodel, {rfield: old_value}, using=using)
-            invalidate_dict(rmodel, {rfield: value}, using=using)
+                invalidator.invalidate_dict(rmodel, {rfield: old_value}, using=using)
+            invalidator.invalidate_dict(rmodel, {rfield: value}, using=using)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
@@ -544,12 +557,12 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
     if action == 'pre_clear':
         objects = sender.objects.using(using).filter(**{instance_column: instance.pk})
         for obj in objects:
-            invalidate_obj(obj, using=using)
+            invalidator.invalidate_obj(obj, using=using)
     elif action in ('post_add', 'pre_remove'):
         # NOTE: we don't need to query through objects here,
         #       cause we already know all their meaningful attributes.
         for pk in pk_set:
-            invalidate_dict(sender, {
+            invalidator.invalidate_dict(sender, {
                 instance_column: instance.pk,
                 model_column: pk
             }, using=using)

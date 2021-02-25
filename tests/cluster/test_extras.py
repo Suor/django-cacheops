@@ -5,8 +5,8 @@ from cacheops import cached_as, invalidator
 from cacheops.conf import settings
 from cacheops.signals import cache_read, cache_invalidated
 
-from .utils import BaseTestCase, make_inc
-from .models import Post, Category, Local, DbAgnostic, DbBinded
+from tests.utils import BaseTestCase, make_inc
+from tests.models import Post, Category, Local, DbAgnostic, DbBinded
 
 
 class SettingsTests(TestCase):
@@ -90,7 +90,7 @@ class LockingTests(BaseTestCase):
     def test_lock(self):
         import random
         import threading
-        from .utils import ThreadWithReturnValue
+        from tests.utils import ThreadWithReturnValue
         from before_after import before
 
         @cached_as(Post, lock=True, timeout=60)
@@ -104,7 +104,7 @@ class LockingTests(BaseTestCase):
         def second_thread():
             def _target():
                 try:
-                    with before('redis.StrictRedis.brpoplpush', lambda *a, **kw: locked.set()):
+                    with before('rediscluster.StrictRedisCluster.brpoplpush', lambda *a, **kw: locked.set()):
                         results.append(func())
                 except Exception:
                     locked.set()
