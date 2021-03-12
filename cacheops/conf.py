@@ -14,7 +14,7 @@ class Defaults:
     CACHEOPS_REDIS = {}
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
-    CACHEOPS_PREFIX = None
+    CACHEOPS_PREFIX = lambda query: ''
     CACHEOPS_LRU = False
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
@@ -36,14 +36,14 @@ class Defaults:
 class Settings(object):
     def __getattr__(self, name):
         res = getattr(base_settings, name, getattr(Defaults, name))
+
         # pp_django_cacheops exclusive
-        if name == 'CACHEOPS_PREFIX' and not res:
-            if self.CACHEOPS_CLUSTER_ENABLED:
-                # prevent circular import
-                from cacheops.cluster.prefix import cluster_prefix
-                res = cluster_prefix
-            else:
-                res = lambda query: ''
+        if name == 'CACHEOPS_PREFIX' and self.CACHEOPS_CLUSTER_ENABLED:
+            """
+            ?INFO: To prevent unintended usage, for cluster mode, we will remove the prefix function
+            For example: User can change the prefix to be a Redis hashtag -> This will break the key's distribution if the hashtag is not random enough
+            """
+            res = lambda _: ''
 
         if name == 'CACHEOPS_PREFIX' and res:
             res = res if callable(res) else import_string(res)

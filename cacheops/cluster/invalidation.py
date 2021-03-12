@@ -11,6 +11,8 @@ from cacheops.redis import redis_client, handle_connection_failure, load_script
 from cacheops.signals import cache_invalidated
 from cacheops.transaction import queue_when_in_transaction
 
+from cacheops.cluster.key_crafter import craft_scheme_key, craft_invalidator_key
+
 
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
@@ -27,61 +29,30 @@ def skip_on_no_invalidation(call):
 
 # ================== lua script functions ==================
 
-def conj_cache_key(db_table, scheme, obj):
-    """
-    craft invalidation key
-    copied from invalidation.lua script and converted to python
-    """
-    parts = []
+def craft_conj_dict(scheme, old_data):
+    conj = {}
 
     for field in re.split(r'[,]+', scheme):
-        field_value = obj.get(field)
+        field_value = old_data.get(field)
 
-        # value None = nil in lua script
-        if field_value is None:
-            field_value = 'nil'
+        conj[field] = field_value
 
-        if field == '':
-            continue
-
-        if isinstance(field_value, bool):
-            field_value = str(field_value).lower()
-
-        parts.append(f"{field}={field_value}")
-
-    # !WARNING: performance issue on large data set
-    return f"*conj:{db_table}:{'&'.join(parts)}"
+    return conj
 
 
-def calculate_conj_key(db_table, obj):
+def calculate_conj_key(prefix, db_table, old_data):
     conj_keys = []
-    # we don't use prefix here, because we don't know how to craft the old prefix
-    # we unable to craft the old prefix since the prefix use md5 hash of the query
-    # however, the invalidation query is different from retrieving data query
-    # !WARNING: performance issue on large data set
-    schema_keys = redis_client.keys(f'*schemes:{db_table}')
-
-    # sunion throw exception on an empty array
-    if not schema_keys:
-        return conj_keys
-
-    schemes = redis_client.sunion(schema_keys)
-    schemes = list(schemes)
+    # return a set of binarty
+    schemes = redis_client.smembers(craft_scheme_key(prefix, db_table))
     schemes = map(lambda s: s.decode('utf-8'), schemes)
 
     for scheme in schemes:
-        conj_keys.append(conj_cache_key(db_table, scheme, obj))
+        conj = craft_conj_dict(scheme, old_data)
+        conj_keys.append(
+            craft_invalidator_key(prefix, db_table, conj)
+        )
 
     return conj_keys
-
-
-def get_invalidation_keys(conj_keys):
-    invalidation_keys = []
-    for conj_key in conj_keys:
-        invalidation_key_list = redis_client.keys(conj_key)
-        invalidation_keys += invalidation_key_list
-
-    return invalidation_keys
 
 
 def remove_chunk(client, data_keys):
@@ -89,17 +60,17 @@ def remove_chunk(client, data_keys):
         client.delete(*data_keys[i: i + 500])
 
 
-def invalidation_dict_transaction(db_table, obj):
+def invalidation_dict_transaction(prefix, db_table, obj):
     # not a part of transaction, since getting key may take a long time
     # hence, we shouldn't include it
 
     # step 1: create the pattern to get invalidation keys
-    conj_keys = calculate_conj_key(db_table, obj)
+    conj_keys = calculate_conj_key(prefix, db_table, obj)
     if not conj_keys:
         return
 
     # step 2: get all the invalidation keys
-    invalidation_keys = get_invalidation_keys(conj_keys)
+    invalidation_keys = conj_keys
     if not invalidation_keys:
         return
 
@@ -111,10 +82,11 @@ def invalidation_dict_transaction(db_table, obj):
 
     # step 4: removal
 
-    # remove all invalidation keys
-    redis_client.delete(*invalidation_keys)
     # remove all data key and its data
     remove_chunk(client=redis_client, data_keys=data_keys)
+
+    # remove all invalidation keys
+    redis_client.delete(*invalidation_keys)
 
     # end invalidation transactions
 
@@ -137,8 +109,7 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
         return
 
     model = model._meta.concrete_model
-    # INFO: prefix will not be used since we are unable to calcualte the old prefix
-    # prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
+    prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
 
     # INFO: this part is removed since it only works on single redis cluster node
     # load_script('invalidate')(keys=[prefix], args=[
@@ -149,6 +120,7 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
     # move to use redis client = redis cluster client
     # so that we can invalidate all the keys across multiple clusters
     invalidation_dict_transaction(
+        prefix=prefix,
         db_table=model._meta.db_table,
         obj=obj_dict,
     )
@@ -179,7 +151,7 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     # NOTE: if we use sharding dependent on DNF then this will fail,
     #       which is ok, since it's hard/impossible to predict all the shards
     # !WARNING: performance issue on large dataset due to KEYS command search with pattern
-    conjs_keys = redis_client.keys('*conj:%s:*' % (model._meta.db_table))
+    conjs_keys = redis_client.keys("conj:%s:*" % (model._meta.db_table))
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         keys = list(cache_keys) + conjs_keys

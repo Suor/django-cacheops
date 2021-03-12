@@ -32,6 +32,8 @@ from .invalidator import invalidator
 from .transaction import transaction_states
 from .signals import cache_read
 
+from .cluster import cache_thing as cache_thing_cluster
+
 
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
@@ -51,14 +53,15 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
         return
 
     if settings.CACHEOPS_CLUSTER_ENABLED:
-        load_script_cluster('cache_thing', settings.CACHEOPS_LRU)(
+        cache_thing_cluster(
             keys=[prefix, cache_key],
             args=[
                 precall_key,
                 pickle.dumps(data, -1),
-                json.dumps(cond_dnfs, default=str),
+                cond_dnfs,
                 timeout
-            ]
+            ],
+            strip=settings.CACHEOPS_LRU,
         )
         return
     

@@ -20,6 +20,9 @@ Note that the main part is in cacheops/cluster folder. Most of the cluster code 
 ## Usage guide
 [Click here](README.rst)
 
+## Change log
+[Click here](PP_CHANGELOG.MD)
+
 ## Documentation
 https://docs.google.com/document/d/1luNTSqhCmGiERJXFD0jJaKzlhIRAC74G6yy75pMWd4o/edit?usp=sharing
 

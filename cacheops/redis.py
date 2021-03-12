@@ -112,6 +112,48 @@ class CacheopsRedisCluster(StrictRedisCluster, CacheopsRedis):
         if not init_slot_cache:
             self.refresh_table_asap = True
 
+    def _handle_lock(self, keys, args):
+        """
+        Move old lua script to this function so that we can work with cluster mode
+        """
+        locked = self.set(keys[0], 'LOCK', ex=args[0], nx=True)
+        if locked:
+            self.delete(keys[1])
+
+        return locked
+
+    @handle_connection_failure
+    def _get_or_lock(self, key):
+        self._lock = getattr(self, '_lock', self._handle_lock)
+        signal_key = key + ':signal'
+
+        while True:
+            data = self.get(key)
+            if data is None:
+                if self._lock(keys=[key, signal_key], args=[LOCK_TIMEOUT]):
+                    return None
+            elif data != b'LOCK':
+                return data
+
+            # No data and not locked, wait
+            self.brpoplpush(signal_key, signal_key, timeout=LOCK_TIMEOUT)
+
+    def _handle_release_lock(self, keys):
+        if self.get(keys[0]) == 'LOCK':
+            self.delete(keys[0])
+
+        self.lpush(keys[1], 1)
+        self.expire(keys[1], 1)
+
+    @handle_connection_failure
+    def _release_lock(self, key):
+        """
+        Move old lua script to this function so that we can work with cluster mode
+        """
+        self._unlock = getattr(self, '_unlock', self._handle_release_lock)
+        signal_key = key + ':signal'
+        self._unlock(keys=[key, signal_key])
+
 
 @LazyObject
 def redis_client():
