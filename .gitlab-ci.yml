@@ -1,0 +1,60 @@
+# Documentation: https://parcelperform.atlassian.net/wiki/display/FN/Gitlab+CI+flow
+
+stages:
+- merge
+- build
+- test
+- release
+
+variables:
+  CONTAINER_TEST_IMAGE: parcelperform/pp_django_cacheops:$CI_COMMIT_SHA
+  CONTAINER_TEST_NAME: pp_django_cacheops_test
+  CONTAINER_RELEASE_IMAGE: parcelperform/pp_django_cacheops
+
+  BRUNO_KAFKA_HOST_NAME: kafka-dev
+  BRUNO_KAFKA_IP: 10.0.7.66
+  APOLLO_KAFKA_HOST_NAME: kafka-apollo
+  APOLLO_KAFKA_IP: 10.0.7.186
+
+  PROJECT_GIT_REPO: git@git.parcelperform.com:dev-team/pp_django_cacheops.git
+  # Docker service name that configured on remote servers
+  DOCKER_SERVICE_NAME: pp_django_cacheops
+  GIT_STRATEGY: none
+  REDIS_CLUSTER_HOST: '10.0.3.70,10.0.3.70,10.0.3.70'
+  REDIS_CLUSTER_PORT: '7000,7001,7002'
+  REDIS_SSL: 'False'
+
+# Merge master or production
+# to test if there is any confliction
+merge:
+  stage: merge
+  script:
+    - git fetch origin master
+    - git merge origin/master
+  variables:
+    GIT_STRATEGY: fetch
+  only:
+    - master
+
+# Build test image
+build:
+  stage: build
+  script:
+    - docker build -t $CONTAINER_TEST_IMAGE .
+  only:
+    - master
+
+test:
+  stage: test
+  script:
+    - docker run --rm --name $CONTAINER_TEST_NAME --env-file=./env_files/test_pp.env --entrypoint python3 $CONTAINER_TEST_IMAGE run_tests_cluster.py
+  only:
+    - master
+
+# Build & Push image to Docker
+release:
+  stage: release
+  script:
+    - docker run --rm --name $CONTAINER_TEST_NAME --entrypoint /srv/pp_django_cacheops/release.sh $CONTAINER_TEST_IMAGE
+  only:
+    - master

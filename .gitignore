@@ -7,3 +7,4 @@ sqlite*.db
 .cache
 .vscode
 .idea
+.DS_Store

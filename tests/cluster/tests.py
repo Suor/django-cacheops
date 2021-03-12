@@ -892,7 +892,7 @@ class ProxyTests(BaseTestCase):
 
 
 class MultitableInheritanceTests(BaseTestCase):
-    @unittest.expectedFailure
+    # @unittest.expectedFailure
     def test_sub_added(self):
         media_count = Media.objects.cache().count()
         Movie.objects.create(name="Matrix", year=1999)
@@ -986,7 +986,7 @@ class MultiDBInvalidationTests(BaseTestCase):
         with self.assertNumQueries(1):
             Category.objects.cache().count()
 
-        with self.assertNumQueries(1, using='slave'):
+        with self.assertNumQueries(0, using='slave'):
             Category.objects.cache().using('slave').count()
 
     def test_save(self):
