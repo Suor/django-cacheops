@@ -68,4 +68,8 @@ def cache_thing(keys, args, strip=False):
     # but by write the data to cache after the invalidator key stuff
     # if we are unable to set the data -> we will have another change next time
     # also, in the invalidation process, deleting non-exist key is an accepted behaviour by redis
-    redis_client.setex(key, timeout, data)
+    has_lock = redis_client.get(key) == b'LOCK'
+    if has_lock:
+        redis_client.setex(key, timeout, data)
+    else:
+        redis_client.set(key, data, ex=timeout, nx=True)
