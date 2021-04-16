@@ -7,13 +7,14 @@ from funcy import wraps
 from .conf import settings
 from .utils import func_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
-
+from .sharding import get_prefix
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
 
 
 class CacheMiss(Exception):
     pass
+
 
 class CacheKey(str):
     @classmethod
@@ -32,11 +33,12 @@ class CacheKey(str):
     def delete(self):
         self.cache.delete(self)
 
+
 class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
+    def cached(self, timeout=None, extra=None, key_func=func_cache_key, ignore_prefix=False):
         """
         A decorator for caching function calls
         """
@@ -44,13 +46,19 @@ class BaseCache(object):
         if callable(timeout):
             return self.cached(key_func=key_func)(timeout)
 
+        def get_simple_cache_key(func, args, kwargs, extra):
+            if ignore_prefix:
+                return key_func(func, args, kwargs, extra)
+            else:
+                return get_prefix(func=func) + 'c:' + key_func(func, args, kwargs, extra)
+
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
                 if not settings.CACHEOPS_ENABLED:
                     return func(*args, **kwargs)
 
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
+                cache_key = get_simple_cache_key(func, args, kwargs, extra)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -60,12 +68,12 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
+                cache_key = get_simple_cache_key(func, args, kwargs, extra)
                 self.delete(cache_key)
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
+                cache_key = get_simple_cache_key(func, args, kwargs, extra)
                 return CacheKey.make(cache_key, cache=self, timeout=timeout)
             wrapper.key = key
 
@@ -99,6 +107,7 @@ class RedisCache(BaseCache):
     @handle_connection_failure
     def delete(self, cache_key):
         self.conn.delete(cache_key)
+
 
 cache = RedisCache(redis_client)
 cached = cache.cached
@@ -166,5 +175,6 @@ class FileCache(BaseCache):
             os.rmdir(dirname)
         except (IOError, OSError):
             pass
+
 
 file_cache = FileCache(settings.FILE_CACHE_DIR)

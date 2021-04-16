@@ -60,7 +60,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
 
 
 def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
-                        key_func=func_cache_key):
+                        key_func=func_cache_key, ignore_prefix=False):
     """
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.

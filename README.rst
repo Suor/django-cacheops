@@ -650,7 +650,20 @@ A ``query`` object passed to callback also enables reflection on used databases 
         if query.tables == ['blog_post']:
             return 'blog:'
 
-**NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
+**NOTE:** Prefix is now used on all cacheops operations.  This was not the case for simple and file cache in cacheops versions 5.1 and earlier.  To share cache between multiple applciations, cache can be saved without the prefix by including ``ignore_prefix=True`` to any of the decorators:
+
+.. code:: python
+
+    from cacheops import cached, cached_view
+
+    @cached(timeout=number_of_seconds, ignore_prefix=True)
+    def top_articles(category):
+        return ... # Some costly queries
+
+    @cached_view(timeout=number_of_seconds, ignore_prefix=True)
+    def top_articles(request, category=None):
+        # Some costly queries
+        return HttpResponse(...)
 
 
 Using memory limit

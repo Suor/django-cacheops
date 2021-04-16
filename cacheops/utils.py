@@ -13,6 +13,7 @@ def get_concrete_model(model):
     return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
                  and not b._meta.proxy and not b._meta.abstract), None)
 
+
 def model_family(model):
     """
     Returns a list of all proxy models, including subclasess, superclassses and siblings.
@@ -34,6 +35,7 @@ def family_has_profile(cls):
 
 class MonkeyProxy(object):
     pass
+
 
 def monkey_mix(cls, mixin):
     """
@@ -86,12 +88,14 @@ def obj_key(obj):
     else:
         return str(obj)
 
+
 def func_cache_key(func, args, kwargs, extra=None):
     """
     Calculate cache key based on func and arguments
     """
     factors = [func, args, kwargs, extra]
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
+
 
 def view_cache_key(func, args, kwargs, extra=None):
     """
@@ -103,6 +107,7 @@ def view_cache_key(func, args, kwargs, extra=None):
     else:
         uri = args[0]
     return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
+
 
 def cached_view_fab(_cached):
     def force_render(response):
@@ -139,6 +144,7 @@ from django.utils.safestring import mark_safe
 
 NEWLINE_BETWEEN_TAGS = mark_safe('>\n<')
 SPACE_BETWEEN_TAGS = mark_safe('> <')
+
 
 def carefully_strip_whitespace(text):
     def repl(m):
