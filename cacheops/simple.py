@@ -90,23 +90,28 @@ class RedisCache(BaseCache):
     def __init__(self, conn):
         self.conn = conn
 
-    def get(self, cache_key):
-        data = self.conn.get(cache_key)
+    def get_cache_key(self, cache_key, ignore_prefix=False):
+        if not ignore_prefix:
+            return get_prefix() + cache_key
+        return cache_key
+
+    def get(self, cache_key, ignore_prefix=False):
+        data = self.conn.get(self.get_cache_key(cache_key, ignore_prefix))
         if data is None:
             raise CacheMiss
         return pickle.loads(data)
 
     @handle_connection_failure
-    def set(self, cache_key, data, timeout=None):
+    def set(self, cache_key, data, timeout=None, ignore_prefix=False):
         pickled_data = pickle.dumps(data, -1)
         if timeout is not None:
-            self.conn.setex(cache_key, timeout, pickled_data)
+            self.conn.setex(self.get_cache_key(cache_key, ignore_prefix), timeout, pickled_data)
         else:
-            self.conn.set(cache_key, pickled_data)
+            self.conn.set(self.get_cache_key(cache_key, ignore_prefix), pickled_data)
 
     @handle_connection_failure
-    def delete(self, cache_key):
-        self.conn.delete(cache_key)
+    def delete(self, cache_key, ignore_prefix=False):
+        self.conn.delete(self.get_cache_key(cache_key, ignore_prefix))
 
 
 cache = RedisCache(redis_client)

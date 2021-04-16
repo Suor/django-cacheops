@@ -650,7 +650,7 @@ A ``query`` object passed to callback also enables reflection on used databases 
         if query.tables == ['blog_post']:
             return 'blog:'
 
-**NOTE:** Prefix is now used on all cacheops operations.  This was not the case for simple and file cache in cacheops versions 5.1 and earlier.  To share cache between multiple applciations, cache can be saved without the prefix by including ``ignore_prefix=True`` to any of the decorators:
+**NOTE:** Prefix is now used on all cacheops operations except ``file_cache``.   This was not the case in cacheops versions 5.1 and earlier.  To share cache between multiple applications, the prefix can be ignored by including the keyword argument ``ignore_prefix=True`` to any of the decorators:
 
 .. code:: python
 
