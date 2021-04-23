@@ -5,7 +5,7 @@ import time
 from funcy import wraps
 
 from .conf import settings
-from .utils import func_cache_key, cached_view_fab, md5hex
+from .utils import get_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
 
 
@@ -36,13 +36,17 @@ class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
+    def cached(self, timeout=None, extra=None):
         """
         A decorator for caching function calls
         """
         # Support @cached (without parentheses) form
         if callable(timeout):
-            return self.cached(key_func=key_func)(timeout)
+            return self.cached()(timeout)
+
+        def _get_key(func, args, kwargs):
+            extra_val = extra(*args, **kwargs) if callable(extra) else extra
+            return 'c:' + get_cache_key(func, args, kwargs, extra_val)
 
         def decorator(func):
             @wraps(func)
@@ -50,7 +54,7 @@ class BaseCache(object):
                 if not settings.CACHEOPS_ENABLED:
                     return func(*args, **kwargs)
 
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
+                cache_key = _get_key(func, args, kwargs)
                 try:
                     result = self.get(cache_key)
                 except CacheMiss:
@@ -60,13 +64,11 @@ class BaseCache(object):
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
-                self.delete(cache_key)
+                self.delete(_get_key(func, args, kwargs))
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
-                return CacheKey.make(cache_key, cache=self, timeout=timeout)
+                return CacheKey.make(_get_key(func, args, kwargs), cache=self, timeout=timeout)
             wrapper.key = key
 
             return wrapper

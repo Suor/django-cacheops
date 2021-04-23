@@ -77,6 +77,8 @@ def stamp_fields(model):
 def obj_key(obj):
     if isinstance(obj, models.Model):
         return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
+    elif hasattr(obj, 'build_absolute_uri'):
+        return obj.build_absolute_uri()  # Only vary HttpRequest by uri
     elif inspect.isfunction(obj):
         factors = [obj.__module__, obj.__name__]
         # Really useful to ignore this while code still in development
@@ -86,23 +88,8 @@ def obj_key(obj):
     else:
         return str(obj)
 
-def func_cache_key(func, args, kwargs, extra=None):
-    """
-    Calculate cache key based on func and arguments
-    """
-    factors = [func, args, kwargs, extra]
+def get_cache_key(*factors):
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
-
-def view_cache_key(func, args, kwargs, extra=None):
-    """
-    Calculate cache key for view func.
-    Use url instead of not properly serializable request argument.
-    """
-    if hasattr(args[0], 'build_absolute_uri'):
-        uri = args[0].build_absolute_uri()
-    else:
-        uri = args[0]
-    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
 
 def cached_view_fab(_cached):
     def force_render(response):
@@ -112,7 +99,6 @@ def cached_view_fab(_cached):
 
     def cached_view(*dargs, **dkwargs):
         def decorator(func):
-            dkwargs['key_func'] = view_cache_key
             cached_func = _cached(*dargs, **dkwargs)(compose(force_render, func))
 
             @wraps(func)

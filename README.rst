@@ -265,9 +265,18 @@ caching, but only path of the request parameter is used to construct cache key:
     @cached_view_as(News)
     def news_index(request):
         # ...
-        return HttpResponse(...)
+        return render(...)
 
-You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``.
+You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``. Note that you can pass a function as ``extra``:
+
+.. code:: python
+
+    @cached_view_as(News, extra=lambda req: req.user.is_staff)
+    def news_index(request):
+        # ... add extra things for staff
+        return render(...)
+
+A function passed as ``extra`` receives the same arguments as the cached function.
 
 Class based views can also be cached:
 
@@ -276,7 +285,7 @@ Class based views can also be cached:
     class NewsIndex(ListView):
         model = News
 
-    news_index = cached_view_as(News)(NewsIndex.as_view())
+    news_index = cached_view_as(News, ...)(NewsIndex.as_view())
 
 
 Invalidation

@@ -23,7 +23,7 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, get_cache_key, cached_view_fab, family_has_profile
 from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
@@ -59,8 +59,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     )
 
 
-def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
-                        key_func=func_cache_key):
+def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
     """
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.
@@ -92,8 +91,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
     querysets = lmap(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
     cond_dnfs = join_with(lcat, map(dnfs, querysets))
-    key_extra = [qs._cache_key(prefix=False) for qs in querysets]
-    key_extra.append(extra)
+    qs_keys = [qs._cache_key(prefix=False) for qs in querysets]
     if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
     if lock is None:
@@ -106,7 +104,8 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
                 return func(*args, **kwargs)
 
             prefix = get_prefix(func=func, _cond_dnfs=cond_dnfs, dbs=dbs)
-            cache_key = prefix + 'as:' + key_func(func, args, kwargs, key_extra)
+            extra_val = extra(*args, **kwargs) if callable(extra) else extra
+            cache_key = prefix + 'as:' + get_cache_key(func, args, kwargs, qs_keys, extra_val)
 
             with redis_client.getting(cache_key, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
@@ -119,7 +118,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False,
                         # the key to prevent falsely thinking the key was not
                         # invalidated when in fact it was invalidated and the
                         # function was called again in another process.
-                        suffix = key_func(func, args, kwargs, key_extra + [random()])
+                        suffix = get_cache_key(func, args, kwargs, qs_keys, extra_val, random())
                         precall_key = prefix + 'asp:' + suffix
                         # Cache a precall_key to watch for invalidation during
                         # the function call. Its value does not matter. If and
