@@ -13,6 +13,8 @@ MIDDLEWARE_CLASSES = []
 
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
 if os.environ.get('CACHEOPS_DB') == 'postgresql':

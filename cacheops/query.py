@@ -7,7 +7,7 @@ from random import random
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy import lmap, map, lcat, join_with
 
-from django.utils.encoding import smart_str, force_text
+from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
 from django.db import models
@@ -175,8 +175,8 @@ class QuerySetMixin(object):
             try:
                 sql_str = sql % params
             except UnicodeDecodeError:
-                sql_str = sql % walk(force_text, params)
-            md.update(smart_str(sql_str))
+                sql_str = sql % walk(force_str, params)
+            md.update(force_str(sql_str))
         except EmptyResultSet:
             pass
         # If query results differ depending on database
