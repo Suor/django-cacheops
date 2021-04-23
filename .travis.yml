@@ -14,30 +14,30 @@ services:
 #     - libgdal-dev
 
 python:
-  - 3.5
   - 3.6
   - 3.7
   - 3.8
+  - 3.9
   - pypy3
 env:
-  - DJANGO=2.1
-  - DJANGO=2.2
   - DJANGO=3.0
+  - DJANGO=3.1
+  - DJANGO=3.2
 matrix:
   exclude:
-    - python: 3.5
-      env: DJANGO=3.0
+    - python: 3.6
+      env: DJANGO=3.2
   include:
-    - python: 3.7
-      env: TOXENV=lint
-    - python: 3.7
-      env: DJANGO=master
     - python: 3.8
+      env: TOXENV=lint
+    - python: 3.8
+      env: DJANGO=master
+    - python: 3.9
       env: DJANGO=master
   allow_failures:
-    - python: 3.7
-      env: DJANGO=master
     - python: 3.8
+      env: DJANGO=master
+    - python: 3.9
       env: DJANGO=master
 install:
   - pip install tox-travis
