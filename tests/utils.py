@@ -64,7 +64,3 @@ def run_in_thread(target):
     t = ThreadWithReturnValue(target=target)
     t.start()
     return t.join()
-
-
-def gen_cluster_prefix(prefix):
-    return f"{{{prefix}}}"

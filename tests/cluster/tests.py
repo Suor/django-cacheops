@@ -18,7 +18,7 @@ from cacheops.templatetags.cacheops import register
 
 decorator_tag = register.decorator_tag
 from tests.models import *  # noqa
-from tests.utils import BaseTestCase, make_inc, gen_cluster_prefix
+from tests.utils import BaseTestCase, make_inc
 
 
 class BasicTests(BaseTestCase):
@@ -972,7 +972,7 @@ class GISTests(BaseTestCase):
 
 
 # NOTE: overriding cache prefix to separate invalidation sets by db.
-@override_settings(CACHEOPS_PREFIX=lambda q: gen_cluster_prefix(q.db))
+@override_settings(CACHEOPS_PREFIX=lambda q: q.db)
 class MultiDBInvalidationTests(BaseTestCase):
     databases = ('default', 'slave')
     fixtures = ['basic']
@@ -983,10 +983,10 @@ class MultiDBInvalidationTests(BaseTestCase):
         Category.objects.using('slave').cache().count()
 
         yield
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(0):
             Category.objects.cache().count()
 
-        with self.assertNumQueries(0, using='slave'):
+        with self.assertNumQueries(1, using='slave'):
             Category.objects.cache().using('slave').count()
 
     def test_save(self):
