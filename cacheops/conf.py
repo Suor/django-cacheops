@@ -37,16 +37,17 @@ class Settings(object):
     def __getattr__(self, name):
         res = getattr(base_settings, name, getattr(Defaults, name))
 
-        # pp_django_cacheops exclusive
-        if name == 'CACHEOPS_PREFIX' and self.CACHEOPS_CLUSTER_ENABLED:
-            """
-            ?INFO: To prevent unintended usage, for cluster mode, we will remove the prefix function
-            For example: User can change the prefix to be a Redis hashtag -> This will break the key's distribution if the hashtag is not random enough
-            """
-            res = lambda _: ''
-
         if name == 'CACHEOPS_PREFIX' and res:
             res = res if callable(res) else import_string(res)
+
+        # pp_django_cacheops exclusive
+        if name == 'CACHEOPS_PREFIX' and self.CACHEOPS_CLUSTER_ENABLED and res:
+            from cacheops.cluster import prefix_validator
+            """
+            ?INFO: To prevent unintended usage, for cluster mode, we will wrap this function with another to check if the prefix contain invalid character
+            For example: PREFIX = {a}bc -> throw an exception since including hash tag will break the distribution of cluster
+            """
+            res = prefix_validator(res)
 
         # Convert old list of classes to list of strings
         if name == 'CACHEOPS_SKIP_FIELDS':
