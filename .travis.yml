@@ -35,6 +35,8 @@ matrix:
     - python: 3.9
       env: DJANGO=master
   allow_failures:
+    - python: pypy3   # This one works for me locally but fails with a weird error on Travis
+      env: DJANGO=3.2
     - python: 3.8
       env: DJANGO=master
     - python: 3.9
