@@ -106,14 +106,17 @@ class Weird(models.Model):
 
 
 # TODO: check other new fields:
-#       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
+#       - PostgreSQL ones: HStoreField, RangeFields, unaccent
 #       - Other: DurationField
 if os.environ.get('CACHEOPS_DB') in {'postgresql', 'postgis'}:
     from django.contrib.postgres.fields import ArrayField
     try:
-        from django.contrib.postgres.fields import JSONField
+        from django.db.models import JSONField
     except ImportError:
-        JSONField = None
+        try:
+            from django.contrib.postgres.fields import JSONField  # Used before Django 3.1
+        except ImportError:
+            JSONField = None
 
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
