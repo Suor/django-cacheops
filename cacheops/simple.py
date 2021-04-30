@@ -1,5 +1,4 @@
 import os
-import pickle
 import time
 
 from funcy import wraps
@@ -88,11 +87,11 @@ class RedisCache(BaseCache):
         data = self.conn.get(cache_key)
         if data is None:
             raise CacheMiss
-        return pickle.loads(data)
+        return settings.CACHEOPS_SERIALIZER.loads(data)
 
     @handle_connection_failure
     def set(self, cache_key, data, timeout=None):
-        pickled_data = pickle.dumps(data, -1)
+        pickled_data = settings.CACHEOPS_SERIALIZER.dumps(data, -1)
         if timeout is not None:
             self.conn.setex(cache_key, timeout, pickled_data)
         else:
@@ -133,8 +132,8 @@ class FileCache(BaseCache):
                 raise CacheMiss
 
             with open(filename, 'rb') as f:
-                return pickle.load(f)
-        except (IOError, OSError, EOFError, pickle.PickleError):
+                return settings.CACHEOPS_SERIALIZER.load(f)
+        except (IOError, OSError, EOFError, settings.CACHEOPS_SERIALIZER.PickleError):
             raise CacheMiss
 
     def set(self, key, data, timeout=None):
@@ -151,7 +150,8 @@ class FileCache(BaseCache):
             # Use open with exclusive rights to prevent data corruption
             f = os.open(filename, os.O_EXCL | os.O_WRONLY | os.O_CREAT)
             try:
-                os.write(f, pickle.dumps(data, pickle.HIGHEST_PROTOCOL))
+                os.write(f, settings.CACHEOPS_SERIALIZER.dumps(
+                    data, settings.CACHEOPS_SERIALIZER.HIGHEST_PROTOCOL))
             finally:
                 os.close(f)
 
