@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import re
+import platform
 import unittest
 import mock
 
@@ -638,6 +639,7 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
         self.assertEqual(categories[0].newest_post, post.pk)
 
+    @unittest.skipIf(platform.python_implementation() == "PyPy", "dill doesn't do that in PyPy")
     def test_385(self):
         Client.objects.create(name='Client Name')
 
