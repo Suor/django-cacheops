@@ -7,10 +7,10 @@ from .models import Category, Post, Extra
 
 
 posts = list(Post.objects.cache().all())
-posts_pickle = settings.CACHEOPS_SERIALIZER.dumps(posts, -1)
+posts_pickle = settings.CACHEOPS_SERIALIZER.dumps(posts)
 
 def do_pickle():
-    settings.CACHEOPS_SERIALIZER.dumps(posts, -1)
+    settings.CACHEOPS_SERIALIZER.dumps(posts)
 
 def do_unpickle():
     settings.CACHEOPS_SERIALIZER.loads(posts_pickle)

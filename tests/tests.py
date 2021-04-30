@@ -649,7 +649,7 @@ class IssueTests(BaseTestCase):
 
         invalidate_model(Client)
 
-        with override_settings(CACHEOPS_SERIALIZER='tests.serializers.DillSerializer'):
+        with override_settings(CACHEOPS_SERIALIZER='dill'):
             with self.assertNumQueries(1):
                 Client.objects.filter(name='Client Name').cache().first()
                 Client.objects.filter(name='Client Name').cache().first()

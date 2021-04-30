@@ -51,7 +51,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
-            settings.CACHEOPS_SERIALIZER.dumps(data, -1),
+            settings.CACHEOPS_SERIALIZER.dumps(data),
             json.dumps(cond_dnfs, default=str),
             timeout
         ]

@@ -76,10 +76,6 @@ Setup redis connection and enable caching for desired models:
     # should be compatible or subclass cacheops.redis.CacheopsRedis
     CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
 
-    # To use your own serializer class,
-    # should be compatible or subclass cacheops.serializers.PickleSerializer
-    CACHEOPS_SERIALIZER = 'your.serializers.ClientClass'
-
     CACHEOPS = {
         # Automatically cache any User.objects.get() calls for 15 minutes
         # This also includes .first() and .last() calls,
@@ -666,44 +662,25 @@ A ``query`` object passed to callback also enables reflection on used databases 
 **NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
 
 
-Pickle serializer
------------------
+Custom serialization
+--------------------
 
-Cacheops by default using serializer build on ``pickle`` lib:
+Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own
+it might be any module or a class having `.dumps()` and `.loads()` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
+
+.. code:: python
+
+    CACHEOPS_SERIALIZER = 'dill'
+
+One less obvious use is to fix pickle protocol, to use cacheops cache across python versions:
 
 .. code:: python
 
     import pickle
 
-    class PickleSerializer:
-        # properties
-        PickleError = pickle.PickleError
-        HIGHEST_PROTOCOL = pickle.HIGHEST_PROTOCOL
-
-        # methods
-        dumps = pickle.dumps
+    class CACHEOPS_SERIALIZER:
+        dumps = lambda data: pickle.dumps(data, 3)
         loads = pickle.loads
-
-You can overwrite it to any own pickle serializer in two step (for ``dill`` lib):
-
-* setup in settings ``CACHEOPS_SERIALIZER = 'your.serializers.DillSerializer'``
-* write own serializer like this:
-
-.. code:: python
-
-    import dill
-
-    class DillSerializer:
-        # properties
-        PickleError = dill.PicklingError
-        HIGHEST_PROTOCOL = dill.HIGHEST_PROTOCOL
-
-        # methods
-        dumps = dill.dumps
-        loads = dill.loads
-
-
-**NOTE:** this can be helpful on raises like: "AttributeError: Can't pickle local object 'curry.<locals>._curried'".
 
 
 Using memory limit
