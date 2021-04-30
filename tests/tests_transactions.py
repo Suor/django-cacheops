@@ -99,7 +99,7 @@ class TransactionSupportTests(TransactionTestCase):
         try:
             with atomic():
                 Post.objects.create(category_id=-1, title='')
-        except (IntegrityError, Exception):
+        except IntegrityError:
             # however, this write should be rolled back and current DB should
             # not be "dirty"
             pass
