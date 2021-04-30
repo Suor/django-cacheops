@@ -77,7 +77,7 @@ class AtomicMixIn(object):
             self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
         except DatabaseError:
             transaction_states[self.using].rollback()
-        finally:
+        else:
             if not connection.closed_in_transaction and exc_type is None and \
                     not connection.needs_rollback:
                 if transaction_states[self.using]:
