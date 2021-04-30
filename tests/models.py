@@ -270,3 +270,19 @@ class Bar(models.Model):
         blank=True,
         null=True
     )
+
+
+# 385
+class Client(models.Model):
+    def __init__(self, *args, **kwargs):
+        # copied from Django 2.1.5 (not exists in Django 3.1.5 installed by current requirements)
+        def curry(_curried_func, *args, **kwargs):
+            def _curried(*moreargs, **morekwargs):
+                return _curried_func(*args, *moreargs, **{**kwargs, **morekwargs})
+
+            return _curried
+
+        super().__init__(*args, **kwargs)
+        setattr(self, '_get_private_data', curry(sum, [1, 2, 3, 4]))
+
+    name = models.CharField(max_length=255)
