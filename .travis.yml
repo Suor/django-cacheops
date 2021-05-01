@@ -31,6 +31,10 @@ matrix:
     - python: 3.8
       env: TOXENV=lint
     - python: 3.8
+      env: DJANGO=2.1
+    - python: 3.8
+      env: DJANGO=2.2
+    - python: 3.8
       env: DJANGO=master
     - python: 3.9
       env: DJANGO=master
