@@ -6,6 +6,7 @@ from funcy import wraps
 from .conf import settings
 from .utils import get_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
+from .sharding import get_prefix
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
@@ -23,13 +24,13 @@ class CacheKey(str):
         return self
 
     def get(self):
-        self.cache.get(self)
+        self.cache._get(self)
 
     def set(self, value):
-        self.cache.set(self, value, self.timeout)
+        self.cache._set(self, value, self.timeout)
 
     def delete(self):
-        self.cache.delete(self)
+        self.cache._delete(self)
 
 class BaseCache(object):
     """
@@ -45,7 +46,7 @@ class BaseCache(object):
 
         def _get_key(func, args, kwargs):
             extra_val = extra(*args, **kwargs) if callable(extra) else extra
-            return 'c:' + get_cache_key(func, args, kwargs, extra_val)
+            return get_prefix(func=func) + 'c:' + get_cache_key(func, args, kwargs, extra_val)
 
         def decorator(func):
             @wraps(func)
@@ -55,15 +56,15 @@ class BaseCache(object):
 
                 cache_key = _get_key(func, args, kwargs)
                 try:
-                    result = self.get(cache_key)
+                    result = self._get(cache_key)
                 except CacheMiss:
                     result = func(*args, **kwargs)
-                    self.set(cache_key, result, timeout)
+                    self._set(cache_key, result, timeout)
 
                 return result
 
             def invalidate(*args, **kwargs):
-                self.delete(_get_key(func, args, kwargs))
+                self._delete(_get_key(func, args, kwargs))
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
@@ -78,19 +79,28 @@ class BaseCache(object):
             return self.cached_view()(timeout)
         return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
+    def get(self, cache_key):
+        return self._get(get_prefix() + cache_key)
+
+    def set(self, cache_key, data, timeout=None):
+        self._set(get_prefix() + cache_key, data, timeout)
+
+    def delete(self, cache_key):
+        self._delete(get_prefix() + cache_key)
+
 
 class RedisCache(BaseCache):
     def __init__(self, conn):
         self.conn = conn
 
-    def get(self, cache_key):
+    def _get(self, cache_key):
         data = self.conn.get(cache_key)
         if data is None:
             raise CacheMiss
         return settings.CACHEOPS_SERIALIZER.loads(data)
 
     @handle_connection_failure
-    def set(self, cache_key, data, timeout=None):
+    def _set(self, cache_key, data, timeout=None):
         pickled_data = settings.CACHEOPS_SERIALIZER.dumps(data)
         if timeout is not None:
             self.conn.setex(cache_key, timeout, pickled_data)
@@ -98,7 +108,7 @@ class RedisCache(BaseCache):
             self.conn.set(cache_key, pickled_data)
 
     @handle_connection_failure
-    def delete(self, cache_key):
+    def _delete(self, cache_key):
         self.conn.delete(cache_key)
 
 cache = RedisCache(redis_client)
@@ -123,7 +133,7 @@ class FileCache(BaseCache):
         digest = md5hex(key)
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
-    def get(self, key):
+    def _get(self, key):
         filename = self._key_to_filename(key)
         try:
             # Remove file if it's stale
@@ -136,7 +146,7 @@ class FileCache(BaseCache):
         except (IOError, OSError, EOFError):
             raise CacheMiss
 
-    def set(self, key, data, timeout=None):
+    def _set(self, key, data, timeout=None):
         filename = self._key_to_filename(key)
         dirname = os.path.dirname(filename)
 
@@ -159,7 +169,7 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-    def delete(self, fname):
+    def _delete(self, fname):
         try:
             os.remove(fname)
             # Trying to remove directory in case it's empty

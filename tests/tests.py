@@ -934,12 +934,7 @@ class MultitableInheritanceTests(BaseTestCase):
 
 class SimpleCacheTests(BaseTestCase):
     def test_cached(self):
-        calls = [0]
-
-        @cached(timeout=100)
-        def get_calls(_):
-            calls[0] += 1
-            return calls[0]
+        get_calls = make_inc(cached(timeout=100))
 
         self.assertEqual(get_calls(1), 1)
         self.assertEqual(get_calls(1), 1)
@@ -954,12 +949,7 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 42)
 
     def test_cached_view(self):
-        calls = [0]
-
-        @cached_view(timeout=100)
-        def get_calls(request):
-            calls[0] += 1
-            return calls[0]
+        get_calls = make_inc(cached_view(timeout=100))
 
         factory = RequestFactory()
         r1 = factory.get('/hi')
