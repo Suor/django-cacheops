@@ -37,7 +37,7 @@ class Settings(object):
 
         # Convert old list of classes to list of strings
         if name == 'CACHEOPS_SKIP_FIELDS':
-            [f if isinstance(f, str) else f.get_internal_type(res) for f in res]
+            res = [f if isinstance(f, str) else f.get_internal_type(res) for f in res]
 
         # Save to dict to speed up next access, __getattr__ won't be called
         self.__dict__[name] = res
