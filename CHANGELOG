@@ -1,3 +1,17 @@
+6.0
+- support and test against Python 3.9 and Django 3.1/3.2
+- added custom serializers support (thx to Arcady Usov)
+- support callable extra in @cached_as() and friends
+- made simple cache obey prefix
+- skip JSONFields for purposes of invalidation
+- configure skipped fields by internal types, classes still supported
+- handle `DatabaseError` on transaction cleanup (Roman Gorbil)
+- do not query old object if cacheops is disabled
+- do not fetch deferred fields during invalidation, fixes #387
+Backwards incompatible changes:
+- callable `extra` param, including type, now behaves differently
+- simple cache now uses prefix
+
 5.1
 - support subqueries in annotations (Jeremy Stretch)
 - included tests into distro (John Vandenberg)
