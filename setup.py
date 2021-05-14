@@ -31,6 +31,7 @@ setup(
         'redis>=3.0.0',
         'funcy>=1.8,<2.0',
         'six>=1.4.0',
+        'redis-py-cluster>=2.0.0',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',

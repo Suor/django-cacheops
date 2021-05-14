@@ -6,3 +6,6 @@ build
 sqlite*.db
 .tox
 .cache
+.idea
+.vscode
+.DS_Store

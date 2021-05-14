@@ -1,4 +1,4 @@
-from cacheops import invalidate_obj, invalidate_model
+from cacheops import invalidator
 from cacheops.conf import settings
 from cacheops.redis import redis_client
 from cacheops.tree import dnfs
@@ -29,7 +29,7 @@ def do_get_nocache():
 
 c = Category.objects.first()
 def invalidate_count():
-    invalidate_obj(c)
+    invalidator.invalidate_obj(c)
 
 def do_count():
     Category.objects.cache().count()
@@ -93,7 +93,7 @@ def prepare_obj():
     return Category.objects.cache().get(pk=1)
 
 def do_invalidate_obj(obj):
-    invalidate_obj(obj)
+    invalidator.invalidate_obj(obj)
 
 def do_save_obj(obj):
     obj.save()
@@ -155,7 +155,7 @@ def prepare_cache():
     return Extra.objects.cache().get(pk=1)
 
 def do_invalidate_model(obj):
-    invalidate_model(obj.__class__)
+    invalidator.invalidate_model(obj.__class__)
 
 
 TESTS = [

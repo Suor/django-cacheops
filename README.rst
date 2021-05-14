@@ -662,6 +662,21 @@ A ``query`` object passed to callback also enables reflection on used databases 
 **NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
 
 
+Cluster mode
+----------------------
+
+In order to enable cluster mode
+
+.. code:: python
+
+    CACHEOPS_CLUSTER_ENABLED = True
+
+In this mode, the prefix function will attached with a Redis Hashtag validation. Therefore, if your prefix contains a syntax of Redis' Hashtag, it will throw an error
+
+.. code:: python
+    CACHEOPS_PREFIX = lambda query: '{prefix}' # not ok, since {prefix} is a redis hashtag
+    CACHEOPS_PREFIX = lambda query: '[prefix]' # ok
+
 Custom serialization
 --------------------
 

@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from cacheops import invalidate_all
+from cacheops import invalidator
 from cacheops.transaction import transaction_states
 
 
@@ -13,7 +13,7 @@ class BaseTestCase(TestCase):
         transaction_states._states, self._states \
             = empty(transaction_states._states), transaction_states._states
 
-        invalidate_all()
+        invalidator.invalidate_all()
 
     def tearDown(self):
         transaction_states._states = self._states

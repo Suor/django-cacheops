@@ -1,4 +1,6 @@
 import warnings
+from funcy.decorators import wraps
+
 from contextlib import contextmanager
 
 from django.core.exceptions import ImproperlyConfigured
@@ -6,6 +8,7 @@ from django.utils.module_loading import import_string
 
 from funcy import decorator, identity, memoize, omit, LazyObject
 import redis
+from rediscluster import RedisCluster
 from redis.sentinel import Sentinel
 from .conf import settings
 
@@ -23,11 +26,28 @@ else:
     handle_connection_failure = identity
 
 
+def handle_timeout_exception(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except redis.TimeoutError as e:
+            error_handler = settings.CACHEOPS_TIMEOUT_HANDLER
+            if callable(error_handler):
+                error_handler(e, *args, **kwargs)
+
+            return None
+
+    return wrapper
+
+
 LOCK_TIMEOUT = 60
 
 
 class CacheopsRedis(redis.StrictRedis):
     get = handle_connection_failure(redis.StrictRedis.get)
+    # every function call this one, so better handle timeout at this level
+    execute_command = handle_timeout_exception(redis.StrictRedis.execute_command)
 
     @contextmanager
     def getting(self, key, lock=False):
@@ -78,12 +98,69 @@ class CacheopsRedis(redis.StrictRedis):
         self._unlock(keys=[key, signal_key])
 
 
+class CacheopsRedisCluster(RedisCluster, CacheopsRedis):
+    get = handle_connection_failure(RedisCluster.get)
+    # every function call this one, so better handle timeout at this level
+    execute_command = handle_timeout_exception(RedisCluster.execute_command)
+
+    def __init__(self, *args, **kwargs):
+        init_slot_cache = kwargs.get('init_slot_cache', True)
+        super(CacheopsRedisCluster, self).__init__(*args, **kwargs)
+        # lazy initialize nodes,
+        # so that if redis is downed before starting django, everything still fine
+        if not init_slot_cache:
+            self.refresh_table_asap = True
+
+    def _handle_lock(self, keys, args):
+        """
+        Move old lua script to this function so that we can work with cluster mode
+        """
+        locked = self.set(keys[0], 'LOCK', ex=args[0], nx=True)
+        if locked:
+            self.delete(keys[1])
+
+        return locked
+
+    @handle_connection_failure
+    def _get_or_lock(self, key):
+        self._lock = getattr(self, '_lock', self._handle_lock)
+        signal_key = key + ':signal'
+
+        while True:
+            data = self.get(key)
+            if data is None:
+                if self._lock(keys=[key, signal_key], args=[LOCK_TIMEOUT]):
+                    return None
+            elif data != b'LOCK':
+                return data
+
+            # No data and not locked, wait
+            self.brpoplpush(signal_key, signal_key, timeout=LOCK_TIMEOUT)
+
+    def _handle_release_lock(self, keys):
+        if self.get(keys[0]) == 'LOCK':
+            self.delete(keys[0])
+
+        self.lpush(keys[1], 1)
+        self.expire(keys[1], 1)
+
+    @handle_connection_failure
+    def _release_lock(self, key):
+        """
+        Move old lua script to this function so that we can work with cluster mode
+        """
+        self._unlock = getattr(self, '_unlock', self._handle_release_lock)
+        signal_key = key + ':signal'
+        self._unlock(keys=[key, signal_key])
+
+
 @LazyObject
 def redis_client():
     if settings.CACHEOPS_REDIS and settings.CACHEOPS_SENTINEL:
         raise ImproperlyConfigured("CACHEOPS_REDIS and CACHEOPS_SENTINEL are mutually exclusive")
 
-    client_class = CacheopsRedis
+    client_class = CacheopsRedisCluster if settings.CACHEOPS_CLUSTER_ENABLED else CacheopsRedis
+
     if settings.CACHEOPS_CLIENT_CLASS:
         client_class = import_string(settings.CACHEOPS_CLIENT_CLASS)
 
@@ -100,11 +177,22 @@ def redis_client():
             db=settings.CACHEOPS_SENTINEL.get('db', 0)
         )
 
+    redis_client = None
+
     # Allow client connection settings to be specified by a URL.
     if isinstance(settings.CACHEOPS_REDIS, str):
-        return client_class.from_url(settings.CACHEOPS_REDIS)
+        redis_client = client_class.from_url(settings.CACHEOPS_REDIS)
+        redis_client.socket_timeout = settings.CACHEOPS_REDIS_CONNECTION_TIMEOUT
+        redis_client.socket_connect_timeout = settings.CACHEOPS_REDIS_CONNECTION_TIMEOUT
     else:
-        return client_class(**settings.CACHEOPS_REDIS)
+        kargs = {
+            "socket_timeout": settings.CACHEOPS_REDIS_CONNECTION_TIMEOUT,
+            "socket_connect_timeout": settings.CACHEOPS_REDIS_CONNECTION_TIMEOUT,
+            **settings.CACHEOPS_REDIS
+        }
+        redis_client = client_class(**kargs)
+
+    return redis_client
 
 
 ### Lua script loader
@@ -117,6 +205,15 @@ STRIP_RE = re.compile(r'TOSTRIP.*/TOSTRIP', re.S)
 @memoize
 def load_script(name, strip=False):
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
+    with open(filename) as f:
+        code = f.read()
+    if strip:
+        code = STRIP_RE.sub('', code)
+    return redis_client.register_script(code)
+
+@memoize
+def load_script_cluster(name, strip=False):
+    filename = os.path.join(os.path.dirname(__file__), 'cluster/lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
     if strip:

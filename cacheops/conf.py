@@ -25,6 +25,10 @@ class Defaults:
     CACHEOPS_LONG_DISJUNCTION = 8
     CACHEOPS_SERIALIZER = 'pickle'
 
+    CACHEOPS_CLUSTER_ENABLED = False
+    CACHEOPS_TIMEOUT_HANDLER = None
+    CACHEOPS_REDIS_CONNECTION_TIMEOUT = 10
+
     FILE_CACHE_DIR = '/tmp/cacheops_file_cache'
     FILE_CACHE_TIMEOUT = 60*60*24*30
 
@@ -34,6 +38,18 @@ class Settings(object):
         res = getattr(base_settings, name, getattr(Defaults, name))
         if name in ['CACHEOPS_PREFIX', 'CACHEOPS_SERIALIZER']:
             res = import_string(res) if isinstance(res, str) else res
+
+        if name == 'CACHEOPS_PREFIX' and self.CACHEOPS_CLUSTER_ENABLED and res:
+            from cacheops.cluster import prefix_validator
+            """
+            ?INFO: To prevent unintended usage, for cluster mode,
+            we will wrap this function with another to check
+            if the prefix contain invalid character
+
+            For example: PREFIX = {a}bc -> throw an exception
+            since including hash tag will break the distribution of cluster
+            """
+            res = prefix_validator(res)
 
         # Convert old list of classes to list of strings
         if name == 'CACHEOPS_SKIP_FIELDS':
