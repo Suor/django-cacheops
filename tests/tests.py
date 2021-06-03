@@ -660,23 +660,22 @@ class IssueTests(BaseTestCase):
         post = Post.objects.defer("visible").last()
         post.delete()
     
-    @override_settings(CACHEOPS = {'tests.post': {'ops': {'get', 'fetch'}},})
     def test_404(self):
-        categories = Category.objects.filter(id=1).values_list('id', flat=True)
-        visible_posts = Post.objects.filter(visible=True)
+        categories = Category.objects.filter(id=1).values_list('id', flat=True).nocache()
+        visible_posts = Post.objects.filter(visible=True).cache()
             
         with self.assertNumQueries(1):
             list(visible_posts)     # From DB
             list(visible_posts)     # From cache
 
         with self.assertNumQueries(1):
-            list(visible_posts.filter(id__in=categories))    # From DB
-            list(visible_posts.filter(id__in=categories))    # From cache
+            list(visible_posts.filter(id__in=categories).cache())    # From DB
+            list(visible_posts.filter(id__in=categories).cache())    # From cache
             
-        categories = Category.objects.filter(id=3).values_list('id', flat=True)
+        categories = Category.objects.filter(id=3).values_list('id', flat=True).nocache()
         with self.assertNumQueries(1):
-            list(visible_posts.filter(id__in=categories))    # From DB
-            list(visible_posts.filter(id__in=categories))    # From cache
+            list(visible_posts.filter(id__in=categories).cache())    # From DB
+            list(visible_posts.filter(id__in=categories).cache())    # From cache
             
 
 class RelatedTests(BaseTestCase):
