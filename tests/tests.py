@@ -661,7 +661,8 @@ class IssueTests(BaseTestCase):
         post.delete()
     
     def test_404(self):
-        categories = Category.objects.filter(id=1).values_list('id', flat=True).nocache()
+        categories = Category.objects.filter(title='Django').values_list('id', flat=True).nocache()
+        self.assertEquals(1, len(categories))
         visible_posts = Post.objects.filter(visible=True).cache()
             
         with self.assertNumQueries(1):
@@ -671,9 +672,11 @@ class IssueTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(visible_posts.filter(id__in=categories).cache())    # From DB
             list(visible_posts.filter(id__in=categories).cache())    # From cache
-            
-        categories = Category.objects.filter(id=3).values_list('id', flat=True).nocache()
-        with self.assertNumQueries(1):
+        
+        Category.objects.create(title='Django')
+        categories = Category.objects.filter(title='Django').values_list('id', flat=True).nocache()
+        self.assertEquals(2, len(categories))
+        with self.assertNumQueries(0):
             list(visible_posts.filter(id__in=categories).cache())    # From DB
             list(visible_posts.filter(id__in=categories).cache())    # From cache
             
