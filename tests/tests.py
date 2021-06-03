@@ -674,7 +674,6 @@ class IssueTests(BaseTestCase):
             list(visible_posts.filter(id__in=categories))    # From cache
             
         categories = Category.objects.filter(id=3).values_list('id', flat=True)
-        visible_posts = Post.objects.filter(visible=True)
         with self.assertNumQueries(1):
             list(visible_posts.filter(id__in=categories))    # From DB
             list(visible_posts.filter(id__in=categories))    # From cache
