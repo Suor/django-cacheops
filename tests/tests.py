@@ -677,8 +677,9 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.filter(title='Django').values_list('id', flat=True).nocache()
         self.assertEquals(2, len(categories))
         with self.assertNumQueries(0):
-            list(visible_posts.filter(id__in=categories).cache())    # From DB
-            list(visible_posts.filter(id__in=categories).cache())    # From cache
+            # The subquey is the same so this is from the cache so 
+            # the new categories values are not taken into account
+            list(visible_posts.filter(id__in=categories).cache())    
             
 
 class RelatedTests(BaseTestCase):
