@@ -103,6 +103,8 @@ CACHEOPS = {
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
     'auth.*': {},
+    'tests.ChatBox': {"ops": "all", "timeout": 3600 },
+    'tests.ChatBoxDesign': {"ops": "all", "timeout": 3600}
 }
 
 if os.environ.get('CACHEOPS_PREFIX'):

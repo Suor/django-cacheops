@@ -1029,3 +1029,40 @@ class MultiDBInvalidationTests(BaseTestCase):
         brand = Brand.objects.using('slave').create()
         brand.labels.add(label)
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+
+
+class TestIssue348(BaseTestCase):
+    def test_case(self):
+        chatbox = ChatBox.objects.create(name="test")
+        design = ChatBoxDesign.objects.create(width=100, height=100)
+        chatbox.design = design
+        chatbox.save()
+
+        self.assertIsNotNone(chatbox)
+        self.assertIsNotNone(chatbox.design)
+
+        chatbox = ChatBox.objects.cache().get(pk=1)
+        self.assertIsNotNone(chatbox)
+        self.assertIsNotNone(chatbox.design)
+
+        d = ChatBoxDesign.objects.get(pk=1)
+        self.assertIsNotNone(d)
+        d.delete()
+
+        verify = ChatBoxDesign.objects.all().count()
+        self.assertEquals(verify, 0)
+
+        # c = ChatBox.objects.cache().get(pk=1)
+        # self.assertIsNone(c.design)
+
+        c = ChatBox.objects.get(pk=1)
+        self.assertIsNone(c.design)
+
+        # Walk around
+        # c = ChatBox.objects.get(pk=1)
+        # from django.core.exceptions import ObjectDoesNotExist
+        # try:
+        #     has_design = c.design is not None
+        # except ObjectDoesNotExist as e:
+        #     has_design = False
+        # self.assertFalse(has_design)

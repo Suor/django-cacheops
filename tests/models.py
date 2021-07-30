@@ -286,3 +286,12 @@ class Client(models.Model):
         setattr(self, '_get_private_data', curry(sum, [1, 2, 3, 4]))
 
     name = models.CharField(max_length=255)
+
+
+class ChatBoxDesign(models.Model):
+    width = models.IntegerField()
+    height = models.IntegerField()
+
+class ChatBox(models.Model):
+    name = models.CharField(max_length=222)
+    design = models.OneToOneField(ChatBoxDesign, on_delete=models.SET_NULL, null=True)
