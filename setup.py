@@ -25,7 +25,7 @@ setup(
         'cacheops.management.commands',
         'cacheops.templatetags'
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     install_requires=[
         'django>=2.1',
         'redis>=3.0.0',
@@ -37,11 +37,11 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Framework :: Django',
         'Framework :: Django :: 2.1',
         'Framework :: Django :: 2.2',

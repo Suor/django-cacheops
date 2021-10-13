@@ -18,6 +18,7 @@ python:
   - 3.7
   - 3.8
   - 3.9
+  - 3.10
   - pypy3
 env:
   - DJANGO=3.0
@@ -37,6 +38,8 @@ matrix:
     - python: 3.8
       env: DJANGO=master
     - python: 3.9
+      env: DJANGO=master
+    - python: "3.10"
       env: DJANGO=master
   allow_failures:
     - python: pypy3   # This one works for me locally but fails with a weird error on Travis
