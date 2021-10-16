@@ -23,15 +23,15 @@ if os.environ.get('CACHEOPS_DB') == 'postgresql':
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'cacheops',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': ''
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': ''
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
     }
 elif os.environ.get('CACHEOPS_DB') == 'postgis':
@@ -41,15 +41,15 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
     }
 elif os.environ.get('CACHEOPS_DB') == 'mysql':
@@ -57,16 +57,16 @@ elif os.environ.get('CACHEOPS_DB') == 'mysql':
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops',
-            'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'USER': 'root',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('MYSQL_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops_slave',
-            'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'USER': 'root',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('MYSQL_HOST') or '127.0.0.1',
         },
     }
 else:
@@ -87,7 +87,7 @@ else:
     }
 
 CACHEOPS_REDIS = {
-    'host': 'localhost',
+    'host': os.getenv('REDIS_HOST') or '127.0.0.1',
     'port': 6379,
     'db': 13,
     'socket_timeout': 3,
