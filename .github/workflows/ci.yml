@@ -64,7 +64,7 @@ jobs:
           architecture: x64
 
       - name: "Install Dependencies"
-        run: pip install -U pip tox tox-gh-actions
+        run: pip install tox tox-gh-actions
 
       - name: "Run tests"
         run: tox ${{ matrix.experimental && '-e py310-djmaster' || '' }}
