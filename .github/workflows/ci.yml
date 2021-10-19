@@ -21,12 +21,17 @@ jobs:
       run: flake8
 
   test:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5", 3.6", "3.7", "3.8", "3.9", "3.10", "pypy3"]
+        python-version: ["3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "pypy3"]
+        experimental: [false]
+        include:
+          - python-version: "3.10"
+            experimental: true
 
-    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres
@@ -62,6 +67,6 @@ jobs:
         run: pip install -U pip tox tox-gh-actions
 
       - name: "Run tests"
-        run: tox
+        run: tox ${{ matrix.experimental && '-e py310-djmaster' || '' }}
         env:
           MYSQL_HOST: 127.0.0.1
