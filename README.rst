@@ -1,4 +1,4 @@
-Cacheops |Build Status| |Gitter|
+Cacheops |Build Status|
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
