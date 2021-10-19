@@ -807,8 +807,8 @@ TODO
 - cache a string directly (no pickle) for direct serving (custom key function?)
 
 
-.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
-   :target: https://travis-ci.org/Suor/django-cacheops
+.. |Build Status| image:: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml/badge.svg
+   :target: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml?query=branch%3Amaster
 
 
 .. |Gitter| image:: https://badges.gitter.im/JoinChat.svg
