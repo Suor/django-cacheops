@@ -660,6 +660,21 @@ class IssueTests(BaseTestCase):
         post = Post.objects.defer("visible").last()
         post.delete()
 
+    def test_407(self):
+        brand = Brand.objects.create()
+        pk = brand.pk
+        label = Label.objects.create()
+        brand.labels.set([label])
+        # Caching
+        assert len(list(brand.labels.cache()._clone())) == 1
+
+        brand.delete()
+        # Invalidation expected after deletionn
+        brand = Brand.objects.create(pk=pk)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(list(brand.labels.cache()._clone())), 0)
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
