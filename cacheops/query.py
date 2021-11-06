@@ -493,6 +493,9 @@ class ManagerMixin(object):
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance, using=using)
+        # NOTE: this is needed because m2m_changed is not sent on such deletion:
+        #       https://code.djangoproject.com/ticket/17688
+        invalidate_m2o(sender, instance, using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -518,6 +521,16 @@ def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
             if old:
                 invalidate_dict(rmodel, {rfield: old_value}, using=using)
             invalidate_dict(rmodel, {rfield: value}, using=using)
+
+
+def invalidate_m2o(sender, instance, using=DEFAULT_DB_ALIAS):
+    """Invoke invalidation for m2o and m2m queries to a deleted instance"""
+    all_fields = sender._meta.get_fields(include_hidden=True, include_parents=True)
+    m2o_fields = [f for f in all_fields if isinstance(f, models.ManyToOneRel)]
+    for f in m2o_fields:
+        value = getattr(instance, f.field_name)
+        rmodel, rfield = f.related_model, f.remote_field.attname
+        invalidate_dict(rmodel, {rfield: value}, using=using)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,

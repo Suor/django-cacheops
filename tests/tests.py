@@ -661,19 +661,25 @@ class IssueTests(BaseTestCase):
         post.delete()
 
     def test_407(self):
-        brand = Brand.objects.create()
-        pk = brand.pk
-        label = Label.objects.create()
-        brand.labels.set([label])
-        # Caching
-        assert len(list(brand.labels.cache()._clone())) == 1
+        brand = Brand.objects.create(pk=1)
+        brand.labels.set([Label.objects.create()])
+        assert len(Label.objects.filter(brands=1).cache()) == 1  # Cache it
 
-        brand.delete()
-        # Invalidation expected after deletionn
-        brand = Brand.objects.create(pk=pk)
+        brand.delete()  # Invalidation expected after deletion
 
         with self.assertNumQueries(1):
-            self.assertEqual(len(list(brand.labels.cache()._clone())), 0)
+            self.assertEqual(len(Label.objects.filter(brands=1).cache()), 0)
+
+    def test_407_reverse(self):
+        brand = Brand.objects.create(pk=1)
+        label = Label.objects.create(pk=1)
+        brand.labels.set([label])
+        assert len(Brand.objects.filter(labels=1).cache()) == 1  # Cache it
+
+        label.delete()  # Invalidation expected after deletion
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(Brand.objects.filter(labels=1).cache()), 0)
 
 
 class RelatedTests(BaseTestCase):
