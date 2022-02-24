@@ -48,6 +48,8 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     # Could have changed after last check, sometimes superficially
     if transaction_states.is_dirty(dbs):
         return
+    if prefix and precall_key == "":
+        precall_key = prefix
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
