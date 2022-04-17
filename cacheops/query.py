@@ -1,19 +1,18 @@
 import sys
 import json
 import threading
-import pickle
 from random import random
 
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy import lmap, map, lcat, join_with
 
-from django.utils.encoding import smart_str, force_text
+from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS
-from django.db.models import Model
+from django.db import models
 from django.db.models.manager import BaseManager
-from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
+from django.db.transaction import atomic
 
 # This thing reappeared in Django 3.0
 try:
@@ -23,12 +22,12 @@ except ImportError:
     MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
-from .utils import monkey_mix, stamp_fields, func_cache_key, cached_view_fab, family_has_profile
+from .utils import monkey_mix, stamp_fields, get_cache_key, cached_view_fab, family_has_profile
 from .utils import md5
 from .sharding import get_prefix
 from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
-from .invalidation import invalidate_obj, invalidate_dict, no_invalidation
+from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidation
 from .transaction import transaction_states
 from .signals import cache_read
 
@@ -49,17 +48,19 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     # Could have changed after last check, sometimes superficially
     if transaction_states.is_dirty(dbs):
         return
+    if prefix and precall_key == "":
+        precall_key = prefix
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
-            pickle.dumps(data, -1),
+            settings.CACHEOPS_SERIALIZER.dumps(data),
             json.dumps(cond_dnfs, default=str),
             timeout
         ]
     )
 
 
-def cached_as(*samples, **kwargs):
+def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
     """
     Caches results of a function and invalidates them same way as given queryset(s).
     NOTE: Ignores queryset cached ops settings, always caches.
@@ -68,15 +69,8 @@ def cached_as(*samples, **kwargs):
     invalidated during the function call. This prevents prolonged caching of
     stale data.
     """
-    timeout = kwargs.pop('timeout', None)
-    extra = kwargs.pop('extra', None)
-    key_func = kwargs.pop('key_func', func_cache_key)
-    lock = kwargs.pop('lock', None)
-    keep_fresh = kwargs.pop('keep_fresh', False)
     if not samples:
         raise TypeError('Pass a queryset, a model or an object to cache like')
-    if kwargs:
-        raise TypeError('Unexpected keyword arguments %s' % ', '.join(kwargs))
 
     # If we unexpectedly get list instead of queryset return identity decorator.
     # Paginator could do this when page.object_list is empty.
@@ -84,9 +78,9 @@ def cached_as(*samples, **kwargs):
         return lambda func: func
 
     def _get_queryset(sample):
-        if isinstance(sample, Model):
+        if isinstance(sample, models.Model):
             queryset = sample.__class__.objects.filter(pk=sample.pk)
-        elif isinstance(sample, type) and issubclass(sample, Model):
+        elif isinstance(sample, type) and issubclass(sample, models.Model):
             queryset = sample.objects.all()
         else:
             queryset = sample
@@ -98,8 +92,7 @@ def cached_as(*samples, **kwargs):
     querysets = lmap(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
     cond_dnfs = join_with(lcat, map(dnfs, querysets))
-    key_extra = [qs._cache_key(prefix=False) for qs in querysets]
-    key_extra.append(extra)
+    qs_keys = [qs._cache_key(prefix=False) for qs in querysets]
     if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
     if lock is None:
@@ -112,12 +105,13 @@ def cached_as(*samples, **kwargs):
                 return func(*args, **kwargs)
 
             prefix = get_prefix(func=func, _cond_dnfs=cond_dnfs, dbs=dbs)
-            cache_key = prefix + 'as:' + key_func(func, args, kwargs, key_extra)
+            extra_val = extra(*args, **kwargs) if callable(extra) else extra
+            cache_key = prefix + 'as:' + get_cache_key(func, args, kwargs, qs_keys, extra_val)
 
             with redis_client.getting(cache_key, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
-                    return pickle.loads(cache_data)
+                    return settings.CACHEOPS_SERIALIZER.loads(cache_data)
                 else:
                     if keep_fresh:
                         # We call this "asp" for "as precall" because this key is
@@ -125,7 +119,7 @@ def cached_as(*samples, **kwargs):
                         # the key to prevent falsely thinking the key was not
                         # invalidated when in fact it was invalidated and the
                         # function was called again in another process.
-                        suffix = key_func(func, args, kwargs, key_extra + [random()])
+                        suffix = get_cache_key(func, args, kwargs, qs_keys, extra_val, random())
                         precall_key = prefix + 'asp:' + suffix
                         # Cache a precall_key to watch for invalidation during
                         # the function call. Its value does not matter. If and
@@ -182,8 +176,8 @@ class QuerySetMixin(object):
             try:
                 sql_str = sql % params
             except UnicodeDecodeError:
-                sql_str = sql % walk(force_text, params)
-            md.update(smart_str(sql_str))
+                sql_str = sql % walk(force_str, params)
+            md.update(force_str(sql_str))
         except EmptyResultSet:
             pass
         # If query results differ depending on database
@@ -284,7 +278,7 @@ class QuerySetMixin(object):
         with redis_client.getting(cache_key, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
-                self._result_cache = pickle.loads(cache_data)
+                self._result_cache = settings.CACHEOPS_SERIALIZER.loads(cache_data)
             else:
                 self._result_cache = list(self._iterable_class(self))
                 self._cache_results(cache_key, self._result_cache)
@@ -384,19 +378,22 @@ class QuerySetMixin(object):
         return objs
 
     def invalidated_update(self, **kwargs):
-        clone = self._clone().nocache()
+        clone = self._clone().nocache().select_related(None)
         clone._for_write = True  # affects routing
 
-        objects = list(clone)
-        rows = clone.update(**kwargs)
+        with atomic(using=clone.db):
+            objects = list(clone.select_for_update())
+            rows = clone.update(**kwargs)
 
-        # TODO: do not refetch objects but update with kwargs in simple cases?
-        # We use clone database to fetch new states, as this is the db they were written to.
-        # Using router with new_objects may fail, using self may return slave during lag.
-        pks = {obj.pk for obj in objects}
-        new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+            # TODO: do not refetch objects but update with kwargs in simple cases?
+            # We use clone database to fetch new states, as this is the db they were written to.
+            # Using router with new_objects may fail, using self may return slave during lag.
+            pks = {obj.pk for obj in objects}
+            new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
+
         for obj in chain(objects, new_objects):
             invalidate_obj(obj, using=clone.db)
+
         return rows
 
 
@@ -431,23 +428,25 @@ class ManagerMixin(object):
         if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
+    @skip_on_no_invalidation
     def _pre_save(self, sender, instance, using, **kwargs):
-        if not (instance.pk is None or instance._state.adding or no_invalidation.active):
+        if instance.pk is not None and not instance._state.adding:
             try:
+                # TODO: do not fetch non-serializable fields
                 _old_objs.__dict__[sender, instance.pk] \
                     = sender.objects.using(using).get(pk=instance.pk)
             except sender.DoesNotExist:
                 pass
 
+    @skip_on_no_invalidation
     def _post_save(self, sender, instance, using, **kwargs):
-        if not settings.CACHEOPS_ENABLED or no_invalidation.active:
-            return
-
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
             invalidate_obj(old, using=using)
         invalidate_obj(instance, using=using)
+
+        invalidate_o2o(sender, old, instance, using=using)
 
         # We run invalidations but skip caching if we are dirty
         if transaction_states[using].is_dirty():
@@ -496,6 +495,9 @@ class ManagerMixin(object):
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance, using=using)
+        # NOTE: this is needed because m2m_changed is not sent on such deletion:
+        #       https://code.djangoproject.com/ticket/17688
+        invalidate_m2o(sender, instance, using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -508,6 +510,29 @@ class ManagerMixin(object):
 
     def invalidated_update(self, **kwargs):
         return self.get_queryset().inplace().invalidated_update(**kwargs)
+
+
+def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
+    """Invoke invalidation for o2o reverse queries"""
+    o2o_fields = [f for f in sender._meta.fields if isinstance(f, models.OneToOneField)]
+    for f in o2o_fields:
+        old_value = getattr(old, f.attname, None)
+        value = getattr(instance, f.attname)
+        if old_value != value:
+            rmodel, rfield = f.related_model, f.remote_field.field_name
+            if old:
+                invalidate_dict(rmodel, {rfield: old_value}, using=using)
+            invalidate_dict(rmodel, {rfield: value}, using=using)
+
+
+def invalidate_m2o(sender, instance, using=DEFAULT_DB_ALIAS):
+    """Invoke invalidation for m2o and m2m queries to a deleted instance"""
+    all_fields = sender._meta.get_fields(include_hidden=True, include_parents=True)
+    m2o_fields = [f for f in all_fields if isinstance(f, models.ManyToOneRel)]
+    for f in m2o_fields:
+        value = getattr(instance, f.field_name)
+        rmodel, rfield = f.related_model, f.remote_field.attname
+        invalidate_dict(rmodel, {rfield: value}, using=using)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
@@ -549,7 +574,7 @@ def install_cacheops():
     Installs cacheops by numerous monkey patches
     """
     monkey_mix(BaseManager, ManagerMixin)
-    monkey_mix(QuerySet, QuerySetMixin)
+    monkey_mix(models.QuerySet, QuerySetMixin)
 
     # Use app registry to introspect used apps
     from django.apps import apps

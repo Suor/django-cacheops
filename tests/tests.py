@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import re
+import platform
 import unittest
 import mock
 
@@ -9,7 +10,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.template import Context, Template
-from django.db.models import F, Count, Sum, Subquery
+from django.db.models import F, Count, OuterRef, Sum, Subquery, Exists
 from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
@@ -593,9 +594,92 @@ class IssueTests(BaseTestCase):
     def test_316(self):
         Category.objects.cache().annotate(num=Count('posts')).aggregate(total=Sum('num'))
 
+    @unittest.expectedFailure
+    def test_348(self):
+        foo = Foo.objects.create()
+        bar = Bar.objects.create(foo=foo)
+
+        bar = Bar.objects.cache().get(pk=bar.pk)
+        bar.foo.delete()
+
+        bar = Bar.objects.cache().get(pk=bar.pk)
+        bar.foo  # fails here since we try to fetch Foo instance by cached id
+
     def test_352(self):
         CombinedFieldModel.objects.create()
         list(CombinedFieldModel.objects.cache().all())
+
+    def test_353(self):
+        foo = Foo.objects.create()
+        bar = Bar.objects.create()
+
+        self.assertEqual(Foo.objects.cache().filter(bar__isnull=True).count(), 1)
+        bar.foo = foo
+        bar.save()
+        self.assertEqual(Foo.objects.cache().filter(bar__isnull=True).count(), 0)
+
+    @unittest.skipIf(django.VERSION < (3, 0), "Supported from Django 3.0")
+    def test_359(self):
+        post_filter = Exists(Post.objects.all())
+        len(Category.objects.filter(post_filter).cache())
+
+    def test_365(self):
+        """
+        Check that an annotated Subquery is automatically invalidated.
+        """
+        # Retrieve all Categories and annotate the ID of the most recent Post for each
+        newest_post = Post.objects.filter(category=OuterRef('pk')).order_by('-pk').values('pk')
+        categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
+
+        # Create a new Post in the first Category
+        post = Post(category=categories[0], title='Foo')
+        post.save()
+
+        # Retrieve Categories again, and check that the newest post ID is correct
+        categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
+        self.assertEqual(categories[0].newest_post, post.pk)
+
+    @unittest.skipIf(platform.python_implementation() == "PyPy", "dill doesn't do that in PyPy")
+    def test_385(self):
+        Client.objects.create(name='Client Name')
+
+        with self.assertRaises(AttributeError) as e:
+            Client.objects.filter(name='Client Name').cache().first()
+        self.assertEqual(
+            str(e.exception),
+            "Can't pickle local object 'Client.__init__.<locals>.curry.<locals>._curried'")
+
+        invalidate_model(Client)
+
+        with override_settings(CACHEOPS_SERIALIZER='dill'):
+            with self.assertNumQueries(1):
+                Client.objects.filter(name='Client Name').cache().first()
+                Client.objects.filter(name='Client Name').cache().first()
+
+    def test_387(self):
+        post = Post.objects.defer("visible").last()
+        post.delete()
+
+    def test_407(self):
+        brand = Brand.objects.create(pk=1)
+        brand.labels.set([Label.objects.create()])
+        assert len(Label.objects.filter(brands=1).cache()) == 1  # Cache it
+
+        brand.delete()  # Invalidation expected after deletion
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(Label.objects.filter(brands=1).cache()), 0)
+
+    def test_407_reverse(self):
+        brand = Brand.objects.create(pk=1)
+        label = Label.objects.create(pk=1)
+        brand.labels.set([label])
+        assert len(Brand.objects.filter(labels=1).cache()) == 1  # Cache it
+
+        label.delete()  # Invalidation expected after deletion
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(Brand.objects.filter(labels=1).cache()), 0)
 
 
 class RelatedTests(BaseTestCase):
@@ -871,12 +955,7 @@ class MultitableInheritanceTests(BaseTestCase):
 
 class SimpleCacheTests(BaseTestCase):
     def test_cached(self):
-        calls = [0]
-
-        @cached(timeout=100)
-        def get_calls(_):
-            calls[0] += 1
-            return calls[0]
+        get_calls = make_inc(cached(timeout=100))
 
         self.assertEqual(get_calls(1), 1)
         self.assertEqual(get_calls(1), 1)
@@ -891,12 +970,7 @@ class SimpleCacheTests(BaseTestCase):
         self.assertEqual(get_calls(2), 42)
 
     def test_cached_view(self):
-        calls = [0]
-
-        @cached_view(timeout=100)
-        def get_calls(request):
-            calls[0] += 1
-            return calls[0]
+        get_calls = make_inc(cached_view(timeout=100))
 
         factory = RequestFactory()
         r1 = factory.get('/hi')

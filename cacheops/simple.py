@@ -1,12 +1,12 @@
 import os
-import pickle
 import time
 
 from funcy import wraps
 
 from .conf import settings
-from .utils import func_cache_key, cached_view_fab, md5hex
+from .utils import get_cache_key, cached_view_fab, md5hex
 from .redis import redis_client, handle_connection_failure
+from .sharding import get_prefix
 
 
 __all__ = ('cache', 'cached', 'cached_view', 'file_cache', 'CacheMiss', 'FileCache', 'RedisCache')
@@ -24,25 +24,29 @@ class CacheKey(str):
         return self
 
     def get(self):
-        self.cache.get(self)
+        self.cache._get(self)
 
     def set(self, value):
-        self.cache.set(self, value, self.timeout)
+        self.cache._set(self, value, self.timeout)
 
     def delete(self):
-        self.cache.delete(self)
+        self.cache._delete(self)
 
 class BaseCache(object):
     """
     Simple cache with time-based invalidation
     """
-    def cached(self, timeout=None, extra=None, key_func=func_cache_key):
+    def cached(self, timeout=None, extra=None):
         """
         A decorator for caching function calls
         """
         # Support @cached (without parentheses) form
         if callable(timeout):
-            return self.cached(key_func=key_func)(timeout)
+            return self.cached()(timeout)
+
+        def _get_key(func, args, kwargs):
+            extra_val = extra(*args, **kwargs) if callable(extra) else extra
+            return get_prefix(func=func) + 'c:' + get_cache_key(func, args, kwargs, extra_val)
 
         def decorator(func):
             @wraps(func)
@@ -50,23 +54,21 @@ class BaseCache(object):
                 if not settings.CACHEOPS_ENABLED:
                     return func(*args, **kwargs)
 
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
+                cache_key = _get_key(func, args, kwargs)
                 try:
-                    result = self.get(cache_key)
+                    result = self._get(cache_key)
                 except CacheMiss:
                     result = func(*args, **kwargs)
-                    self.set(cache_key, result, timeout)
+                    self._set(cache_key, result, timeout)
 
                 return result
 
             def invalidate(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
-                self.delete(cache_key)
+                self._delete(_get_key(func, args, kwargs))
             wrapper.invalidate = invalidate
 
             def key(*args, **kwargs):
-                cache_key = 'c:' + key_func(func, args, kwargs, extra)
-                return CacheKey.make(cache_key, cache=self, timeout=timeout)
+                return CacheKey.make(_get_key(func, args, kwargs), cache=self, timeout=timeout)
             wrapper.key = key
 
             return wrapper
@@ -77,27 +79,36 @@ class BaseCache(object):
             return self.cached_view()(timeout)
         return cached_view_fab(self.cached)(timeout=timeout, extra=extra)
 
+    def get(self, cache_key):
+        return self._get(get_prefix() + cache_key)
+
+    def set(self, cache_key, data, timeout=None):
+        self._set(get_prefix() + cache_key, data, timeout)
+
+    def delete(self, cache_key):
+        self._delete(get_prefix() + cache_key)
+
 
 class RedisCache(BaseCache):
     def __init__(self, conn):
         self.conn = conn
 
-    def get(self, cache_key):
+    def _get(self, cache_key):
         data = self.conn.get(cache_key)
         if data is None:
             raise CacheMiss
-        return pickle.loads(data)
+        return settings.CACHEOPS_SERIALIZER.loads(data)
 
     @handle_connection_failure
-    def set(self, cache_key, data, timeout=None):
-        pickled_data = pickle.dumps(data, -1)
+    def _set(self, cache_key, data, timeout=None):
+        pickled_data = settings.CACHEOPS_SERIALIZER.dumps(data)
         if timeout is not None:
             self.conn.setex(cache_key, timeout, pickled_data)
         else:
             self.conn.set(cache_key, pickled_data)
 
     @handle_connection_failure
-    def delete(self, cache_key):
+    def _delete(self, cache_key):
         self.conn.delete(cache_key)
 
 cache = RedisCache(redis_client)
@@ -122,7 +133,7 @@ class FileCache(BaseCache):
         digest = md5hex(key)
         return os.path.join(self._dir, digest[-2:], digest[:-2])
 
-    def get(self, key):
+    def _get(self, key):
         filename = self._key_to_filename(key)
         try:
             # Remove file if it's stale
@@ -131,11 +142,11 @@ class FileCache(BaseCache):
                 raise CacheMiss
 
             with open(filename, 'rb') as f:
-                return pickle.load(f)
-        except (IOError, OSError, EOFError, pickle.PickleError):
+                return settings.CACHEOPS_SERIALIZER.load(f)
+        except (IOError, OSError, EOFError):
             raise CacheMiss
 
-    def set(self, key, data, timeout=None):
+    def _set(self, key, data, timeout=None):
         filename = self._key_to_filename(key)
         dirname = os.path.dirname(filename)
 
@@ -149,7 +160,7 @@ class FileCache(BaseCache):
             # Use open with exclusive rights to prevent data corruption
             f = os.open(filename, os.O_EXCL | os.O_WRONLY | os.O_CREAT)
             try:
-                os.write(f, pickle.dumps(data, pickle.HIGHEST_PROTOCOL))
+                os.write(f, settings.CACHEOPS_SERIALIZER.dumps(data))
             finally:
                 os.close(f)
 
@@ -158,7 +169,7 @@ class FileCache(BaseCache):
         except (IOError, OSError):
             pass
 
-    def delete(self, fname):
+    def _delete(self, fname):
         try:
             os.remove(fname)
             # Trying to remove directory in case it's empty

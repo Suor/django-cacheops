@@ -1,6 +1,7 @@
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
+from cacheops import cache, CacheMiss
 from .models import Category, Post, Extra
 from .utils import BaseTestCase
 
@@ -41,3 +42,13 @@ class PrefixTests(BaseTestCase):
     def test_union_tables(self):
         qs = Post.objects.filter(pk=1).union(Post.objects.filter(pk=2)).cache()
         list(qs)
+
+
+class SimpleCacheTests(BaseTestCase):
+    def test_prefix(self):
+        with override_settings(CACHEOPS_PREFIX=lambda _: 'a'):
+            cache.set("key", "value")
+            self.assertEqual(cache.get("key"), "value")
+
+        with self.assertRaises(CacheMiss):
+            cache.get("key")

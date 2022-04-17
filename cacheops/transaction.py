@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from funcy import once, decorator
 
-from django.db import DEFAULT_DB_ALIAS
+from django.db import DEFAULT_DB_ALIAS, DatabaseError
 from django.db.backends.utils import CursorWrapper
 from django.db.transaction import Atomic, get_connection, on_commit
 
@@ -73,13 +73,18 @@ class AtomicMixIn(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         connection = get_connection(self.using)
-        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
-        if not connection.closed_in_transaction and exc_type is None and \
-                not connection.needs_rollback:
-            if transaction_states[self.using]:
-                transaction_states[self.using].commit()
-        else:
+        try:
+            self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
+        except DatabaseError:
             transaction_states[self.using].rollback()
+            raise
+        else:
+            if not connection.closed_in_transaction and exc_type is None and \
+                    not connection.needs_rollback:
+                if transaction_states[self.using]:
+                    transaction_states[self.using].commit()
+            else:
+                transaction_states[self.using].rollback()
 
 
 class CursorWrapperMixin(object):

@@ -1,15 +1,16 @@
 from itertools import product
 from funcy import group_by, join_with, lcat, lmap
 
+from django.db.models import Subquery
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
-from django.db.models import Subquery
-from django.db.models.expressions import RawSQL
+from django.db.models.expressions import BaseExpression, Exists
 
 from .conf import settings
+from .invalidation import serializable_fields
 
 
 def dnfs(qs):
@@ -41,10 +42,10 @@ def dnfs(qs):
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE
             # Don't bother with complex right hand side either
-            if isinstance(where.rhs, (QuerySet, Query, Subquery, RawSQL)):
+            if isinstance(where.rhs, (QuerySet, Query, BaseExpression)):
                 return SOME_TREE
             # Skip conditions on non-serialized fields
-            if isinstance(where.lhs.target, settings.CACHEOPS_SKIP_FIELDS):
+            if where.lhs.target not in serializable_fields(where.lhs.target.model):
                 return SOME_TREE
 
             attname = where.lhs.target.attname
@@ -58,7 +59,7 @@ def dnfs(qs):
                 return SOME_TREE
         elif isinstance(where, NothingNode):
             return []
-        elif isinstance(where, (ExtraWhere, SubqueryConstraint)):
+        elif isinstance(where, (ExtraWhere, SubqueryConstraint, Exists)):
             return SOME_TREE
         elif len(where) == 0:
             return [[]]
@@ -122,6 +123,18 @@ def dnfs(qs):
         return {table: clean_dnf(dnf, table_aliases) for table, table_aliases in tables.items()}
 
     if qs.query.combined_queries:
-        return join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
+        dnfs_ = join_with(lcat, (query_dnf(q) for q in qs.query.combined_queries))
     else:
-        return query_dnf(qs.query)
+        dnfs_ = query_dnf(qs.query)
+
+    # Add any subqueries used for annotation
+    if qs.query.annotations:
+        subqueries = (
+            # Django 3.0+ sets Subquery.query
+            query_dnf(getattr(q, 'query', None) or getattr(q, 'queryset').query)
+            for q in qs.query.annotations.values()
+            if type(q) is Subquery
+        )
+        dnfs_.update(join_with(lcat, subqueries))
+
+    return dnfs_

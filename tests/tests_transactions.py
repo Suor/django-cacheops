@@ -1,10 +1,10 @@
-from django.db import connection
+from django.db import connection, IntegrityError
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
 
 from cacheops.transaction import queue_when_in_transaction
 
-from .models import Category
+from .models import Category, Post
 from .utils import run_in_thread
 
 
@@ -90,6 +90,21 @@ class TransactionSupportTests(TransactionTestCase):
             get_category()
             with self.assertNumQueries(1):
                 get_category()
+
+    def test_rollback_during_integrity_error(self):
+        # store category in cache
+        get_category()
+
+        # Make current DB be "dirty" by write
+        with self.assertRaises(IntegrityError):
+            with atomic():
+                Post.objects.create(category_id=-1, title='')
+
+        # however, this write should be rolled back and current DB should
+        # not be "dirty"
+
+        with self.assertNumQueries(0):
+            get_category()
 
     def test_call_cacheops_cbs_before_on_commit_cbs(self):
         calls = []
