@@ -96,13 +96,12 @@ class TransactionSupportTests(TransactionTestCase):
         get_category()
 
         # Make current DB be "dirty" by write
-        try:
+        with self.assertRaises(IntegrityError):
             with atomic():
                 Post.objects.create(category_id=-1, title='')
-        except IntegrityError:
-            # however, this write should be rolled back and current DB should
-            # not be "dirty"
-            pass
+
+        # however, this write should be rolled back and current DB should
+        # not be "dirty"
 
         with self.assertNumQueries(0):
             get_category()
