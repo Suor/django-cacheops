@@ -2,14 +2,9 @@ import sys
 import json
 import threading
 
-import dill
-import six
 from random import random
-
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
 from funcy.py3 import lmap, map, lcat, join_with
-from .cross import md5
-from funcy import lmap, map, lcat, join_with
 
 from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
@@ -58,7 +53,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     load_script('cache_thing', settings.CACHEOPS_LRU)(
         keys=[prefix, cache_key, precall_key],
         args=[
-            settings.CACHEOPS_SERIALIZER.dumps(data, -1),
+            settings.CACHEOPS_SERIALIZER.dumps(data),
             json.dumps(cond_dnfs, default=str),
             timeout
         ]
@@ -388,12 +383,14 @@ class QuerySetMixin(object):
 
         with atomic(using=clone.db):
             objects = list(clone.select_for_update())
-            rows = clone.update(**kwargs)
+            pks = {obj.pk for obj in objects}
+
+            rows = clone.update(**kwargs, check_test=False, count_invalidated_updates=len(pks))
 
             # TODO: do not refetch objects but update with kwargs in simple cases?
             # We use clone database to fetch new states, as this is the db they were written to.
             # Using router with new_objects may fail, using self may return slave during lag.
-            pks = {obj.pk for obj in objects}
+
             new_objects = self.model.objects.filter(pk__in=pks).using(clone.db)
 
         for obj in chain(objects, new_objects):
