@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
-import unittest
-
-import django
-from django.test import override_settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import connections
+from django.test import override_settings
 
+from cacheops import cache, CacheMiss
 from .models import Category, Post, Extra
 from .utils import BaseTestCase
 
@@ -27,11 +23,6 @@ class PrefixTests(BaseTestCase):
         with self.assertNumQueries(1):
             list(Category.objects.cache())
 
-        # HACK: This prevents initialization queries to break .assertNumQueries() in MySQL.
-        #       Also there is no .ensure_connection() in older Djangos, thus it's even uglier.
-        # TODO: remove in Django 1.10
-        connections['slave'].cursor().close()
-
         with self.assertNumQueries(1, using='slave'):
             list(Category.objects.cache().using('slave'))
             list(Category.objects.cache().using('slave'))
@@ -47,8 +38,17 @@ class PrefixTests(BaseTestCase):
     def test_self_join_tables(self):
         list(Extra.objects.filter(to_tag__pk=1).cache())
 
-    @unittest.skipIf(django.VERSION < (1, 11), 'Union added in Django 1.11')
     @override_settings(CACHEOPS_PREFIX=lambda q: q.table)
     def test_union_tables(self):
         qs = Post.objects.filter(pk=1).union(Post.objects.filter(pk=2)).cache()
         list(qs)
+
+
+class SimpleCacheTests(BaseTestCase):
+    def test_prefix(self):
+        with override_settings(CACHEOPS_PREFIX=lambda _: 'a'):
+            cache.set("key", "value")
+            self.assertEqual(cache.get("key"), "value")
+
+        with self.assertRaises(CacheMiss):
+            cache.get("key")

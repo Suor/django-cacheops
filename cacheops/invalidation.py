@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 import json
 import threading
-from funcy import memoize, post_processing, ContextDecorator
+from funcy import memoize, post_processing, ContextDecorator, decorator
 from django.db import DEFAULT_DB_ALIAS
 from django.db.models.expressions import F, Expression
-from distutils.version import StrictVersion
 
 from .conf import settings
 from .sharding import get_prefix
@@ -16,19 +14,14 @@ from .transaction import queue_when_in_transaction
 __all__ = ('invalidate_obj', 'invalidate_model', 'invalidate_all', 'no_invalidation')
 
 
-@memoize
-def redis_can_unlink():
-    redis_version = redis_client.info()['redis_version']
-    return StrictVersion(redis_version) >= StrictVersion('4.0')
+@decorator
+def skip_on_no_invalidation(call):
+    if not settings.CACHEOPS_ENABLED or no_invalidation.active:
+        return
+    return call()
 
 
-def invalidate_keys(*keys):
-    if redis_can_unlink():
-        redis_client.execute_command('UNLINK', *keys)
-    else:
-        redis_client.delete(*keys)
-
-
+@skip_on_no_invalidation
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
@@ -36,13 +29,14 @@ def invalidate_dict(model, obj_dict, using=DEFAULT_DB_ALIAS):
         return
     model = model._meta.concrete_model
     prefix = get_prefix(_cond_dnfs=[(model._meta.db_table, list(obj_dict.items()))], dbs=[using])
-    load_script('invalidate', strip=redis_can_unlink())(keys=[prefix], args=[
+    load_script('invalidate')(keys=[prefix], args=[
         model._meta.db_table,
         json.dumps(obj_dict, default=str)
     ])
     cache_invalidated.send(sender=model, obj_dict=obj_dict)
 
 
+@skip_on_no_invalidation
 def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
     """
     Invalidates caches that can possibly be influenced by object
@@ -51,6 +45,7 @@ def invalidate_obj(obj, using=DEFAULT_DB_ALIAS):
     invalidate_dict(model, get_obj_dict(model, obj), using=using)
 
 
+@skip_on_no_invalidation
 @queue_when_in_transaction
 @handle_connection_failure
 def invalidate_model(model, using=DEFAULT_DB_ALIAS):
@@ -59,8 +54,6 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     NOTE: This is a heavy artillery which uses redis KEYS request,
           which could be relatively slow on large datasets.
     """
-    if no_invalidation.active or not settings.CACHEOPS_ENABLED:
-        return
     model = model._meta.concrete_model
     # NOTE: if we use sharding dependent on DNF then this will fail,
     #       which is ok, since it's hard/impossible to predict all the shards
@@ -69,14 +62,13 @@ def invalidate_model(model, using=DEFAULT_DB_ALIAS):
     if conjs_keys:
         cache_keys = redis_client.sunion(conjs_keys)
         keys = list(cache_keys) + conjs_keys
-        invalidate_keys(*keys)
+        redis_client.unlink(*keys)
     cache_invalidated.send(sender=model, obj_dict=None)
 
 
+@skip_on_no_invalidation
 @handle_connection_failure
 def invalidate_all():
-    if no_invalidation.active or not settings.CACHEOPS_ENABLED:
-        return
     redis_client.flushdb()
     cache_invalidated.send(sender=None, obj_dict=None)
 
@@ -105,12 +97,17 @@ no_invalidation = _no_invalidation()
 
 @memoize
 def serializable_fields(model):
-    return tuple(f for f in model._meta.fields
-                   if not isinstance(f, settings.CACHEOPS_SKIP_FIELDS))
+    return {f for f in model._meta.fields
+              if f.get_internal_type() not in settings.CACHEOPS_SKIP_FIELDS}
 
 @post_processing(dict)
 def get_obj_dict(model, obj):
     for field in serializable_fields(model):
+        # Skip deferred fields, in post_delete trying to fetch them results in error anyway.
+        # In post_save we rely on deferred values be the same as in pre_save.
+        if field.attname not in obj.__dict__:
+            continue
+
         value = getattr(obj, field.attname)
         if value is None:
             yield field.attname, None

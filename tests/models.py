@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from django.db import models
 from django.db.models.query import QuerySet
-from django.db.models import sql
+from django.db.models import sql, manager
 from django.contrib.auth.models import User
 
 
@@ -54,7 +54,7 @@ class CustomField(models.Field):
             return value
         return CustomValue(value)
 
-    def from_db_value(self, value, expession, conn, context):
+    def from_db_value(self, value, expession, conn):
         return self.to_python(value)
 
     def get_prep_value(self, value):
@@ -84,7 +84,7 @@ class IntegerArrayField(models.Field):
             return value
         return [int(v) for v in value.split(',')]
 
-    def from_db_value(self, value, expession, conn, context):
+    def from_db_value(self, value, expession, conn):
         return self.to_python(value)
 
     def get_prep_value(self, value):
@@ -106,14 +106,17 @@ class Weird(models.Model):
 
 
 # TODO: check other new fields:
-#       - PostgreSQL ones: ArrayField, HStoreField, RangeFields, unaccent
+#       - PostgreSQL ones: HStoreField, RangeFields, unaccent
 #       - Other: DurationField
 if os.environ.get('CACHEOPS_DB') in {'postgresql', 'postgis'}:
     from django.contrib.postgres.fields import ArrayField
     try:
-        from django.contrib.postgres.fields import JSONField
+        from django.db.models import JSONField
     except ImportError:
-        JSONField = None
+        try:
+            from django.contrib.postgres.fields import JSONField  # Used before Django 3.1
+        except ImportError:
+            JSONField = None
 
     class TaggedPost(models.Model):
         name = models.CharField(max_length=200)
@@ -223,3 +226,63 @@ post_save.connect(set_boolean_true, sender=One)
 class Device(models.Model):
     uid = models.UUIDField(default=uuid.uuid4)
     model = models.CharField(max_length=64)
+
+
+# 333
+class CustomQuerySet(QuerySet):
+    pass
+
+
+class CustomFromQSManager(manager.BaseManager.from_queryset(CustomQuerySet)):
+    use_for_related_fields = True
+
+
+class CustomFromQSModel(models.Model):
+    boolean = models.BooleanField(default=False)
+    objects = CustomFromQSManager()
+
+
+# 352
+class CombinedField(models.CharField):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.another_field = models.CharField(*args, **kwargs)
+
+    def contribute_to_class(self, cls, name, **kwargs):
+        super().contribute_to_class(cls, name, private_only=True)
+        self.another_field.contribute_to_class(cls, name, **kwargs)
+
+
+class CombinedFieldModel(models.Model):
+    text = CombinedField(max_length=8, default='example')
+
+
+# 353
+class Foo(models.Model):
+    pass
+
+
+class Bar(models.Model):
+    foo = models.OneToOneField(
+        to="Foo",
+        on_delete=models.SET_NULL,
+        related_name='bar',
+        blank=True,
+        null=True
+    )
+
+
+# 385
+class Client(models.Model):
+    def __init__(self, *args, **kwargs):
+        # copied from Django 2.1.5 (not exists in Django 3.1.5 installed by current requirements)
+        def curry(_curried_func, *args, **kwargs):
+            def _curried(*moreargs, **morekwargs):
+                return _curried_func(*args, *moreargs, **{**kwargs, **morekwargs})
+
+            return _curried
+
+        super().__init__(*args, **kwargs)
+        setattr(self, '_get_private_data', curry(sum, [1, 2, 3, 4]))
+
+    name = models.CharField(max_length=255)

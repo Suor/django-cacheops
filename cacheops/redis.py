@@ -1,7 +1,5 @@
-from __future__ import absolute_import
 import warnings
 from contextlib import contextmanager
-import six
 
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
@@ -105,7 +103,7 @@ def redis_client():
         )
 
     # Allow client connection settings to be specified by a URL.
-    if isinstance(settings.CACHEOPS_REDIS, six.string_types):
+    if isinstance(settings.CACHEOPS_REDIS, str):
         return client_class.from_url(settings.CACHEOPS_REDIS)
     else:
         return client_class(**settings.CACHEOPS_REDIS)

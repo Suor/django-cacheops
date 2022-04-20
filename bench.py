@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-from __future__ import print_function
+#!/usr/bin/env python3
 import os, time, gc, sys, shutil
 from funcy import re_tester
 os.environ['DJANGO_SETTINGS_MODULE'] = 'tests.settings'

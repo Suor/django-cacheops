@@ -1,3 +1,40 @@
+6.0
+- support and test against Python 3.9 and Django 3.1/3.2
+- added custom serializers support (thx to Arcady Usov)
+- support callable extra in @cached_as() and friends
+- made simple cache obey prefix
+- skip JSONFields for purposes of invalidation
+- configure skipped fields by internal types, classes still supported
+- handle `DatabaseError` on transaction cleanup (Roman Gorbil)
+- do not query old object if cacheops is disabled
+- do not fetch deferred fields during invalidation, fixes #387
+Backwards incompatible changes:
+- callable `extra` param, including type, now behaves differently
+- simple cache now uses prefix
+
+5.1
+- support subqueries in annotations (Jeremy Stretch)
+- included tests into distro (John Vandenberg)
+- fixed .invalidated_update(), if updated QuerySet had related fields selected (M1hacka)
+- fixed possible deadlock in .invalidated_update() (M1hacka)
+- fixed filtering with expressions
+- fixed queries filtering in Exists (thx to Axel Wegener)
+- updated min redis-py to 3.0.0
+
+5.0.1
+- fixed reverse o2o invalidation (thx to John Anderson)
+- fixed unstable cache key when field validors are used
+- guard against non-integer timeouts
+
+5.0
+- support Python 3.8 and Django 3.0 (thx to Misha Kalyna)
+- improve model fields stamping (Alex Lokhman)
+- disabled postponed invalidation when no_invalidation is applied (Vladimir)
+- fixed custom manager derived from BaseManager (Eric Plaster)
+Backwards incompatible changes:
+- dropped Python 2.7 and Djangos before 2.1
+- Redis 4.0+ required
+
 4.2
 - support Django 2.1 and 2.2
 - added keep_fresh option to @cached_as (George Lee)

@@ -1,11 +1,6 @@
 local prefix = KEYS[1]
 local db_table = ARGV[1]
 local obj = cjson.decode(ARGV[2])
-local conj_del_fn = 'unlink'
--- If Redis version < 4.0 we can't use UNLINK
--- TOSTRIP
-conj_del_fn = 'del'
--- /TOSTRIP
 
 -- Utility functions
 local conj_cache_key = function (db_table, scheme, obj)
@@ -38,7 +33,7 @@ if next(conj_keys) ~= nil then
     local cache_keys = redis.call('sunion', unpack(conj_keys))
     -- we delete cache keys since they are invalid
     -- and conj keys as they will refer only deleted keys
-    redis.call(conj_del_fn, unpack(conj_keys))
+    redis.call("unlink", unpack(conj_keys))
     if next(cache_keys) ~= nil then
         -- NOTE: can't just do redis.call('del', unpack(...)) cause there is limit on number
         --       of return values in lua.

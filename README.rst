@@ -1,4 +1,4 @@
-Cacheops |Build Status| |Gitter|
+Cacheops |Build Status|
 ========
 
 A slick app that supports automatic or manual queryset caching and automatic
@@ -19,20 +19,20 @@ And there is more to it:
 Requirements
 ------------
 
-| Python 2.7 or 3.3+, Django 1.8+ and Redis 2.6+ (4.0+ recommended)
+Python 3.5+, Django 2.1+ and Redis 4.0+.
 
 
 Installation
 ------------
 
-Using pip::
+Using pip:
+
+.. code:: bash
 
     $ pip install django-cacheops
 
-Or you can get latest one from github::
-
-    $ git clone git://github.com/Suor/django-cacheops.git
-    $ pip install -e django-cacheops
+    # Or from github directly
+    $ pip install git+https://github.com/Suor/django-cacheops.git@master
 
 
 Setup
@@ -123,7 +123,7 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     }
 
 Using ``'*.*'`` with non-empty ``ops`` is **not recommended**
-since it will easily cache something you don't intent to or even now about like migrations tables.
+since it will easily cache something you don't intent to or even know about like migrations tables.
 The better approach will be restricting by app with ``'app_name.*'``.
 
 Besides ``ops`` and ``timeout`` options you can also use:
@@ -166,14 +166,14 @@ It's automatic you just need to set it up.
 
 | **Manual caching**
 
-You can force any queryset to use cache by calling it's ``.cache()`` method:
+You can force any queryset to use cache by calling its ``.cache()`` method:
 
 .. code:: python
 
     Article.objects.filter(tag=2).cache()
 
 
-Here you can specify which ops should be cached for queryset, for example, this code:
+Here you can specify which ops should be cached for the queryset, for example, this code:
 
 .. code:: python
 
@@ -265,9 +265,18 @@ caching, but only path of the request parameter is used to construct cache key:
     @cached_view_as(News)
     def news_index(request):
         # ...
-        return HttpResponse(...)
+        return render(...)
 
-You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``.
+You can pass ``timeout``, ``extra`` and several samples the same way as to ``@cached_as()``. Note that you can pass a function as ``extra``:
+
+.. code:: python
+
+    @cached_view_as(News, extra=lambda req: req.user.is_staff)
+    def news_index(request):
+        # ... add extra things for staff
+        return render(...)
+
+A function passed as ``extra`` receives the same arguments as the cached function.
 
 Class based views can also be cached:
 
@@ -276,7 +285,7 @@ Class based views can also be cached:
     class NewsIndex(ListView):
         model = News
 
-    news_index = cached_view_as(News)(NewsIndex.as_view())
+    news_index = cached_view_as(News, ...)(NewsIndex.as_view())
 
 
 Invalidation
@@ -653,6 +662,27 @@ A ``query`` object passed to callback also enables reflection on used databases 
 **NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
 
 
+Custom serialization
+--------------------
+
+Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own
+it might be any module or a class having `.dumps()` and `.loads()` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
+
+.. code:: python
+
+    CACHEOPS_SERIALIZER = 'dill'
+
+One less obvious use is to fix pickle protocol, to use cacheops cache across python versions:
+
+.. code:: python
+
+    import pickle
+
+    class CACHEOPS_SERIALIZER:
+        dumps = lambda data: pickle.dumps(data, 3)
+        loads = pickle.loads
+
+
 Using memory limit
 ------------------
 
@@ -701,7 +731,7 @@ CAVEATS
 1. Conditions other than ``__exact``, ``__in`` and ``__isnull=True`` don't make invalidation
    more granular.
 2. Conditions on TextFields, FileFields and BinaryFields don't make it either.
-   One should not test on their equality anyway.
+   One should not test on their equality anyway. See `CACHEOPS_SKIP_FIELDS` though.
 3. Update of "selected_related" object does not invalidate cache for queryset.
    Use ``.prefetch_related()`` instead.
 4. Mass updates don't trigger invalidation by default. But see ``.invalidated_update()``.
@@ -777,8 +807,8 @@ TODO
 - cache a string directly (no pickle) for direct serving (custom key function?)
 
 
-.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
-   :target: https://travis-ci.org/Suor/django-cacheops
+.. |Build Status| image:: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml/badge.svg
+   :target: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml?query=branch%3Amaster
 
 
 .. |Gitter| image:: https://badges.gitter.im/JoinChat.svg

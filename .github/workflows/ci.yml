@@ -1,0 +1,72 @@
+name: "CI"
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: "Install Dependencies"
+      run: pip install flake8
+    - name: Lint
+      run: flake8
+
+  test:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "pypy3"]
+        experimental: [false]
+        include:
+          - python-version: "3.10"
+            experimental: true
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: cacheops
+          POSTGRES_USER: cacheops
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ROOT_PASSWORD: cacheops
+          MYSQL_DATABASE: cacheops
+        ports:
+            - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
+
+    name: ${{ matrix.experimental && 'Django master [ok to fail]' || format('Python {0}', matrix.python-version) }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
+      - name: "Install Dependencies"
+        run: pip install tox tox-gh-actions
+
+      - name: "Run tests"
+        run: tox ${{ matrix.experimental && '-e py310-djmaster' || '' }}
+        env:
+          MYSQL_HOST: 127.0.0.1

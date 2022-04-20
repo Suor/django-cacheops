@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 import re
 import json
 import inspect
-from funcy import memoize, compose, wraps, any, any_fn, select_values
-from funcy.py3 import lmapcat
-from .cross import md5hex
+from funcy import memoize, compose, wraps, any, any_fn, select_values, lmapcat
 
 from django.db import models
 from django.http import HttpRequest
@@ -67,7 +64,11 @@ def stamp_fields(model):
     """
     Returns serialized description of model fields.
     """
-    stamp = str(sorted((f.name, f.attname, f.db_column, f.__class__) for f in model._meta.fields))
+    def _stamp(field):
+        name, class_name, *_ = field.deconstruct()
+        return name, class_name, field.attname, field.column
+
+    stamp = str(sorted(map(_stamp, model._meta.fields)))
     return md5hex(stamp)
 
 
@@ -76,6 +77,8 @@ def stamp_fields(model):
 def obj_key(obj):
     if isinstance(obj, models.Model):
         return '%s.%s.%s' % (obj._meta.app_label, obj._meta.model_name, obj.pk)
+    elif hasattr(obj, 'build_absolute_uri'):
+        return obj.build_absolute_uri()  # Only vary HttpRequest by uri
     elif inspect.isfunction(obj):
         factors = [obj.__module__, obj.__name__]
         # Really useful to ignore this while code still in development
@@ -85,23 +88,8 @@ def obj_key(obj):
     else:
         return str(obj)
 
-def func_cache_key(func, args, kwargs, extra=None):
-    """
-    Calculate cache key based on func and arguments
-    """
-    factors = [func, args, kwargs, extra]
+def get_cache_key(*factors):
     return md5hex(json.dumps(factors, sort_keys=True, default=obj_key))
-
-def view_cache_key(func, args, kwargs, extra=None):
-    """
-    Calculate cache key for view func.
-    Use url instead of not properly serializable request argument.
-    """
-    if hasattr(args[0], 'build_absolute_uri'):
-        uri = args[0].build_absolute_uri()
-    else:
-        uri = args[0]
-    return 'v:' + func_cache_key(func, args[1:], kwargs, extra=(uri, extra))
 
 def cached_view_fab(_cached):
     def force_render(response):
@@ -111,7 +99,6 @@ def cached_view_fab(_cached):
 
     def cached_view(*dargs, **dkwargs):
         def decorator(func):
-            dkwargs['key_func'] = view_cache_key
             cached_func = _cached(*dargs, **dkwargs)(compose(force_render, func))
 
             @wraps(func)
@@ -144,3 +131,25 @@ def carefully_strip_whitespace(text):
         return NEWLINE_BETWEEN_TAGS if '\n' in m.group(0) else SPACE_BETWEEN_TAGS
     text = re.sub(r'>\s{2,}<', repl, text)
     return text
+
+
+### hashing helpers
+
+import hashlib
+
+
+class md5:
+    def __init__(self, s=None):
+        self.md5 = hashlib.md5()
+        if s is not None:
+            self.update(s)
+
+    def update(self, s):
+        return self.md5.update(s.encode('utf-8'))
+
+    def hexdigest(self):
+        return self.md5.hexdigest()
+
+
+def md5hex(s):
+    return md5(s).hexdigest()
