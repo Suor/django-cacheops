@@ -1,3 +1,9 @@
+6.1
+- support Django 3.2 and 4.0 (thx to Olivér Kecskeméty)
+- do not gulp commit errors (Oleg Yamnikov)
+- fixed precall key when a prefix is defined (Peter Baumgartner)
+- fixed m2o/m2m queries invalidation on object deletion (thx to Sergey Tikhonov)
+
 6.0
 - support and test against Python 3.9 and Django 3.1/3.2
 - added custom serializers support (thx to Arcady Usov)

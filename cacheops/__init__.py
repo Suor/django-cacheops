@@ -1,4 +1,4 @@
-__version__ = '6.0'
+__version__ = '6.1'
 VERSION = tuple(map(int, __version__.split('.')))
 
 import django
