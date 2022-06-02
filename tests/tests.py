@@ -14,8 +14,9 @@ from django.db.models import F, Count, OuterRef, Sum, Subquery, Exists
 from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
-                     cached, cached_view, cached_as, cached_view_as
+    cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
+from cacheops.query import invalidate_m2o
 from cacheops.templatetags.cacheops import register
 
 decorator_tag = register.decorator_tag
@@ -680,6 +681,39 @@ class IssueTests(BaseTestCase):
 
         with self.assertNumQueries(1):
             self.assertEqual(len(Brand.objects.filter(labels=1).cache()), 0)
+
+    @mock.patch('cacheops.query.invalidate_dict')
+    def test_430(self, mock_invalidate_dict):
+        media_type = MediaType.objects.create(
+            name="some type"
+        )
+        movie = Movie.objects.create(
+            year=2022,
+            media_type=media_type,
+        )
+        Scene.objects.create(
+            name="first scene",
+            movie=movie,
+        )
+        invalidate_m2o(Movie, movie)
+        obj_dict = mock_invalidate_dict.call_args[0][1]
+        self.assertFalse(isinstance(obj_dict['movie_id'], Media))
+        self.assertTrue(isinstance(obj_dict['movie_id'], int))
+
+    def test_430_no_error_raises(self):
+        media_type = MediaType.objects.create(
+            name="some type"
+        )
+        movie = Movie.objects.create(
+            year=2022,
+            media_type=media_type,
+        )
+        Scene.objects.create(
+            name="first scene",
+            movie=movie,
+        )
+        # no error raises on delete
+        media_type.delete()
 
 
 class RelatedTests(BaseTestCase):
