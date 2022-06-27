@@ -165,6 +165,7 @@ class Media(models.Model):
     def __str__(self):
         return str(self.media_type)
 
+
 class Movie(Media):
     year = models.IntegerField()
 

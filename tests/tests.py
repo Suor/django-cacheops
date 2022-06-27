@@ -696,9 +696,10 @@ class IssueTests(BaseTestCase):
             movie=movie,
         )
         invalidate_m2o(Movie, movie)
-        obj_dict = mock_invalidate_dict.call_args[0][1]
-        self.assertFalse(isinstance(obj_dict['movie_id'], Media))
-        self.assertTrue(isinstance(obj_dict['movie_id'], int))
+
+        obj_movie_dict = mock_invalidate_dict.call_args[0][1]
+        self.assertFalse(isinstance(obj_movie_dict['movie_id'], Media))
+        self.assertTrue(isinstance(obj_movie_dict['movie_id'], int))
 
     def test_430_no_error_raises(self):
         media_type = MediaType.objects.create(
