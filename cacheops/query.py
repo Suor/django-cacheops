@@ -183,7 +183,7 @@ class QuerySetMixin(object):
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
-        # Iterable class pack results diffrently
+        # Iterable class pack results differently
         it_class = self._iterable_class
         md.update('%s.%s' % (it_class.__module__, it_class.__name__))
 
@@ -217,7 +217,7 @@ class QuerySetMixin(object):
             timeout    - override default cache timeout
             lock       - use lock to prevent dog-pile effect
 
-        NOTE: you actually can disable caching by omiting corresponding ops,
+        NOTE: you actually can disable caching by omitting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
         """
         self._require_cacheprofile()
@@ -287,7 +287,7 @@ class QuerySetMixin(object):
 
     def count(self):
         if self._should_cache('count'):
-            # Optmization borrowed from overriden method:
+            # Optmization borrowed from overridden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
                 return len(self._result_cache)
@@ -331,7 +331,7 @@ class QuerySetMixin(object):
                     and not self.query.select_related \
                     and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
-                #       Some day it could produce same key for diffrent requests.
+                #       Some day it could produce same key for different requests.
                 key = (self.__class__, self.model) + tuple(sorted(kwargs.items()))
                 try:
                     return _local_get_cache[key]

@@ -15,7 +15,7 @@ def get_concrete_model(model):
 
 def model_family(model):
     """
-    Returns a list of all proxy models, including subclasess, superclassses and siblings.
+    Returns a list of all proxy models, including subclasess, superclasses and siblings.
     """
     def class_tree(cls):
         return [cls] + lmapcat(class_tree, cls.__subclasses__())
