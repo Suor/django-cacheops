@@ -485,7 +485,7 @@ class IssueTests(BaseTestCase):
         brand.labels.add(label)
 
         # Create another brand with the same pk as label.
-        # This will trigger a bug invalidating brands quering them by label id.
+        # This will trigger a bug invalidating brands querying them by label id.
         another_brand = Brand.objects.create(pk=2)
 
         list(brand.labels.cache())
