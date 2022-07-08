@@ -1,17 +1,11 @@
-# -*- coding: utf-8 -*-
 import threading
 from collections import defaultdict
 
-import six
-from django.db import DEFAULT_DB_ALIAS
-from django.db.backends.utils import CursorWrapper
-from django.db.transaction import Atomic, get_connection
-# Hack for Django < 1.9
-try:
-    from django.db.transaction import on_commit
-except ImportError:
-    on_commit = None
 from funcy import once, decorator
+
+from django.db import DEFAULT_DB_ALIAS, DatabaseError
+from django.db.backends.utils import CursorWrapper
+from django.db.transaction import Atomic, get_connection, on_commit
 
 from .utils import monkey_mix
 
@@ -74,18 +68,23 @@ class AtomicMixIn(object):
         entering = not transaction_states[self.using]
         transaction_states[self.using].begin()
         self._no_monkey.__enter__(self)
-        if on_commit and entering:
+        if entering:
             on_commit(transaction_states[self.using].commit, self.using)
 
     def __exit__(self, exc_type, exc_value, traceback):
         connection = get_connection(self.using)
-        self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
-        if not connection.closed_in_transaction and exc_type is None and \
-                not connection.needs_rollback:
-            if not on_commit or transaction_states[self.using]:
-                transaction_states[self.using].commit()
-        else:
+        try:
+            self._no_monkey.__exit__(self, exc_type, exc_value, traceback)
+        except DatabaseError:
             transaction_states[self.using].rollback()
+            raise
+        else:
+            if not connection.closed_in_transaction and exc_type is None and \
+                    not connection.needs_rollback:
+                if transaction_states[self.using]:
+                    transaction_states[self.using].commit()
+            else:
+                transaction_states[self.using].rollback()
 
 
 class CursorWrapperMixin(object):
@@ -113,7 +112,7 @@ CHARS = set('abcdefghijklmnoprqstuvwxyz_')
 def is_sql_dirty(sql):
     # This should not happen as using bytes in Python 3 is against db protocol,
     # but some people will pass it anyway
-    if six.PY3 and isinstance(sql, six.binary_type):
+    if isinstance(sql, bytes):
         sql = sql.decode()
     # NOTE: not using regex here for speed
     sql = sql.lower()

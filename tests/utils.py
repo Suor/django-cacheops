@@ -32,8 +32,6 @@ def make_inc(deco=lambda x: x):
 
 
 # Thread utilities
-import sys
-import six
 from threading import Thread
 
 
@@ -41,27 +39,24 @@ class ThreadWithReturnValue(Thread):
     def __init__(self, *args, **kwargs):
         super(ThreadWithReturnValue, self).__init__(*args, **kwargs)
         self._return = None
-        self._exc_info = None
+        self._exc = None
 
     def run(self):
         try:
-            if six.PY3:
-                self._return = self._target(*self._args, **self._kwargs)
-            else:
-                self._return = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
-        except Exception:
-            self._exc_info = sys.exc_info()
+            self._return = self._target(*self._args, **self._kwargs)
+        except Exception as e:
+            self._exc = e
         finally:
             # Django does not drop postgres connections opened in new threads.
-            # This leads to postgres complaining about db accessed when we try to destory it.
+            # This leads to postgres complaining about db accessed when we try to destroy it.
             # See https://code.djangoproject.com/ticket/22420#comment:18
             from django.db import connection
             connection.close()
 
     def join(self, *args, **kwargs):
         super(ThreadWithReturnValue, self).join(*args, **kwargs)
-        if self._exc_info:
-            six.reraise(*self._exc_info)
+        if self._exc:
+            raise self._exc
         return self._return
 
 

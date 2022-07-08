@@ -1,29 +1,8 @@
-from __future__ import absolute_import
+from inspect import getfullargspec, unwrap
 from functools import partial
-from ..cross import getargspec
-
-# NOTE: moved in Django 1.9
-try:
-    from django.template.library import TagHelperNode, parse_bits
-except ImportError:
-    from django.template.base import TagHelperNode as _TagHelperNode, parse_bits
-
-    class TagHelperNode(_TagHelperNode):
-        def __init__(self, func, takes_context, args, kwargs):
-            _TagHelperNode.__init__(self, takes_context, args, kwargs)
-            self.func = func
-
-# Fix Django 2.0 parse_bits being too smart
-import django
-if django.VERSION >= (2, 0):
-    _parse_bits = parse_bits
-
-    def parse_bits(parser, bits, params, varargs, varkw, defaults,
-                   takes_context=None, name=None):
-        return _parse_bits(parser, bits, params, varargs, varkw, defaults, (), (),
-                           takes_context=takes_context, name=name)
 
 from django.template import Library
+from django.template.library import TagHelperNode, parse_bits
 
 import cacheops
 from cacheops.utils import carefully_strip_whitespace
@@ -38,7 +17,7 @@ class CacheopsLibrary(Library):
             return partial(self.decorator_tag, takes_context=takes_context)
 
         name = func.__name__
-        params, varargs, varkw, defaults = getargspec(func)
+        params, varargs, varkw, defaults, kwonly, kwonly_defaults, _ = getfullargspec(unwrap(func))
 
         def _compile(parser, token):
             # content
@@ -47,8 +26,10 @@ class CacheopsLibrary(Library):
 
             # args
             bits = token.split_contents()[1:]
-            args, kwargs = parse_bits(parser, bits, params, varargs, varkw, defaults,
-                                      takes_context=takes_context, name=name)
+            args, kwargs = parse_bits(
+                parser, bits, params, varargs, varkw, defaults,
+                kwonly, kwonly_defaults, takes_context, name,
+            )
             return CachedNode(func, takes_context, args, kwargs, nodelist)
 
         self.tag(name=name, compile_function=_compile)
