@@ -151,13 +151,33 @@ class MediaProxy(NonCachedMedia):
         proxy = True
 
 
+class MediaType(models.Model):
+    name = models.CharField(max_length=50)
+
 # Multi-table inheritance
 class Media(models.Model):
     name = models.CharField(max_length=128)
+    media_type = models.ForeignKey(
+        MediaType,
+        on_delete=models.CASCADE,
+    )
+
+    def __str__(self):
+        return str(self.media_type)
+
 
 class Movie(Media):
     year = models.IntegerField()
 
+
+class Scene(models.Model):
+    """Model with FK to submodel."""
+    name = models.CharField(max_length=50)
+    movie = models.ForeignKey(
+        Movie,
+        on_delete=models.CASCADE,
+        related_name="scenes",
+    )
 
 # M2M models
 class Label(models.Model):

@@ -529,8 +529,13 @@ def invalidate_m2o(sender, instance, using=DEFAULT_DB_ALIAS):
     """Invoke invalidation for m2o and m2m queries to a deleted instance"""
     all_fields = sender._meta.get_fields(include_hidden=True, include_parents=True)
     m2o_fields = [f for f in all_fields if isinstance(f, models.ManyToOneRel)]
+    fk_fields_names_map = {
+        f.name: f.attname
+        for f in all_fields if isinstance(f, models.ForeignKey)
+    }
     for f in m2o_fields:
-        value = getattr(instance, f.field_name)
+        attr = fk_fields_names_map.get(f.field_name, f.field_name)
+        value = getattr(instance, attr)
         rmodel, rfield = f.related_model, f.remote_field.attname
         invalidate_dict(rmodel, {rfield: value}, using=using)
 
