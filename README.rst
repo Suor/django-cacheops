@@ -725,6 +725,32 @@ Here is a simple stats implementation:
 Cache invalidation signal is emitted after object, model or global invalidation passing ``sender`` and ``obj_dict`` args. Note that during normal operation cacheops only uses object invalidation, calling it once for each model create/delete and twice for update: passing old and new object dictionary.
 
 
+Memory usage cleanup
+--------------------
+
+In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able
+to invalidate them. Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
+ignoring conjunction sets with some reasonable size.
+
+It can be called using the ``reapconjs`` management command::
+
+    ./manage.py reapconjs --chunk-size=100 --min-conj-set-size=10000  # with custom values
+    ./manage.py reapconjs                                             # with default values (chunks=1000, min size=1000)
+
+The command is a small wrapper that calls a function with the main logic. You can also call it from your code, for example from a Celery task:
+
+.. code:: python
+
+    from cacheops import reap_conjs
+
+    @app.task
+    def reap_conjs_task():
+        reap_conjs(
+            chunk_size=2000,
+            min_conj_set_size=100,
+        )
+
+
 CAVEATS
 -------
 
