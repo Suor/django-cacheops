@@ -6,7 +6,7 @@ from cacheops.reaper import reap_conjs
 
 
 class Command(BaseCommand):
-    help = 'Removes expired cache keys from cacheops.'
+    help = 'Removes expired conjunction keys from cacheops.'
 
     def add_arguments(self, parser: ArgumentParser):
         parser.add_argument('--chunk-size', type=int, default=1000)
