@@ -30,7 +30,7 @@ def reap_conjs(
     """
     logger.info('Starting scan for large conj sets')
     prefix = get_prefix(dbs=[using])
-    for conj_key in redis_client.scan_iter(f'{prefix}conj:*', count=chunk_size):
+    for conj_key in redis_client.scan_iter(prefix + 'conj:*', count=chunk_size):
         total = redis_client.scard(conj_key)
         if total < min_conj_set_size:
             continue
