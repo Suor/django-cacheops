@@ -1,12 +1,19 @@
 import logging
 
+from django.db import DEFAULT_DB_ALIAS
+
 from .redis import redis_client
 from .sharding import get_prefix
 
 logger = logging.getLogger(__name__)
 
 
-def reap_conjs(chunk_size: int = 1000, min_conj_set_size: int = 1000, dry_run: bool = False):
+def reap_conjs(
+    chunk_size: int = 1000,
+    min_conj_set_size: int = 1000,
+    using=DEFAULT_DB_ALIAS,
+    dry_run: bool = False,
+):
     """
     Remove expired cache keys from invalidation sets.
 
@@ -22,7 +29,7 @@ def reap_conjs(chunk_size: int = 1000, min_conj_set_size: int = 1000, dry_run: b
     This function scans cacheops' conj keys for already-expired cache keys and removes them.
     """
     logger.info('Starting scan for large conj sets')
-    prefix = get_prefix(dbs=['default'])
+    prefix = get_prefix(dbs=[using])
     for conj_key in redis_client.scan_iter(f'{prefix}conj:*', count=chunk_size):
         total = redis_client.scard(conj_key)
         if total < min_conj_set_size:
