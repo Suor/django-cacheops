@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand
 
-from cacheops.cleaner import clear_stale_cacheops_keys
+from cacheops.reaper import reap_conjs
 
 
 class Command(BaseCommand):
@@ -14,7 +14,7 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, chunk_size: int, min_conj_set_size: int, dry_run: bool, **kwargs):
-        clear_stale_cacheops_keys(
+        reap_conjs(
             chunk_size=chunk_size,
             min_conj_set_size=min_conj_set_size,
             dry_run=dry_run,

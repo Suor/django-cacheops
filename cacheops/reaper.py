@@ -6,7 +6,7 @@ from .sharding import get_prefix
 logger = logging.getLogger(__name__)
 
 
-def clear_stale_cacheops_keys(chunk_size: int, min_conj_set_size: int, dry_run: bool = False):
+def reap_conjs(chunk_size: int = 1000, min_conj_set_size: int = 1000, dry_run: bool = False):
     """
     Remove expired cache keys from invalidation sets.
 
@@ -23,27 +23,27 @@ def clear_stale_cacheops_keys(chunk_size: int, min_conj_set_size: int, dry_run: 
     """
     logger.info('Starting scan for large conj sets')
     prefix = get_prefix(dbs=['default'])
-    for conjunction_key in redis_client.scan_iter(f'{prefix}conj:*', count=chunk_size):
-        total = redis_client.scard(conjunction_key)
+    for conj_key in redis_client.scan_iter(f'{prefix}conj:*', count=chunk_size):
+        total = redis_client.scard(conj_key)
         if total < min_conj_set_size:
             continue
-        logger.info('Found %s cache keys in %s, scanning for expired keys', total, conjunction_key)
-        _clear_conjunction_key(conjunction_key, chunk_size, dry_run)
+        logger.info('Found %s cache keys in %s, scanning for expired keys', total, conj_key)
+        _clear_conj_key(conj_key, chunk_size, dry_run)
     logger.info('Done scan for large conj sets')
 
 
-def _clear_conjunction_key(conjunction_key: bytes, chunk_size: int, dry_run: bool):
+def _clear_conj_key(conj_key: bytes, chunk_size: int, dry_run: bool):
     """Scan the cache keys in a conj set in batches and remove any that have expired."""
     count, removed = 0, 0
-    for keys in _iter_keys_chunk(chunk_size, conjunction_key):
+    for keys in _iter_keys_chunk(chunk_size, conj_key):
         count += len(keys)
         values = redis_client.mget(keys)
         expired = [k for k, v in zip(keys, values) if not v]
         if expired:
             if not dry_run:
-                redis_client.srem(conjunction_key, *expired)
+                redis_client.srem(conj_key, *expired)
             removed += len(expired)
-            logger.info('Removed %s/%s cache keys from %s', removed, count, conjunction_key)
+            logger.info('Removed %s/%s cache keys from %s', removed, count, conj_key)
     if removed and not dry_run:
         redis_client.execute_command('MEMORY PURGE')
 
