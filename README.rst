@@ -9,17 +9,22 @@ filesystem for simple time-invalidated one.
 
 And there is more to it:
 
-- decorators to cache any user function or view as a queryset or by time
-- extensions for django and jinja2 templates
-- transparent transaction support
-- dog-pile prevention mechanism
-- a couple of hacks to make django faster
+- Decorators to cache any user function or view as a queryset or by time
+- Extensions for django and jinja2 templates
+- Transparent transaction support
+- Dog-pile prevention mechanism
+- A couple of hacks to make django faster
+
+.. contents:: **Overview**
+   :depth: 2
 
 
 Requirements
 ------------
 
-Python 3.5+, Django 2.1+ and Redis 4.0+.
+- Python 3.5+
+- Django 2.1+
+- Redis 4.0+
 
 
 Installation
@@ -161,7 +166,7 @@ Usage
 
 | **Automatic caching**
 
-It's automatic you just need to set it up.
+It's automatic! You just need to set it up.
 
 
 | **Manual caching**
@@ -185,7 +190,7 @@ Here you can specify which ops should be cached for the queryset, for example, t
 will cache count call in ``Paginator`` but not later articles fetch.
 There are five possible actions - ``get``, ``fetch``, ``count``, ``aggregate`` and ``exists``.
 You can pass any subset of this ops to ``.cache()`` method even empty - to turn off caching.
-There is, however, a shortcut for the latter:
+However, there is a shortcut for the latter:
 
 .. code:: python
 
@@ -217,7 +222,7 @@ addition or deletion:
         }
 
 
-Note that we are using list on both querysets here, it's because we don't want
+Note that we are using ``list`` on both querysets here. It's because we don't want
 to cache queryset objects but their results.
 
 Also note that if you want to filter queryset based on arguments,
@@ -239,7 +244,7 @@ e.g. to make invalidation more granular, you can use a local function:
 
 We added ``extra`` here to make different keys for calls with same ``category`` but different
 ``count``. Cache key will also depend on function arguments, so we could just pass ``count`` as
-an argument to inner function. We also omitted ``timeout`` here, so a default for the model
+an argument to the inner function. We also omitted ``timeout`` here, so a default for the model
 will be used.
 
 Another possibility is to make function cache invalidate on changes to any one of several models:
@@ -297,7 +302,7 @@ and m2m changes.
 
 Invalidation tries to be granular which means it won't invalidate a queryset
 that cannot be influenced by added/updated/deleted object judging by query
-conditions. Most of the time this will do what you want, if it won't you can use
+conditions. Most of the time this will do what you want. If it doesn't, you can use
 one of the following:
 
 .. code:: python
@@ -308,13 +313,13 @@ one of the following:
     invalidate_model(Article)     # invalidates all queries for model
     invalidate_all()              # flush redis cache database
 
-And last there is ``invalidate`` command::
+And lastly, there is the ``invalidate`` command::
 
     ./manage.py invalidate articles.Article.34  # same as invalidate_obj
     ./manage.py invalidate articles.Article     # same as invalidate_model
     ./manage.py invalidate articles   # invalidate all models in articles
 
-And the one that FLUSHES cacheops redis database::
+And the one that *FLUSHES* cacheops redis database::
 
     ./manage.py invalidate all
 
@@ -359,13 +364,13 @@ Postponing invalidation can speed up batch jobs.
 
 | **Mass updates**
 
-Normally `qs.update(...)` doesn't emit any events and thus doesn't trigger invalidation.
+Normally ``qs.update(...)`` doesn't emit any events and thus doesn't trigger invalidation.
 And there is no transparent and efficient way to do that: trying to act on conditions will
 invalidate too much if update conditions are orthogonal to many queries conditions,
 and to act on specific objects we will need to fetch all of them,
-which `QuerySet.update()` users generally try to avoid.
+which ``QuerySet.update()`` users generally try to avoid.
 
-In the case you actually want to perform the latter cacheops provides a shortcut:
+In the case you actually want to perform the latter, cacheops provides a shortcut:
 
 .. code:: python
 
@@ -377,7 +382,7 @@ Note that all the updated objects are fetched twice, prior and post the update.
 Simple time-invalidated cache
 -----------------------------
 
-To cache result of a function call or a view for some time use:
+To cache the result of a function call or a view for some time use:
 
 .. code:: python
 
@@ -417,7 +422,7 @@ You can manually invalidate or update a result of a cached function:
     top_articles.key(some_category).set(new_value)
 
 
-To invalidate cached view you can pass absolute uri instead of request:
+To invalidate cached view, you can pass the absolute **uri** instead of a request:
 
 .. code:: python
 
@@ -476,9 +481,9 @@ File based cache can be used the same way as simple time-invalidated one:
     file_cache.delete(cache_key)
 
 
-It has several improvements upon django built-in file cache, both about high load.
+It has a couple improvements upon django's built-in file cache, both about high load.
 First, it's safe against concurrent writes. Second, it's invalidation is done as separate task,
-you'll need to call this from crontab for that to work::
+you'll need to call this from **crontab** for that to work::
 
     /path/manage.py cleanfilecache
     /path/manage.py cleanfilecache /path/to/non-default/cache/dir
@@ -513,9 +518,9 @@ To invalidate cached fragment use:
     invalidate_fragment(fragment_name, extra1, ...)
 
 If you have more complex fragment caching needs, cacheops provides a helper to
-make your own template tags which decorate a template fragment in a way
+make your own template tags which decorate a template fragment in a way that is
 analogous to decorating a function with ``@cached`` or ``@cached_as``.
-This is **experimental** feature for now.
+This is an **experimental** feature for now.
 
 To use it create ``myapp/templatetags/mycachetags.py`` and add something like this there:
 
@@ -544,7 +549,7 @@ To use it create ``myapp/templatetags/mycachetags.py`` and add something like th
             timeout=24 * 60 * 60
         )
 
-``@decorator_tag`` here creates a template tag behaving the same as returned decorator
+``@decorator_tag`` here creates a template tag behaving the same way as a returned decorator
 upon wrapped template fragment. Resulting template tag could be used as follows:
 
 .. code:: django
@@ -589,7 +594,7 @@ Transactions
 
 Cacheops transparently supports transactions. This is implemented by following simple rules:
 
-1. Once transaction is dirty (has changes) caching turns off. The reason is that the state of database at this point is only visible to current transaction and should not affect other users and vice versa.
+1. Once transaction is dirty (has changes) caching turns off. The is because the state of the database at this point is only visible to current transaction and should not affect other users and vice versa.
 
 2. Any invalidating calls are scheduled to run on the outer commit of transaction.
 
@@ -659,7 +664,7 @@ A ``query`` object passed to callback also enables reflection on used databases 
         if query.tables == ['blog_post']:
             return 'blog:'
 
-**NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
+**NOTE:** Prefix is not used in simple and file cache. This might change in future cacheops.
 
 
 Custom serialization
@@ -764,14 +769,14 @@ CAVEATS
 5. Sliced queries are invalidated as non-sliced ones.
 6. Doesn't work with ``.raw()`` and other sql queries.
 7. Conditions on subqueries don't affect invalidation.
-8. Doesn't work right with multi-table inheritance.
+8. Doesn't work correctly with multi-table inheritance.
 
-Here 1, 2, 3, 5 are part of the design compromise, trying to solve them will make
+Here 1, 2, 3 and 5 are part of the design compromise, trying to solve them will make
 things complicated and slow. 7 can be implemented if needed, but it's
 probably counter-productive since one can just break queries into simpler ones,
 which cache better. 4 is a deliberate choice, making it "right" will flush
 cache too much when update conditions are orthogonal to most queries conditions,
-see, however, `.invalidated_update()`. 8 is postponed until it will gain
+see, however, ``.invalidated_update()``. 8 is postponed until it will gain
 more interest or a champion willing to implement it emerges.
 
 All unsupported things could still be used easily enough with the help of ``@cached_as()``.
@@ -798,14 +803,14 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 5. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
-   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
+Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
 
 
 Writing a test
 --------------
 
-Writing a test for an issue you are experiencing can speed up its resolution a lot.
-Here is how you do that. I suppose you have some application code causing it.
+Writing a test for an issue you are experiencing can greatly speed up its resolution.
+Here is how you do that:
 
 1. Make a fork.
 2. Install all from ``requirements-test.txt``.
@@ -820,17 +825,17 @@ Here is how you do that. I suppose you have some application code causing it.
 TODO
 ----
 
-- faster .get() handling for simple cases such as get by pk/id, with simple key calculation
-- integrate previous one with prefetch_related()
-- shard cache between multiple redises
-- respect subqueries?
-- respect headers in @cached_view*?
-- group invalidate_obj() calls?
-- a postpone invalidation context manager/decorator?
-- fast mode: store cache in local memory, but check in with redis if it's valid
-- an interface for complex fields to extract exact on parts or transforms: ArrayField.len => field__len=?, ArrayField[0] => field__0=?, JSONField['some_key'] => field__some_key=?
-- custom cache eviction strategy in lua
-- cache a string directly (no pickle) for direct serving (custom key function?)
+- Faster ``.get()`` handling for simple cases such as: get by pk/id, with simple key calculation
+- Integrate previous one with ``prefetch_related()``
+- Shared cache between multiple redises
+- Respect subqueries?
+- Respect headers in ``@cached_view*``?
+- Group ``invalidate_obj()`` calls?
+- A postpone invalidation context manager/decorator?
+- Fast mode: store cache in local memory, but check in with redis if it's valid
+- An interface for complex fields to extract exact on parts or transforms:``ArrayField.len => field__len=?, ArrayField[0] => field__0=?, JSONField['some_key'] => field__some_key=?``
+- Custom cache eviction strategy in lua
+- Cache a string directly (no pickle) for direct serving (custom key function?)
 
 
 .. |Build Status| image:: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml/badge.svg
