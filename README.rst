@@ -128,14 +128,14 @@ You can configure default profile setting with ``CACHEOPS_DEFAULTS``. This way y
     }
 
 Using ``'*.*'`` with non-empty ``ops`` is **not recommended**
-since it will easily cache something you don't intent to or even know about like migrations tables.
+since it will easily cache something you don't intend to or even know about like migration tables.
 The better approach will be restricting by app with ``'app_name.*'``.
 
 Besides ``ops`` and ``timeout`` options you can also use:
 
 ``local_get: True``
-    To cache simple gets for this model in process local memory.
-    This is very fast, but is not invalidated in any way until process is restarted.
+    To cache simple ``get``s for this model in process local memory.
+    This is very fast, but is not invalidated in any way until the process is restarted.
     Still could be useful for extremely rarely changed things.
 
 ``cache_on_save=True | 'field_name'``
@@ -261,7 +261,7 @@ As you can see, we can mix querysets and models here.
 | **View caching**
 
 You can also cache and invalidate a view as a queryset. This works mostly the same way as function
-caching, but only path of the request parameter is used to construct cache key:
+caching, but only the path of the request parameter is used to construct the cache key:
 
 .. code:: python
 
@@ -313,7 +313,7 @@ one of the following:
     invalidate_model(Article)     # invalidates all queries for model
     invalidate_all()              # flush redis cache database
 
-And lastly, there is the ``invalidate`` command::
+And lastly, there is the also ``invalidate`` commands::
 
     ./manage.py invalidate articles.Article.34  # same as invalidate_obj
     ./manage.py invalidate articles.Article     # same as invalidate_model
@@ -365,7 +365,7 @@ Postponing invalidation can speed up batch jobs.
 | **Mass updates**
 
 Normally ``qs.update(...)`` doesn't emit any events and thus doesn't trigger invalidation.
-And there is no transparent and efficient way to do that: trying to act on conditions will
+And there is no transparent and efficient way to do that. Trying to act on conditions will
 invalidate too much if update conditions are orthogonal to many queries conditions,
 and to act on specific objects we will need to fetch all of them,
 which ``QuerySet.update()`` users generally try to avoid.
@@ -594,7 +594,7 @@ Transactions
 
 Cacheops transparently supports transactions. This is implemented by following simple rules:
 
-1. Once transaction is dirty (has changes) caching turns off. The is because the state of the database at this point is only visible to current transaction and should not affect other users and vice versa.
+1. Once transaction is dirty (has changes), caching turns off. The is because the state of the database at this point is only visible to current transaction and should not affect other users and vice versa.
 
 2. Any invalidating calls are scheduled to run on the outer commit of transaction.
 
@@ -644,7 +644,7 @@ Cacheops provides a way to share a redis instance by adding prefix to cache keys
     # or
     CACHEOPS_PREFIX = 'some.module.cacheops_prefix'
 
-A most common usage would probably be a prefix by host name:
+The most common usage would probably be a prefix by host name:
 
 .. code:: python
 
@@ -670,8 +670,8 @@ A ``query`` object passed to callback also enables reflection on used databases 
 Custom serialization
 --------------------
 
-Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own
-it might be any module or a class having `.dumps()` and `.loads()` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
+Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own,
+it might be any module or a class having ``.dumps()`` and ``.loads()`` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
 
 .. code:: python
 
@@ -691,15 +691,15 @@ One less obvious use is to fix pickle protocol, to use cacheops cache across pyt
 Using memory limit
 ------------------
 
-If your cache never grows too large you may not bother. But if you do you have some options.
+If your cache never grows too large you may not bother. But if you do, you have some options.
 Cacheops stores cached data along with invalidation data,
 so you can't just set ``maxmemory`` and let redis evict at its will.
 For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
 So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
 
 First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
-Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
-one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
+Redis, however, doesn't guarantee perfect TTL eviction order, it selects several keys and removes
+one with the least TTL. Thus the invalidator could be evicted before the cache key it refers to, leaving the cache key orphan and causing it to survive next invalidation.
 You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
 
 Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
