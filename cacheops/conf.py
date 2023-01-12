@@ -99,6 +99,9 @@ def model_profile(model):
     # Django migrations these fake models, we don't want to cache them
     if model.__module__ == '__fake__':
         return None
+    # FIX UpdateReturningModel form django_pg_returning
+    elif model._meta.app_label is None and model._meta.abstract:
+        return None
 
     model_profiles = prepare_profiles()
 
