@@ -1,8 +1,8 @@
 Cacheops |Build Status|
 ========
 
-A slick app that supports automatic or manual queryset caching and automatic
-granular event-driven invalidation.
+A slick app that supports automatic or manual queryset caching and `automatic
+granular event-driven invalidation <http://suor.github.io/blog/2014/03/09/on-orm-cache-invalidation/>`_.
 
 It uses `redis <http://redis.io/>`_ as backend for ORM cache and redis or
 filesystem for simple time-invalidated one.
@@ -15,15 +15,18 @@ And there is more to it:
 - dog-pile prevention mechanism
 - a couple of hacks to make django faster
 
+.. contents:: Contents
+    :local:
+    :backlinks: top
 
 Requirements
-------------
+++++++++++++
 
 Python 3.5+, Django 2.1+ and Redis 4.0+.
 
 
 Installation
-------------
+++++++++++++
 
 Using pip:
 
@@ -36,7 +39,7 @@ Using pip:
 
 
 Setup
------
++++++
 
 Add ``cacheops`` to your ``INSTALLED_APPS``.
 
@@ -157,7 +160,7 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 
 
 Usage
------
++++++
 
 | **Automatic caching**
 
@@ -289,7 +292,7 @@ Class based views can also be cached:
 
 
 Invalidation
-------------
+++++++++++++
 
 Cacheops uses both time and event-driven invalidation. The event-driven one
 listens on model signals and invalidates appropriate caches on ``Model.save()``, ``.delete()``
@@ -372,6 +375,9 @@ In the case you actually want to perform the latter cacheops provides a shortcut
     qs.invalidated_update(...)
 
 Note that all the updated objects are fetched twice, prior and post the update.
+
+Components
+++++++++++
 
 
 Simple time-invalidated cache
@@ -584,6 +590,9 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Special topics
+++++++++++++++
+
 Transactions
 ------------
 
@@ -728,11 +737,10 @@ Cache invalidation signal is emitted after object, model or global invalidation 
 Memory usage cleanup
 --------------------
 
-In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able
-to invalidate them. Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
-ignoring conjunction sets with some reasonable size.
+In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able to invalidate them. Those will still expire with age, but in the meantime may cause issues like slow invalidation (even "BUSY Redis ...") and extra memory usage. To prevent that it is advised to not cache complex queries, see `Perfomance tips <#performance-tips>`_, 5.
 
-It can be called using the ``reapconjs`` management command::
+Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
+ignoring conjunction sets with some reasonable size. It can be called using the ``reapconjs`` management command::
 
     ./manage.py reapconjs --chunk-size=100 --min-conj-set-size=10000  # with custom values
     ./manage.py reapconjs                                             # with default values (chunks=1000, min size=1000)
@@ -750,6 +758,9 @@ The command is a small wrapper that calls a function with the main logic. You ca
             min_conj_set_size=100,
         )
 
+
+Troubleshooting
++++++++++++++++
 
 CAVEATS
 -------
@@ -818,7 +829,7 @@ Here is how you do that. I suppose you have some application code causing it.
 
 
 TODO
-----
+++++
 
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate previous one with prefetch_related()
