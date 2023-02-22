@@ -1,3 +1,9 @@
+6.2
+- support Python 3.11 and Django 4.1
+- added command to clear stale cacheops keys (Bruno Alla)
+- fixed `invalidate_m2o` for polymorphic models (#430) (Andrey Alekseev)
+- updated README: TOC, link to the post, some explanations
+
 6.1
 - support Django 3.2 and 4.0 (thx to Olivér Kecskeméty)
 - do not gulp commit errors (Oleg Yamnikov)
