@@ -846,8 +846,3 @@ TODO
 
 .. |Build Status| image:: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml/badge.svg
    :target: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml?query=branch%3Amaster
-
-
-.. |Gitter| image:: https://badges.gitter.im/JoinChat.svg
-   :alt: Join the chat at https://gitter.im/Suor/django-cacheops
-   :target: https://gitter.im/Suor/django-cacheops?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
