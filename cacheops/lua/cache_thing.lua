@@ -47,15 +47,6 @@ for db_table, disj in pairs(dnfs) do
         redis.call('sadd', conj_key, key)
         -- NOTE: an invalidator should live longer than any key it references.
         --       So we update its ttl on every key if needed.
-        -- NOTE: if CACHEOPS_LRU is True when invalidators should be left persistent,
-        --       so we strip next section from this script.
-        -- TOSTRIP
-        local conj_ttl = redis.call('ttl', conj_key)
-        if conj_ttl < timeout then
-            -- We set conj_key life with a margin over key life to call expire rarer
-            -- And add few extra seconds to be extra safe
-            redis.call('expire', conj_key, timeout * 2 + 10)
-        end
-        -- /TOSTRIP
+        redis.call('expire', conj_key, timeout, 'gt')
     end
 end

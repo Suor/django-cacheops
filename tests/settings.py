@@ -108,7 +108,6 @@ CACHEOPS = {
 if os.environ.get('CACHEOPS_PREFIX'):
     CACHEOPS_PREFIX = lambda q: 'p:'
 
-CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
 CACHEOPS_INSIDEOUT = bool(os.environ.get('CACHEOPS_INSIDEOUT'))
 CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE'))
 ALLOWED_HOSTS = ['testserver']

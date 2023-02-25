@@ -15,7 +15,6 @@ class Defaults:
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
     CACHEOPS_PREFIX = lambda query: ''
-    CACHEOPS_LRU = False
     CACHEOPS_INSIDEOUT = False
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False

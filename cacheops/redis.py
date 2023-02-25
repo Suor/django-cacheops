@@ -53,16 +53,12 @@ def redis_client():
 
 ### Lua script loader
 
-import re
 import os.path
 
-STRIP_RE = re.compile(r'TOSTRIP.*/TOSTRIP', re.S)
 
 @memoize
-def load_script(name, strip=False):
+def load_script(name):
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
-    if strip:
-        code = STRIP_RE.sub('', code)
     return redis_client.register_script(code)

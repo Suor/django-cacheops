@@ -705,9 +705,6 @@ Redis however doesn't guarantee perfect TTL eviction order, it selects several k
 one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
 You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
 
-Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
-However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
-
 
 Keeping stats
 -------------

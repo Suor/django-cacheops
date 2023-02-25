@@ -41,7 +41,7 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
     else:
         if prefix and precall_key == "":
             precall_key = prefix
-        load_script('cache_thing', settings.CACHEOPS_LRU)(
+        load_script('cache_thing')(
             keys=[prefix, cache_key, precall_key],
             args=[
                 settings.CACHEOPS_SERIALIZER.dumps(data),
