@@ -1,5 +1,4 @@
 import sys
-import json
 import threading
 from random import random
 
@@ -24,8 +23,8 @@ except ImportError:
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, get_cache_key, cached_view_fab, family_has_profile
 from .utils import md5
+from .getset import cache_thing, getting
 from .sharding import get_prefix
-from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidation
 from .transaction import transaction_states
@@ -35,29 +34,6 @@ from .signals import cache_read
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
-
-
-@handle_connection_failure
-def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key=''):
-    """
-    Writes data to cache and creates appropriate invalidators.
-
-    If precall_key is not the empty string, the data will only be cached if the
-    precall_key is set to avoid caching stale data.
-    """
-    # Could have changed after last check, sometimes superficially
-    if transaction_states.is_dirty(dbs):
-        return
-    if prefix and precall_key == "":
-        precall_key = prefix
-    load_script('cache_thing', settings.CACHEOPS_LRU)(
-        keys=[prefix, cache_key, precall_key],
-        args=[
-            settings.CACHEOPS_SERIALIZER.dumps(data),
-            json.dumps(cond_dnfs, default=str),
-            timeout
-        ]
-    )
 
 
 def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
@@ -91,7 +67,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
 
     querysets = lmap(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
-    cond_dnfs = join_with(lcat, map(dnfs, querysets))
+    cond_dnfs = join_with(lcat, map(dnfs, querysets))  # TODO: use cached version?
     qs_keys = [qs._cache_key(prefix=False) for qs in querysets]
     if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
@@ -108,12 +84,22 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
             extra_val = extra(*args, **kwargs) if callable(extra) else extra
             cache_key = prefix + 'as:' + get_cache_key(func, args, kwargs, qs_keys, extra_val)
 
-            with redis_client.getting(cache_key, lock=lock) as cache_data:
+            with getting(cache_key, cond_dnfs, prefix, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
                     return settings.CACHEOPS_SERIALIZER.loads(cache_data)
                 else:
-                    if keep_fresh:
+                    precall_key = ''
+                    expected_checksum = ''
+                    if keep_fresh and settings.CACHEOPS_INSIDEOUT:
+                        # The conj stamps should not be dropped while we calculate the function.
+                        # But being filled in concurrently is a normal concurrent cache write.
+                        # However, if they are filled in and then dropped, we cannot detect that.
+                        # Unless we fill them ourselves and get expected checksum now. We also need
+                        # to fill in schemes, so we just reuse the cache_thing().
+                        expected_checksum = cache_thing(prefix, cache_key, '', cond_dnfs, timeout,
+                                                        dbs=dbs, expected_checksum='never match')
+                    elif keep_fresh:
                         # We call this "asp" for "as precall" because this key is
                         # cached before the actual function is called. We randomize
                         # the key to prevent falsely thinking the key was not
@@ -126,12 +112,10 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
                         # only if it remains valid before, during, and after the
                         # call, the result can be cached and returned.
                         cache_thing(prefix, precall_key, 'PRECALL', cond_dnfs, timeout, dbs=dbs)
-                    else:
-                        precall_key = ''
 
                     result = func(*args, **kwargs)
                     cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs,
-                                precall_key=precall_key)
+                                precall_key=precall_key, expected_checksum=expected_checksum)
                     return result
 
         return wrapper
@@ -275,7 +259,7 @@ class QuerySetMixin(object):
         cache_key = self._cache_key()
         lock = self._cacheprofile['lock']
 
-        with redis_client.getting(cache_key, lock=lock) as cache_data:
+        with getting(cache_key, self._cond_dnfs, self._prefix, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
                 self._result_cache = settings.CACHEOPS_SERIALIZER.loads(cache_data)

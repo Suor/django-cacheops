@@ -16,7 +16,7 @@ def run_benchmarks(tests):
         if 'h' in flags:
             print(HEADER_TEMPLATE % name)
         time = bench_test(test)
-        print('%-18s time: %.2fms' % (name, time * 1000))
+        print('%-18s time: %.3fms' % (name, time * 1000))
 
 def bench_test(test):
     prepared = None
@@ -80,6 +80,9 @@ try:
     call_command('makemigrations', 'tests', verbosity=0)
     db_name = connection.creation.create_test_db(verbosity=verbosity, autoclobber=not interactive)
     call_command('loaddata', *fixtures, **{'verbosity': verbosity})
+
+    from cacheops.redis import redis_client
+    redis_client.flushdb()
 
     from tests.bench import TESTS  # import is here because it executes queries
     if selector:

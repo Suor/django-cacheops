@@ -90,11 +90,12 @@ class BasicTests(BaseTestCase):
 
     def test_invalidate_by_boolean(self):
         count = Post.objects.cache().filter(visible=True).count()
+        with self.assertNumQueries(0):
+            Post.objects.cache().filter(visible=True).count()
 
         post = Post.objects.get(pk=1, visible=True)
         post.visible = False
         post.save()
-
         with self.assertNumQueries(1):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
@@ -829,11 +830,10 @@ class M2MTests(BaseTestCase):
     def test_granular_through_on_clear(self):
         through_qs = self.brand_cls.labels.through.objects.cache() \
                                                   .filter(brand=self.bs, label=self.slow)
-        self._template(
-            lambda: through_qs.get(),
-            lambda: self.bf.labels.clear(),
-            should_invalidate=False
-        )
+        through_qs.get()
+        self.bf.labels.clear()
+        with self.assertNumQueries(0):
+            through_qs.get()
 
     def test_granular_target_on_clear(self):
         self._template(
