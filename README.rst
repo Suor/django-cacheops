@@ -674,7 +674,7 @@ Custom serialization
 --------------------
 
 Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own
-it might be any module or a class having `.dumps()` and `.loads()` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
+it might be any module or a class having ``.dumps()`` and ``.loads()`` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
 
 .. code:: python
 
@@ -694,16 +694,45 @@ One less obvious use is to fix pickle protocol, to use cacheops cache across pyt
 Using memory limit
 ------------------
 
-If your cache never grows too large you may not bother. But if you do you have some options.
-Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will.
-For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
-So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
+Cacheops offers an "insideout" mode, which idea is instead of conj sets contatining cache keys, cache values contain a checksum of random stamps stored in conj keys, which are checked on each read to stay the same. To use that add to settings:
 
-First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
-Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
-one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
-You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
+.. code:: python
+
+    CACHEOPS_INSIDEOUT = True  # Might become default in future
+
+And set up ``maxmemory`` and ``maxmemory-policy`` in redis config::
+
+    maxmemory 4gb
+    maxmemory-policy volatile-lru  # or other volatile-*
+
+Note that using any of ``allkeys-*`` policies might drop important invalidation structures of cacheops and lead to stale cache.
+
+
+Memory usage cleanup
+--------------------
+
+**This does not apply to "insideout" mode. This issue doesn't happen there.**
+
+In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able to invalidate them. Those will still expire with age, but in the meantime may cause issues like slow invalidation (even "BUSY Redis ...") and extra memory usage. To prevent that it is advised to not cache complex queries, see `Perfomance tips <#performance-tips>`_, 5.
+
+Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
+ignoring conjunction sets with some reasonable size. It can be called using the ``reapconjs`` management command::
+
+    ./manage.py reapconjs --chunk-size=100 --min-conj-set-size=10000  # with custom values
+    ./manage.py reapconjs                                             # with default values (chunks=1000, min size=1000)
+
+The command is a small wrapper that calls a function with the main logic. You can also call it from your code, for example from a Celery task:
+
+.. code:: python
+
+    from cacheops import reap_conjs
+
+    @app.task
+    def reap_conjs_task():
+        reap_conjs(
+            chunk_size=2000,
+            min_conj_set_size=100,
+        )
 
 
 Keeping stats
@@ -728,31 +757,6 @@ Here is a simple stats implementation:
     cache_read.connect(stats_collector)
 
 Cache invalidation signal is emitted after object, model or global invalidation passing ``sender`` and ``obj_dict`` args. Note that during normal operation cacheops only uses object invalidation, calling it once for each model create/delete and twice for update: passing old and new object dictionary.
-
-
-Memory usage cleanup
---------------------
-
-In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able to invalidate them. Those will still expire with age, but in the meantime may cause issues like slow invalidation (even "BUSY Redis ...") and extra memory usage. To prevent that it is advised to not cache complex queries, see `Perfomance tips <#performance-tips>`_, 5.
-
-Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
-ignoring conjunction sets with some reasonable size. It can be called using the ``reapconjs`` management command::
-
-    ./manage.py reapconjs --chunk-size=100 --min-conj-set-size=10000  # with custom values
-    ./manage.py reapconjs                                             # with default values (chunks=1000, min size=1000)
-
-The command is a small wrapper that calls a function with the main logic. You can also call it from your code, for example from a Celery task:
-
-.. code:: python
-
-    from cacheops import reap_conjs
-
-    @app.task
-    def reap_conjs_task():
-        reap_conjs(
-            chunk_size=2000,
-            min_conj_set_size=100,
-        )
 
 
 Troubleshooting
@@ -791,13 +795,13 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
-2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return the clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return the clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning:
+
+   .. code:: python
 
     items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
 
-   You can revert queryset to cloning state using ``.cloning()`` call.
-
-   Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
+   You can revert queryset to cloning state using ``.cloning()`` call. Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
 
 3. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
 
