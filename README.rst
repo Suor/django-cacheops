@@ -809,9 +809,19 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 5. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
-   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
+   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model (negligable for "insideout" mode). You can disable caching if more than some amount of fields is used in filter simultaneously.
 
-6. Split database queries into smaller ones when you cache them. This goes against usual approach, but this allows invalidation to be more granular: smaller parts will be invalidated independently and each part will invalidate more precisely. E.g. `Post.objects.filter(category__slug="foo")` and `Post.objects.filter(category=Category.objects.get(slug="foo"))`
+6. Split database queries into smaller ones when you cache them. This goes against usual approach, but this allows invalidation to be more granular: smaller parts will be invalidated independently and each part will invalidate more precisely.
+
+   .. code:: python
+
+    Post.objects.filter(category__slug="foo")
+    # A single database query, but will be invalidated not only on
+    # any Category with .slug == "foo" change, but also for any Post change
+
+    Post.objects.filter(category=Category.objects.get(slug="foo"))
+    # Two queries, each invalidates only on a granular event:
+    # either category.slug == "foo" or Post with .category_id == <whatever is there>
 
 
 Writing a test
