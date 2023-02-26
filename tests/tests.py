@@ -784,6 +784,15 @@ class AggregationTests(BaseTestCase):
         with self.assertNumQueries(1):
             qs.aggregate(posts_count=Count('posts'))
 
+    def test_aggregate_granular(self):
+        cat1, cat2 = Category.objects.all()[:2]
+        qs = Category.objects.cache().filter(id=cat1.id)
+        qs.aggregate(posts_count=Count('posts'))
+        # Test invalidation
+        Post.objects.create(title='New One', category=cat2)
+        with self.assertNumQueries(0):
+            qs.aggregate(posts_count=Count('posts'))
+
 
 class M2MTests(BaseTestCase):
     brand_cls = Brand
