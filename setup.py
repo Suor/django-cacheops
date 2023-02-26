@@ -22,7 +22,7 @@ setup(
         'cacheops.management.commands',
         'cacheops.templatetags'
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.7',
     install_requires=[
         'django>=3.2',
         'redis>=3.0.0',
