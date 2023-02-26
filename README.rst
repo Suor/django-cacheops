@@ -667,8 +667,6 @@ A ``query`` object passed to callback also enables reflection on used databases 
         if query.tables == ['blog_post']:
             return 'blog:'
 
-**NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
-
 
 Custom serialization
 --------------------
