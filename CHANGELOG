@@ -1,3 +1,9 @@
+- added a new insideout mode
+- made join invalidation more granular
+Backwards incompatible changes:
+- dropped Python 3.5, 3.6 and Django 2.1, 2.2, 3.0 and 3.1 support
+- removed CACHEOPS_LRU
+
 6.2
 - support Python 3.11 and Django 4.1
 - added command to clear stale cacheops keys (Bruno Alla)
