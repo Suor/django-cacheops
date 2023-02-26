@@ -3,22 +3,15 @@ import threading
 from random import random
 
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
-from funcy import lmap, map, lcat, join_with
+from funcy import lmap, lcat, join_with
 
 from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
-from django.db import DEFAULT_DB_ALIAS
-from django.db import models
+from django.db import DEFAULT_DB_ALIAS, connections, models
 from django.db.models.manager import BaseManager
+from django.db.models.query import MAX_GET_RESULTS
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 from django.db.transaction import atomic
-
-# This thing reappeared in Django 3.0
-try:
-    from django.db.models.query import MAX_GET_RESULTS
-    from django.db import connections
-except ImportError:
-    MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, get_cache_key, cached_view_fab, family_has_profile
@@ -462,7 +455,7 @@ class ManagerMixin(object):
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
             qs = sender.objects.inplace().using(using).filter(**cond).order_by()
-            # Mimic Django 3.0 .get() logic
+            # Mimic Django .get() logic
             if MAX_GET_RESULTS and (
                     not qs.query.select_for_update
                     or connections[qs.db].features.supports_select_for_update_with_limit):
@@ -596,11 +589,3 @@ def install_cacheops():
     # Make buffers/memoryviews pickleable to serialize binary field data
     import copyreg
     copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
-
-    # Fix random ordered dict keys producing different SQL for same QuerySet
-    if (3, 3) <= sys.version_info < (3, 6):
-        from django.db.models.query_utils import Q
-
-        def Q__init__(self, *args, **kwargs):  # noqa
-            super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
-        Q.__init__ = Q__init__

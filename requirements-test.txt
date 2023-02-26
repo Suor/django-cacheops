@@ -1,4 +1,4 @@
-django>=1.8
+django>=3.2
 redis>=3.0.0
 funcy>=1.8,<2.0
 before_after==1.0.0
