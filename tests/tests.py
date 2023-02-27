@@ -295,7 +295,8 @@ class DecoratorTests(BaseTestCase):
         view(factory.get('/hi'))
 
 
-from datetime import date, datetime, time
+from datetime import date, time
+from django.utils import timezone
 
 class WeirdTests(BaseTestCase):
     def _template(self, field, value):
@@ -314,7 +315,7 @@ class WeirdTests(BaseTestCase):
 
     def test_datetime(self):
         # NOTE: some databases (mysql) don't store microseconds
-        self._template('datetime_field', datetime.now().replace(microsecond=0))
+        self._template('datetime_field', timezone.now().replace(microsecond=0))
 
     def test_time(self):
         self._template('time_field', time(10, 30))

@@ -1,11 +1,12 @@
 import os
 import uuid
-from datetime import date, datetime, time
+from datetime import date, time
 
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql, manager
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 ### For basic tests and bench
@@ -95,7 +96,7 @@ def custom_value_default():
 
 class Weird(models.Model):
     date_field = models.DateField(default=date(2000, 1, 1))
-    datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
+    datetime_field = models.DateTimeField(default=timezone.now)
     time_field = models.TimeField(default=time(10, 10))
     list_field = IntegerArrayField(default=list, blank=True)
     custom_field = CustomField(default=custom_value_default)

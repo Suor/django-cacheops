@@ -54,7 +54,7 @@ jobs:
             - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
 
-    name: ${{ matrix.experimental && 'Django master [ok to fail]' || format('Python {0}', matrix.python-version) }}
+    name: ${{ matrix.experimental && 'Django main [ok to fail]' || format('Python {0}', matrix.python-version) }}
     steps:
       - uses: actions/checkout@v2
       - name: Setup python
@@ -67,6 +67,6 @@ jobs:
         run: pip install tox tox-gh-actions
 
       - name: "Run tests"
-        run: tox ${{ matrix.experimental && '-e py310-djmaster' || '' }}
+        run: tox ${{ matrix.experimental && '-e py310-djmain' || '' }}
         env:
           MYSQL_HOST: 127.0.0.1
