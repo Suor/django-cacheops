@@ -103,7 +103,6 @@ def dnfs(qs):
         # Any empty conjunction eats up the rest
         # NOTE: a more elaborate DNF reduction is not really needed,
         #       just keep your querysets sane.
-        # BUG: On self join this will wipe up valuable data
         if not all(cleaned):
             return [{}]
         return cleaned

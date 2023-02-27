@@ -274,14 +274,11 @@ class QuerySetMixin(object):
 
     def aggregate(self, *args, **kwargs):
         if self._should_cache('aggregate'):
-            # Apply all aggregates the same way original .aggregate(), but do not perform sql
-            kwargs = kwargs.copy()
-            for arg in args:
-                kwargs[arg.default_alias] = arg
-
+            # We resolve aggregates to add joins, which will affect query DNF
             qs = self._clone()
-            for (alias, aggregate_expr) in kwargs.items():
-                qs.query.add_annotation(aggregate_expr, alias, is_summary=True)
+            for aggregate_expr in chain(args, kwargs.values()):
+                aggregate_expr.resolve_expression(
+                    qs.query, allow_joins=True, reuse=None, summarize=True)
 
             # Use resulting qs as a ref
             return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
