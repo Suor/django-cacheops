@@ -31,12 +31,22 @@ elif re.search(r'^\d+', names):
 elif not names.startswith('tests.'):
     names = 'tests.tests.' + names
 
+# Filter by test name
+from argparse import ArgumentParser
+parser = ArgumentParser()
+parser.add_argument('-k', action='append')
+patterns = parser.parse_known_args(sys.argv)[0].k
+if patterns:
+    names = 'tests'
 
 # NOTE: we create migrations each time  since they depend on type of database,
 #       python and django versions
 try:
     shutil.rmtree('tests/migrations', True)
     call_command('makemigrations', 'tests', verbosity=2 if '-v' in sys.argv else 0)
-    call_command('test', names, failfast='-x' in sys.argv, verbosity=2 if '-v' in sys.argv else 1)
+    call_command('test', names,
+                 failfast='-x' in sys.argv,
+                 verbosity=2 if '-v' in sys.argv else 1,
+                 test_name_patterns=patterns)
 finally:
     shutil.rmtree('tests/migrations', True)
