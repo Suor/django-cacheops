@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.8
@@ -21,7 +21,7 @@ jobs:
       run: flake8
 
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
