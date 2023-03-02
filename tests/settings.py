@@ -14,6 +14,7 @@ MIDDLEWARE_CLASSES = []
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+USE_TZ = True
 
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
@@ -34,6 +35,14 @@ if os.environ.get('CACHEOPS_DB') == 'postgresql':
             'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
     }
+
+    # Use psycopg2cffi for PyPy
+    try:
+        import psycopg2  # noqa
+    except ImportError:
+        from psycopg2cffi import compat
+        compat.register()
+
 elif os.environ.get('CACHEOPS_DB') == 'postgis':
     POSTGIS_VERSION = (2, 1, 1)
     DATABASES = {
