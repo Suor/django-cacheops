@@ -1,3 +1,4 @@
+- support Django 4.2b and 5.0a
 - added a new insideout mode
 - made join invalidation more granular
 Backwards incompatible changes:

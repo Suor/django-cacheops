@@ -830,10 +830,10 @@ Here is how you do that. I suppose you have some application code causing it.
 
 1. Make a fork.
 2. Install all from ``requirements-test.txt``.
-3. Ensure you can run tests with ``./run_tests.py``.
+3. Ensure you can run tests with ``pytest``.
 4. Copy relevant models code to ``tests/models.py``.
 5. Go to ``tests/tests.py`` and paste code causing exception to ``IssueTests.test_{issue_number}``.
-6. Execute ``./run_tests.py {issue_number}`` and see it failing.
+6. Execute ``pytest -k {issue_number}`` and see it failing.
 7. Cut down model and test code until error disappears and make a step back.
 8. Commit changes and make a pull request.
 
