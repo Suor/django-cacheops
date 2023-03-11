@@ -1,4 +1,4 @@
-__version__ = '6.2'
+__version__ = '7.0'
 VERSION = tuple(map(int, __version__.split('.')))
 
 from .simple import *  # noqa
