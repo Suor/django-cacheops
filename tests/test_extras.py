@@ -104,7 +104,7 @@ class LockingTests(BaseTestCase):
         def second_thread():
             def _target():
                 try:
-                    with before('redis.StrictRedis.brpoplpush', lambda *a, **kw: locked.set()):
+                    with before('redis.Redis.brpoplpush', lambda *a, **kw: locked.set()):
                         results.append(func())
                 except Exception:
                     locked.set()

@@ -27,7 +27,7 @@ def redis_client():
     if settings.CACHEOPS_REDIS and settings.CACHEOPS_SENTINEL:
         raise ImproperlyConfigured("CACHEOPS_REDIS and CACHEOPS_SENTINEL are mutually exclusive")
 
-    client_class = redis.StrictRedis
+    client_class = redis.Redis
     if settings.CACHEOPS_CLIENT_CLASS:
         client_class = import_string(settings.CACHEOPS_CLIENT_CLASS)
 

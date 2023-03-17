@@ -75,7 +75,7 @@ Setup redis connection and enable caching for desired models:
         ...                                  # everything else is passed to Sentinel()
     }
 
-    # Use your own redis client class, should be compatible or subclass redis.StrictRedis
+    # Use your own redis client class, should be compatible or subclass redis.Redis
     CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
 
     CACHEOPS = {
