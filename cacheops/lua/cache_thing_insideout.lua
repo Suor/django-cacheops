@@ -19,7 +19,17 @@ for _, conj_key in ipairs(conj_keys) do
     table.insert(stamps, stamp)
     -- NOTE: an invalidator should live longer than any key it references.
     --       So we update its ttl on every key if needed.
+    -- REDIS_7
     redis.call('expire', conj_key, timeout, 'gt')
+    -- /REDIS_7
+    -- REDIS_6
+    local conj_ttl = redis.call('ttl', conj_key)
+    if conj_ttl < timeout then
+        -- We set conj_key life with a margin over key life to call expire rarer
+        -- And add few extra seconds to be extra safe
+        redis.call('expire', conj_key, timeout * 2 + 10)
+    end
+    -- /REDIS_6
 end
 
 -- Write data to cache along with a checksum of the stamps to see if any of them changed

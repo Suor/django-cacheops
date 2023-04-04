@@ -54,6 +54,7 @@ def redis_client():
 ### Lua script loader
 
 import os.path
+import re
 
 
 @memoize
@@ -61,4 +62,14 @@ def load_script(name):
     filename = os.path.join(os.path.dirname(__file__), 'lua/%s.lua' % name)
     with open(filename) as f:
         code = f.read()
+    if is_redis_7():
+        code = re.sub(r'REDIS_6.*?/REDIS_6', '', code, flags=re.S)
+    else:
+        code = re.sub(r'REDIS_7.*?/REDIS_7', '', code, flags=re.S)
     return redis_client.register_script(code)
+
+
+@memoize
+def is_redis_7():
+    redis_version = redis_client.info('server')['redis_version']
+    return int(redis_version.split('.')[0]) >= 7
