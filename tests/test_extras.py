@@ -6,7 +6,7 @@ from cacheops.conf import settings
 from cacheops.signals import cache_read, cache_invalidated
 
 from .utils import BaseTestCase, make_inc
-from .models import Post, Category, Local, DbAgnostic, DbBinded
+from .models import Post, Category, Local, DbAgnostic, DbBinded, Abs
 
 
 class SettingsTests(TestCase):
@@ -183,3 +183,9 @@ class DbAgnosticTests(BaseTestCase):
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
+
+
+def test_abstract_family():
+    from cacheops.utils import model_family
+
+    assert model_family(Abs) == []

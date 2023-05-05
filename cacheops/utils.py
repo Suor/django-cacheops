@@ -9,22 +9,24 @@ from django.http import HttpRequest
 from .conf import model_profile
 
 
-def get_concrete_model(model):
+def get_table_model(model):
     return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
                  and not b._meta.proxy and not b._meta.abstract), None)
 
 def model_family(model):
     """
-    Returns a list of all proxy models, including subclasess, superclasses and siblings.
+    The family is models sharing a database table, events on one should affect each other.
+
+    We simply collect a list of all proxy models, including subclasess, superclasses and siblings.
+    Two descendants of an abstract model are not family - they cannot affect each other.
     """
     def class_tree(cls):
         return [cls] + lmapcat(class_tree, cls.__subclasses__())
 
     # NOTE: we also list multitable submodels here, we just don't care.
     #       Cacheops doesn't support them anyway.
-    # NOTE: when this is called in Manager.contribute_to_class()
-    #       ._meta.concrete_model might still be None
-    return class_tree(model._meta.concrete_model or get_concrete_model(model) or model)
+    table_model = get_table_model(model)
+    return class_tree(table_model) if table_model else []
 
 
 @memoize

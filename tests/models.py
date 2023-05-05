@@ -307,3 +307,8 @@ class Client(models.Model):
         setattr(self, '_get_private_data', curry(sum, [1, 2, 3, 4]))
 
     name = models.CharField(max_length=255)
+
+
+class Abs(models.Model):
+    class Meta:
+        abstract = True

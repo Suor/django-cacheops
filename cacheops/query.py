@@ -393,13 +393,12 @@ class ManagerMixin(object):
         if not hasattr(module, cls.__name__):
             setattr(module, cls.__name__, cls)
 
-    # This is probably still needed if models are created dynamically
+    # This is probably still needed if models are created dynamically or imported late
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
-        # Django migrations create lots of fake models, just skip them
-        # NOTE: we make it here rather then inside _install_cacheops()
+        # NOTE: we check it here rather then inside _install_cacheops()
         #       because we don't want @once_per() to hold refs to all of them.
-        if cls.__module__ != '__fake__' and family_has_profile(cls):
+        if family_has_profile(cls):
             self._install_cacheops(cls)
 
     @skip_on_no_invalidation

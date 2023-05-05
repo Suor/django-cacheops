@@ -961,6 +961,13 @@ class ProxyTests(BaseTestCase):
         with self.assertRaises(NonCachedMedia.DoesNotExist):
             MediaProxy.objects.cache().get(title=media.title)
 
+    def test_siblings(self):
+        list(VideoProxy.objects.cache())
+        NonCachedVideoProxy.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(VideoProxy.objects.cache())
+
     def test_proxy_caching(self):
         video = Video.objects.create(title='Pulp Fiction')
         self.assertEqual(type(Video.objects.cache().get(pk=video.pk)),
