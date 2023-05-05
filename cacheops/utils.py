@@ -8,6 +8,13 @@ from django.http import HttpRequest
 
 from .conf import model_profile
 
+def _check_request(request):
+    # Ensure argument looks like a request.
+    if not hasattr(request, "META"):
+        raise TypeError(
+            f"A view should be passed with HttpRequest as first argument. If you are "
+            "decorating a classmethod, be sure to use @method_decorator."
+        )
 
 def get_table_model(model):
     return next((b for b in model.__mro__ if issubclass(b, models.Model) and b is not models.Model
@@ -105,8 +112,9 @@ def cached_view_fab(_cached):
 
             @wraps(func)
             def wrapper(request, *args, **kwargs):
-                assert isinstance(request, HttpRequest),                            \
-                       "A view should be passed with HttpRequest as first argument"
+
+                _check_request(request)
+                
                 if request.method not in ('GET', 'HEAD'):
                     return func(request, *args, **kwargs)
 
