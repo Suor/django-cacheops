@@ -4,7 +4,6 @@ import inspect
 from funcy import memoize, compose, wraps, any, any_fn, select_values, lmapcat
 
 from django.db import models
-from django.http import HttpRequest
 
 from .conf import model_profile
 
@@ -12,7 +11,7 @@ def _check_request(request):
     # Ensure argument looks like a request.
     if not hasattr(request, "META"):
         raise TypeError(
-            f"A view should be passed with HttpRequest as first argument. If you are "
+            "A view should be passed with HttpRequest as first argument. If you are "
             "decorating a classmethod, be sure to use @method_decorator."
         )
 
@@ -114,7 +113,7 @@ def cached_view_fab(_cached):
             def wrapper(request, *args, **kwargs):
 
                 _check_request(request)
-                
+
                 if request.method not in ('GET', 'HEAD'):
                     return func(request, *args, **kwargs)
 
