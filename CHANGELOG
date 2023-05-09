@@ -1,3 +1,8 @@
+7.0.1
+- made it work with Redis 6.x and older again
+- handle abstract models better
+- some docs improvements
+
 7.0
 - support Django 4.2b and 5.0a
 - added a new insideout mode
