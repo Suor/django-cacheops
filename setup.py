@@ -26,7 +26,7 @@ setup(
     install_requires=[
         'django>=3.2',
         'redis>=3.0.0',
-        'funcy>=1.8,<2.0',
+        'funcy>=1.8,<3.0',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
