@@ -15,7 +15,8 @@ end
 local stamps = {}
 local rnd = tostring(math.random())  -- A new value for empty stamps
 for _, conj_key in ipairs(conj_keys) do
-    local stamp = redis.call('set', conj_key, rnd, 'nx', 'get') or rnd
+    local stamp = redis.pcall('set', conj_key, rnd, 'nx', 'get')
+    if not stamp or stamp['err'] ~= nil then stamp = rnd end
     table.insert(stamps, stamp)
     -- NOTE: an invalidator should live longer than any key it references.
     --       So we update its ttl on every key if needed.
