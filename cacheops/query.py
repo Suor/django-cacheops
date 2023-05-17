@@ -274,14 +274,33 @@ class QuerySetMixin(object):
 
     def aggregate(self, *args, **kwargs):
         if self._should_cache('aggregate'):
-            # We resolve aggregates to add joins, which will affect query DNF
-            qs = self._clone()
-            for aggregate_expr in chain(args, kwargs.values()):
-                aggregate_expr.resolve_expression(
-                    qs.query, allow_joins=True, reuse=None, summarize=True)
+            # Apply all aggregates the same way original .aggregate() does, but do not perform sql.
+            # This code is mostly taken from QuerySet.aggregate().
+            normalized_kwargs = kwargs.copy()
+            for arg in args:
+                try:
+                    normalized_kwargs[arg.default_alias] = arg
+                except (AttributeError, TypeError):
+                    # Let Django raise a proper error
+                    return self._no_monkey.aggregate(*args, **kwargs)
 
-            # Use resulting qs as a ref
-            return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
+            # Simulate Query.get_aggregation() preparations, this adds proper joins to qs.query
+            if not normalized_kwargs:
+                return {}
+
+            qs = self._clone()
+            aggregates = {}
+            for alias, aggregate_expr in normalized_kwargs.items():
+                aggregate = aggregate_expr.resolve_expression(
+                    qs.query, allow_joins=True, reuse=None, summarize=True
+                )
+                if not aggregate.contains_aggregate:
+                    raise TypeError("%s is not an aggregate expression" % alias)
+                aggregates[alias] = aggregate
+
+            # Use resulting qs as a ref, aggregates still contain names, etc
+            func = lambda: self._no_monkey.aggregate(self, *args, **kwargs)
+            return cached_as(qs, extra=aggregates)(func)()
         else:
             return self._no_monkey.aggregate(self, *args, **kwargs)
 

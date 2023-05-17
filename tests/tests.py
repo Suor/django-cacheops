@@ -10,7 +10,7 @@ from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.template import Context, Template
-from django.db.models import F, Count, OuterRef, Sum, Subquery, Exists
+from django.db.models import F, Count, Max, OuterRef, Sum, Subquery, Exists, Q
 from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
@@ -793,6 +793,16 @@ class AggregationTests(BaseTestCase):
         Post.objects.create(title='New One', category=cat2)
         with self.assertNumQueries(0):
             qs.aggregate(posts_count=Count('posts'))
+
+    def test_new_alias(self):
+        qs = Post.objects.cache()
+        assert qs.aggregate(max=Max('category')) == {'max': 3}
+        assert qs.aggregate(cat=Max('category')) == {'cat': 3}
+
+    def test_filter(self):
+        qs = Post.objects.cache()
+        assert qs.aggregate(cnt=Count('category', filter=Q(category__gt=1))) == {'cnt': 2}
+        assert qs.aggregate(cnt=Count('category', filter=Q(category__lt=3))) == {'cnt': 1}
 
 
 class M2MTests(BaseTestCase):
