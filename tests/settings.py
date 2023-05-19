@@ -111,6 +111,7 @@ CACHEOPS = {
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
+    'tests.noprofile': None,
     'auth.*': {},
 }
 

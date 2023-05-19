@@ -6,7 +6,7 @@ from cacheops.conf import settings
 from cacheops.signals import cache_read, cache_invalidated
 
 from .utils import BaseTestCase, make_inc
-from .models import Post, Category, Local, DbAgnostic, DbBinded, Abs
+from .models import Post, Category, Local, DbAgnostic, DbBinded
 
 
 class SettingsTests(TestCase):
@@ -185,7 +185,22 @@ class DbAgnosticTests(BaseTestCase):
             list(DbBinded.objects.cache().using('slave'))
 
 
-def test_abstract_family():
+def test_model_family():
     from cacheops.utils import model_family
+    from .models import Abs, Concrete1, AbsChild, Concrete2
+    from .models import NoProfile, NoProfileProxy, AbsNoProfile, NoProfileChild, Mess, MessChild
 
-    assert model_family(Abs) == []
+    # Abstract models do not have family, children of an abstract model are not a family
+    assert model_family(Abs) == set()
+    assert model_family(Concrete1) == {Concrete1}
+    assert model_family(AbsChild) == set()
+    assert model_family(Concrete2) == {Concrete2}
+
+    # Everything in but an abstract model
+    assert model_family(NoProfile) == {NoProfile, NoProfileProxy, NoProfileChild}
+    assert model_family(NoProfileProxy) == {NoProfile, NoProfileProxy, NoProfileChild}
+    assert model_family(AbsNoProfile) == set()
+    assert model_family(NoProfileChild) == {NoProfile, NoProfileProxy, NoProfileChild}
+
+    # The worst of multiple inheritance
+    assert model_family(Mess) == {Mess, MessChild, Post, Category}

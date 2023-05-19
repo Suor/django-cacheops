@@ -309,6 +309,38 @@ class Client(models.Model):
     name = models.CharField(max_length=255)
 
 
+# Abstract models
 class Abs(models.Model):
     class Meta:
         abstract = True
+
+class Concrete1(Abs):
+    pass
+
+class AbsChild(Abs):
+    class Meta:
+        abstract = True
+
+class Concrete2(AbsChild):
+    pass
+
+class NoProfile(models.Model):
+    title = models.CharField(max_length=128)
+
+class NoProfileProxy(NoProfile):
+    class Meta:
+        proxy = True
+
+class AbsNoProfile(NoProfile):
+    class Meta:
+        abstract = True
+
+class NoProfileChild(AbsNoProfile):
+    pass
+
+
+class Mess(Post, Category):
+    pass
+
+class MessChild(Mess):
+    pass

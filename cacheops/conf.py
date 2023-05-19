@@ -96,7 +96,7 @@ def model_profile(model):
     """
     Returns cacheops profile for a model
     """
-    assert not model._meta.abstract, "This should be handled by caller"
+    assert not model._meta.abstract, "Can't get profile for %s" % model
     # Django migrations create lots of fake models, just skip them
     if model.__module__ == '__fake__':
         return None
