@@ -50,13 +50,13 @@ for db_table, disj in pairs(dnfs) do
         -- REDIS_7
         redis.call('expire', conj_key, timeout, 'gt')
         -- /REDIS_7
-        -- REDIS_6
+        -- REDIS_4
         local conj_ttl = redis.call('ttl', conj_key)
         if conj_ttl < timeout then
             -- We set conj_key life with a margin over key life to call expire rarer
             -- And add few extra seconds to be extra safe
             redis.call('expire', conj_key, timeout * 2 + 10)
         end
-        -- /REDIS_6
+        -- /REDIS_4
     end
 end

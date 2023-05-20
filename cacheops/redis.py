@@ -63,7 +63,7 @@ def load_script(name):
     with open(filename) as f:
         code = f.read()
     if is_redis_7():
-        code = re.sub(r'REDIS_6.*?/REDIS_6', '', code, flags=re.S)
+        code = re.sub(r'REDIS_4.*?/REDIS_4', '', code, flags=re.S)
     else:
         code = re.sub(r'REDIS_7.*?/REDIS_7', '', code, flags=re.S)
     return redis_client.register_script(code)

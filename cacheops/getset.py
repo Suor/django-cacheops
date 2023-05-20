@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import hashlib
 import json
+import random
 
 from .conf import settings
 from .redis import redis_client, handle_connection_failure, load_script
@@ -35,6 +36,8 @@ def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key
                 json.dumps(schemes),
                 json.dumps(conj_keys),
                 timeout,
+                # Need to pass it from here since random inside is not seeded in Redis pre 7.0
+                random.random(),
                 expected_checksum,
             ]
         )

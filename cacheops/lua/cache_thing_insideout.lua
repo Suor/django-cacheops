@@ -4,7 +4,8 @@ local data = ARGV[1]
 local schemes = cjson.decode(ARGV[2])
 local conj_keys = cjson.decode(ARGV[3])
 local timeout = tonumber(ARGV[4])
-local expected_checksum = ARGV[5]
+local rnd = ARGV[5]  -- A new value for empty stamps
+local expected_checksum = ARGV[6]
 
 -- Ensure schemes are known
 for db_table, _schemes in pairs(schemes) do
@@ -13,23 +14,31 @@ end
 
 -- Fill in invalidators and collect stamps
 local stamps = {}
-local rnd = tostring(math.random())  -- A new value for empty stamps
 for _, conj_key in ipairs(conj_keys) do
+    -- REDIS_7
     local stamp = redis.call('set', conj_key, rnd, 'nx', 'get') or rnd
+    -- /REDIS_7
+    -- REDIS_4
+    local stamp = redis.call('get', conj_key)
+    if not stamp then
+        stamp = rnd
+        redis.call('set', conj_key, rnd)
+    end
+    -- /REDIS_4
     table.insert(stamps, stamp)
     -- NOTE: an invalidator should live longer than any key it references.
     --       So we update its ttl on every key if needed.
     -- REDIS_7
     redis.call('expire', conj_key, timeout, 'gt')
     -- /REDIS_7
-    -- REDIS_6
+    -- REDIS_4
     local conj_ttl = redis.call('ttl', conj_key)
     if conj_ttl < timeout then
         -- We set conj_key life with a margin over key life to call expire rarer
         -- And add few extra seconds to be extra safe
         redis.call('expire', conj_key, timeout * 2 + 10)
     end
-    -- /REDIS_6
+    -- /REDIS_4
 end
 
 -- Write data to cache along with a checksum of the stamps to see if any of them changed
