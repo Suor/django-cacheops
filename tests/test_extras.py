@@ -188,7 +188,8 @@ class DbAgnosticTests(BaseTestCase):
 def test_model_family():
     from cacheops.utils import model_family
     from .models import Abs, Concrete1, AbsChild, Concrete2
-    from .models import NoProfile, NoProfileProxy, AbsNoProfile, NoProfileChild, Mess, MessChild
+    from .models import NoProfile, NoProfileProxy, AbsNoProfile, NoProfileChild
+    from .models import ParentId, ParentStr, Mess, MessChild
 
     # Abstract models do not have family, children of an abstract model are not a family
     assert model_family(Abs) == set()
@@ -203,4 +204,4 @@ def test_model_family():
     assert model_family(NoProfileChild) == {NoProfile, NoProfileProxy, NoProfileChild}
 
     # The worst of multiple inheritance
-    assert model_family(Mess) == {Mess, MessChild, Post, Category}
+    assert model_family(Mess) == {Mess, MessChild, ParentId, ParentStr}

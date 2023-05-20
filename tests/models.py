@@ -339,7 +339,13 @@ class NoProfileChild(AbsNoProfile):
     pass
 
 
-class Mess(Post, Category):
+class ParentId(models.Model):
+    pass
+
+class ParentStr(models.Model):
+    name = models.CharField(max_length=128, primary_key=True)
+
+class Mess(ParentId, ParentStr):
     pass
 
 class MessChild(Mess):
