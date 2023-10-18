@@ -416,8 +416,9 @@ class ManagerMixin(object):
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
         # NOTE: we check it here rather then inside _install_cacheops()
-        #       because we don't want @once_per() to hold refs to all of them.
-        if family_has_profile(cls):
+        #       because we don't want @once_per() and family_has_profile() memory to hold refs.
+        #       Otherwise, temporary classes made for migrations might hoard lots of memory.
+        if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
     @skip_on_no_invalidation
