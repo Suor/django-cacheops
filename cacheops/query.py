@@ -31,7 +31,6 @@ from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidati
 from .transaction import transaction_states
 from .signals import cache_read
 
-
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
@@ -133,6 +132,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
                     return result
 
         return wrapper
+
     return decorator
 
 
@@ -156,7 +156,7 @@ class QuerySetMixin(object):
                 'Cacheops is not enabled for %s.%s model.\n'
                 'If you don\'t want to cache anything by default '
                 'you can configure it with empty ops.'
-                    % (self.model._meta.app_label, self.model._meta.model_name))
+                % (self.model._meta.app_label, self.model._meta.model_name))
 
     def _cache_key(self, prefix=True):
         """
@@ -324,8 +324,8 @@ class QuerySetMixin(object):
             #       - ...
             # TODO: don't distinguish between pk, pk__exaxt, id, id__exact
             # TOOD: work with .filter(**kwargs).get() ?
-            if self._cacheprofile['local_get']        \
-                    and not args                      \
+            if self._cacheprofile['local_get'] \
+                    and not args \
                     and not self.query.select_related \
                     and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
@@ -401,10 +401,31 @@ def connect_first(signal, receiver, sender):
     signal.connect(receiver, sender=sender, weak=False)
     signal.receivers += old_receivers
 
+
 # We need to stash old object before Model.save() to invalidate on its properties
 _old_objs = threading.local()
 
+
 class ManagerMixin(object):
+    def _has_principal_difference(self, old_instance, new_instance, validation_fields):
+        # Compares old and new objects using exclude fields.
+        # Returns False If the difference only in 'validation_fields' fields
+        old_instance_data = old_instance.__dict__.copy()
+        pop_keys = [i for i in old_instance_data.keys() if i.startswith('_')]
+        list(map(old_instance_data.pop, pop_keys))
+        old_instance_data = set(old_instance_data.items())
+
+        new_instance_data = new_instance.__dict__.copy()
+        pop_keys = [i for i in new_instance_data.keys() if i.startswith('_')]
+        list(map(new_instance_data.pop, pop_keys))
+        new_instance_data = set(new_instance_data.items())
+        difference = old_instance_data.difference(new_instance_data)
+        updated_fields = set(i[0] for i in difference)
+        if not updated_fields.difference(validation_fields):
+            return False
+        else:
+            return True
+
     @once_per('cls')
     def _install_cacheops(self, cls):
         # Set up signals
@@ -439,10 +460,21 @@ class ManagerMixin(object):
     @skip_on_no_invalidation
     def _post_save(self, sender, instance, using, **kwargs):
         # Invoke invalidations for both old and new versions of saved object
+
+        # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
+        #       but its base having one. Or vice versa.
+        #       We still need to invalidate in this case, but cache on save better be skipped.
+
+        cacheprofile = model_profile(instance.__class__)
+
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
-        if old:
+        if old and 'exclude' in cacheprofile.keys():
+            if self._has_principal_difference(old, instance, cacheprofile.get('exclude')):
+                invalidate_obj(old, using=using)
+                invalidate_obj(instance, using=using)
+        elif old:
             invalidate_obj(old, using=using)
-        invalidate_obj(instance, using=using)
+            invalidate_obj(instance, using=using)
 
         invalidate_o2o(sender, old, instance, using=using)
 
@@ -450,10 +482,6 @@ class ManagerMixin(object):
         if transaction_states[using].is_dirty():
             return
 
-        # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
-        #       but its base having one. Or vice versa.
-        #       We still need to invalidate in this case, but cache on save better be skipped.
-        cacheprofile = model_profile(instance.__class__)
         if not cacheprofile:
             return
 
@@ -533,7 +561,7 @@ def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=N
         return
 
     m2m = next(m2m for m2m in instance._meta.many_to_many + model._meta.many_to_many
-                   if m2m.remote_field.through == sender)
+               if m2m.remote_field.through == sender)
     instance_column, model_column = m2m.m2m_column_name(), m2m.m2m_reverse_name()
     if reverse:
         instance_column, model_column = model_column, instance_column
@@ -570,7 +598,7 @@ def install_cacheops():
             if not isinstance(model._default_manager, BaseManager):
                 raise ImproperlyConfigured("Can't install cacheops for %s.%s model:"
                                            " non-django model class or manager is used."
-                                            % (model._meta.app_label, model._meta.model_name))
+                                           % (model._meta.app_label, model._meta.model_name))
             model._default_manager._install_cacheops(model)
 
             # Bind m2m changed handlers
@@ -599,4 +627,5 @@ def install_cacheops():
 
         def Q__init__(self, *args, **kwargs):  # noqa
             super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
+
         Q.__init__ = Q__init__
