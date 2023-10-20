@@ -2,7 +2,7 @@ include LICENSE
 include README.rst
 include CHANGELOG
 include cacheops/lua/*
-include manage.py run_tests.py bench.py
+include manage.py bench.py
 include requirements-test.txt
 include tox.ini
 recursive-include tests *.json

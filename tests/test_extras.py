@@ -104,7 +104,7 @@ class LockingTests(BaseTestCase):
         def second_thread():
             def _target():
                 try:
-                    with before('redis.StrictRedis.brpoplpush', lambda *a, **kw: locked.set()):
+                    with before('redis.Redis.brpoplpush', lambda *a, **kw: locked.set()):
                         results.append(func())
                 except Exception:
                     locked.set()
@@ -183,3 +183,25 @@ class DbAgnosticTests(BaseTestCase):
 
         with self.assertNumQueries(1, using='slave'):
             list(DbBinded.objects.cache().using('slave'))
+
+
+def test_model_family():
+    from cacheops.utils import model_family
+    from .models import Abs, Concrete1, AbsChild, Concrete2
+    from .models import NoProfile, NoProfileProxy, AbsNoProfile, NoProfileChild
+    from .models import ParentId, ParentStr, Mess, MessChild
+
+    # Abstract models do not have family, children of an abstract model are not a family
+    assert model_family(Abs) == set()
+    assert model_family(Concrete1) == {Concrete1}
+    assert model_family(AbsChild) == set()
+    assert model_family(Concrete2) == {Concrete2}
+
+    # Everything in but an abstract model
+    assert model_family(NoProfile) == {NoProfile, NoProfileProxy, NoProfileChild}
+    assert model_family(NoProfileProxy) == {NoProfile, NoProfileProxy, NoProfileChild}
+    assert model_family(AbsNoProfile) == set()
+    assert model_family(NoProfileChild) == {NoProfile, NoProfileProxy, NoProfileChild}
+
+    # The worst of multiple inheritance
+    assert model_family(Mess) == {Mess, MessChild, ParentId, ParentStr}

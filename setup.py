@@ -1,16 +1,13 @@
 from setuptools import setup
 
 
-# Remove build status and move Gitter link under title for PyPi
-README = open('README.rst').read()    \
-    .replace('|Build Status|', '', 1) \
-    .replace('|Gitter|', '', 1)       \
-    .replace('===\n', '===\n\n|Gitter|\n')
+# Remove build status
+README = open('README.rst').read().replace('|Build Status|', '', 1)
 
 
 setup(
     name='django-cacheops',
-    version='6.0',
+    version='7.0.1',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
@@ -25,29 +22,27 @@ setup(
         'cacheops.management.commands',
         'cacheops.templatetags'
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.7',
     install_requires=[
-        'django>=2.1',
+        'django>=3.2',
         'redis>=3.0.0',
-        'funcy>=1.8,<2.0',
-        'six>=1.4.0',
+        'funcy>=1.8,<3.0',
     ],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Framework :: Django',
-        'Framework :: Django :: 2.1',
-        'Framework :: Django :: 2.2',
-        'Framework :: Django :: 3.0',
-        'Framework :: Django :: 3.1',
         'Framework :: Django :: 3.2',
+        'Framework :: Django :: 4.0',
+        'Framework :: Django :: 4.1',
+        'Framework :: Django :: 4.2',
 
         'Environment :: Web Environment',
         'Intended Audience :: Developers',

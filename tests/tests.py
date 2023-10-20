@@ -10,12 +10,13 @@ from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
 from django.template import Context, Template
-from django.db.models import F, Count, OuterRef, Sum, Subquery, Exists
+from django.db.models import F, Count, Max, OuterRef, Sum, Subquery, Exists, Q
 from django.db.models.expressions import RawSQL
 
 from cacheops import invalidate_model, invalidate_obj, \
-                     cached, cached_view, cached_as, cached_view_as
+    cached, cached_view, cached_as, cached_view_as
 from cacheops import invalidate_fragment
+from cacheops.query import invalidate_m2o
 from cacheops.templatetags.cacheops import register
 
 decorator_tag = register.decorator_tag
@@ -89,11 +90,12 @@ class BasicTests(BaseTestCase):
 
     def test_invalidate_by_boolean(self):
         count = Post.objects.cache().filter(visible=True).count()
+        with self.assertNumQueries(0):
+            Post.objects.cache().filter(visible=True).count()
 
         post = Post.objects.get(pk=1, visible=True)
         post.visible = False
         post.save()
-
         with self.assertNumQueries(1):
             new_count = Post.objects.cache().filter(visible=True).count()
             self.assertEqual(new_count, count - 1)
@@ -293,7 +295,8 @@ class DecoratorTests(BaseTestCase):
         view(factory.get('/hi'))
 
 
-from datetime import date, datetime, time
+from datetime import date, time
+from django.utils import timezone
 
 class WeirdTests(BaseTestCase):
     def _template(self, field, value):
@@ -312,7 +315,7 @@ class WeirdTests(BaseTestCase):
 
     def test_datetime(self):
         # NOTE: some databases (mysql) don't store microseconds
-        self._template('datetime_field', datetime.now().replace(microsecond=0))
+        self._template('datetime_field', timezone.now().replace(microsecond=0))
 
     def test_time(self):
         self._template('time_field', time(10, 30))
@@ -485,7 +488,7 @@ class IssueTests(BaseTestCase):
         brand.labels.add(label)
 
         # Create another brand with the same pk as label.
-        # This will trigger a bug invalidating brands quering them by label id.
+        # This will trigger a bug invalidating brands querying them by label id.
         another_brand = Brand.objects.create(pk=2)
 
         list(brand.labels.cache())
@@ -660,6 +663,61 @@ class IssueTests(BaseTestCase):
         post = Post.objects.defer("visible").last()
         post.delete()
 
+    def test_407(self):
+        brand = Brand.objects.create(pk=1)
+        brand.labels.set([Label.objects.create()])
+        assert len(Label.objects.filter(brands=1).cache()) == 1  # Cache it
+
+        brand.delete()  # Invalidation expected after deletion
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(Label.objects.filter(brands=1).cache()), 0)
+
+    def test_407_reverse(self):
+        brand = Brand.objects.create(pk=1)
+        label = Label.objects.create(pk=1)
+        brand.labels.set([label])
+        assert len(Brand.objects.filter(labels=1).cache()) == 1  # Cache it
+
+        label.delete()  # Invalidation expected after deletion
+
+        with self.assertNumQueries(1):
+            self.assertEqual(len(Brand.objects.filter(labels=1).cache()), 0)
+
+    @mock.patch('cacheops.query.invalidate_dict')
+    def test_430(self, mock_invalidate_dict):
+        media_type = MediaType.objects.create(
+            name="some type"
+        )
+        movie = Movie.objects.create(
+            year=2022,
+            media_type=media_type,
+        )
+        Scene.objects.create(
+            name="first scene",
+            movie=movie,
+        )
+        invalidate_m2o(Movie, movie)
+
+        obj_movie_dict = mock_invalidate_dict.call_args[0][1]
+        self.assertFalse(isinstance(obj_movie_dict['movie_id'], Media))
+        self.assertTrue(isinstance(obj_movie_dict['movie_id'], int))
+
+    def test_430_no_error_raises(self):
+        media_type = MediaType.objects.create(
+            name="some type"
+        )
+        movie = Movie.objects.create(
+            year=2022,
+            media_type=media_type,
+        )
+        Scene.objects.create(
+            name="first scene",
+            movie=movie,
+        )
+        # no error raises on delete
+        media_type.delete()
+
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
@@ -727,6 +785,25 @@ class AggregationTests(BaseTestCase):
         with self.assertNumQueries(1):
             qs.aggregate(posts_count=Count('posts'))
 
+    def test_aggregate_granular(self):
+        cat1, cat2 = Category.objects.all()[:2]
+        qs = Category.objects.cache().filter(id=cat1.id)
+        qs.aggregate(posts_count=Count('posts'))
+        # Test invalidation
+        Post.objects.create(title='New One', category=cat2)
+        with self.assertNumQueries(0):
+            qs.aggregate(posts_count=Count('posts'))
+
+    def test_new_alias(self):
+        qs = Post.objects.cache()
+        assert qs.aggregate(max=Max('category')) == {'max': 3}
+        assert qs.aggregate(cat=Max('category')) == {'cat': 3}
+
+    def test_filter(self):
+        qs = Post.objects.cache()
+        assert qs.aggregate(cnt=Count('category', filter=Q(category__gt=1))) == {'cnt': 2}
+        assert qs.aggregate(cnt=Count('category', filter=Q(category__lt=3))) == {'cnt': 1}
+
 
 class M2MTests(BaseTestCase):
     brand_cls = Brand
@@ -773,11 +850,10 @@ class M2MTests(BaseTestCase):
     def test_granular_through_on_clear(self):
         through_qs = self.brand_cls.labels.through.objects.cache() \
                                                   .filter(brand=self.bs, label=self.slow)
-        self._template(
-            lambda: through_qs.get(),
-            lambda: self.bf.labels.clear(),
-            should_invalidate=False
-        )
+        through_qs.get()
+        self.bf.labels.clear()
+        with self.assertNumQueries(0):
+            through_qs.get()
 
     def test_granular_target_on_clear(self):
         self._template(
@@ -894,6 +970,13 @@ class ProxyTests(BaseTestCase):
 
         with self.assertRaises(NonCachedMedia.DoesNotExist):
             MediaProxy.objects.cache().get(title=media.title)
+
+    def test_siblings(self):
+        list(VideoProxy.objects.cache())
+        NonCachedVideoProxy.objects.create(title='Pulp Fiction')
+
+        with self.assertNumQueries(1):
+            list(VideoProxy.objects.cache())
 
     def test_proxy_caching(self):
         video = Video.objects.create(title='Pulp Fiction')

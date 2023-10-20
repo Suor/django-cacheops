@@ -15,7 +15,7 @@ class Defaults:
     CACHEOPS_DEFAULTS = {}
     CACHEOPS = {}
     CACHEOPS_PREFIX = lambda query: ''
-    CACHEOPS_LRU = False
+    CACHEOPS_INSIDEOUT = False
     CACHEOPS_CLIENT_CLASS = None
     CACHEOPS_DEGRADE_ON_FAILURE = False
     CACHEOPS_SENTINEL = {}
@@ -97,7 +97,8 @@ def model_profile(model):
     """
     Returns cacheops profile for a model
     """
-    # Django migrations these fake models, we don't want to cache them
+    assert not model._meta.abstract, "Can't get profile for %s" % model
+    # Django migrations create lots of fake models, just skip them
     if model.__module__ == '__fake__':
         return None
 

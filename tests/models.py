@@ -1,11 +1,12 @@
 import os
 import uuid
-from datetime import date, datetime, time
+from datetime import date, time
 
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql, manager
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 ### For basic tests and bench
@@ -95,7 +96,7 @@ def custom_value_default():
 
 class Weird(models.Model):
     date_field = models.DateField(default=date(2000, 1, 1))
-    datetime_field = models.DateTimeField(default=datetime(2000, 1, 1, 10, 10))
+    datetime_field = models.DateTimeField(default=timezone.now)
     time_field = models.TimeField(default=time(10, 10))
     list_field = IntegerArrayField(default=list, blank=True)
     custom_field = CustomField(default=custom_value_default)
@@ -151,13 +152,33 @@ class MediaProxy(NonCachedMedia):
         proxy = True
 
 
+class MediaType(models.Model):
+    name = models.CharField(max_length=50)
+
 # Multi-table inheritance
 class Media(models.Model):
     name = models.CharField(max_length=128)
+    media_type = models.ForeignKey(
+        MediaType,
+        on_delete=models.CASCADE,
+    )
+
+    def __str__(self):
+        return str(self.media_type)
+
 
 class Movie(Media):
     year = models.IntegerField()
 
+
+class Scene(models.Model):
+    """Model with FK to submodel."""
+    name = models.CharField(max_length=50)
+    movie = models.ForeignKey(
+        Movie,
+        on_delete=models.CASCADE,
+        related_name="scenes",
+    )
 
 # M2M models
 class Label(models.Model):
@@ -286,3 +307,46 @@ class Client(models.Model):
         setattr(self, '_get_private_data', curry(sum, [1, 2, 3, 4]))
 
     name = models.CharField(max_length=255)
+
+
+# Abstract models
+class Abs(models.Model):
+    class Meta:
+        abstract = True
+
+class Concrete1(Abs):
+    pass
+
+class AbsChild(Abs):
+    class Meta:
+        abstract = True
+
+class Concrete2(AbsChild):
+    pass
+
+class NoProfile(models.Model):
+    title = models.CharField(max_length=128)
+
+class NoProfileProxy(NoProfile):
+    class Meta:
+        proxy = True
+
+class AbsNoProfile(NoProfile):
+    class Meta:
+        abstract = True
+
+class NoProfileChild(AbsNoProfile):
+    pass
+
+
+class ParentId(models.Model):
+    pass
+
+class ParentStr(models.Model):
+    name = models.CharField(max_length=128, primary_key=True)
+
+class Mess(ParentId, ParentStr):
+    pass
+
+class MessChild(Mess):
+    pass

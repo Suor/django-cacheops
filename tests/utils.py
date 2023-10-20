@@ -48,7 +48,7 @@ class ThreadWithReturnValue(Thread):
             self._exc = e
         finally:
             # Django does not drop postgres connections opened in new threads.
-            # This leads to postgres complaining about db accessed when we try to destory it.
+            # This leads to postgres complaining about db accessed when we try to destroy it.
             # See https://code.djangoproject.com/ticket/22420#comment:18
             from django.db import connection
             connection.close()

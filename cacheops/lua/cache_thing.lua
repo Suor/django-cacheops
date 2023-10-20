@@ -5,7 +5,7 @@ local data = ARGV[1]
 local dnfs = cjson.decode(ARGV[2])
 local timeout = tonumber(ARGV[3])
 
-if precall_key ~= '' and redis.call('exists', precall_key) == 0 then
+if precall_key ~= prefix and redis.call('exists', precall_key) == 0 then
   -- Cached data was invalidated during the function call. The data is
   -- stale and should not be cached.
   return
@@ -47,15 +47,16 @@ for db_table, disj in pairs(dnfs) do
         redis.call('sadd', conj_key, key)
         -- NOTE: an invalidator should live longer than any key it references.
         --       So we update its ttl on every key if needed.
-        -- NOTE: if CACHEOPS_LRU is True when invalidators should be left persistent,
-        --       so we strip next section from this script.
-        -- TOSTRIP
+        -- REDIS_7
+        redis.call('expire', conj_key, timeout, 'gt')
+        -- /REDIS_7
+        -- REDIS_4
         local conj_ttl = redis.call('ttl', conj_key)
         if conj_ttl < timeout then
             -- We set conj_key life with a margin over key life to call expire rarer
             -- And add few extra seconds to be extra safe
             redis.call('expire', conj_key, timeout * 2 + 10)
         end
-        -- /TOSTRIP
+        -- /REDIS_4
     end
 end

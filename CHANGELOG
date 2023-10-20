@@ -1,3 +1,29 @@
+7.0.1
+- made it work with Redis 6.x and older again
+- handle abstract models better
+- some docs improvements
+
+7.0
+- support Django 4.2b and 5.0a
+- added a new insideout mode
+- made join invalidation more granular
+Backwards incompatible changes:
+- dropped Python 3.5, 3.6 and Django 2.1, 2.2, 3.0 and 3.1 support
+- removed CACHEOPS_LRU
+- removed CacheopsRedis, should inherit redis.Redis instead
+
+6.2
+- support Python 3.11 and Django 4.1
+- added command to clear stale cacheops keys (Bruno Alla)
+- fixed `invalidate_m2o` for polymorphic models (#430) (Andrey Alekseev)
+- updated README: TOC, link to the post, some explanations
+
+6.1
+- support Django 3.2 and 4.0 (thx to Olivér Kecskeméty)
+- do not gulp commit errors (Oleg Yamnikov)
+- fixed precall key when a prefix is defined (Peter Baumgartner)
+- fixed m2o/m2m queries invalidation on object deletion (thx to Sergey Tikhonov)
+
 6.0.1
 - feature that includes the functionality to exclude fields update for invalidation
 

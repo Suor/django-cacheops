@@ -14,6 +14,7 @@ MIDDLEWARE_CLASSES = []
 AUTH_PROFILE_MODULE = 'tests.UserProfile'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+USE_TZ = True
 
 # Django replaces this, but it still wants it. *shrugs*
 DATABASE_ENGINE = 'django.db.backends.sqlite3',
@@ -23,17 +24,25 @@ if os.environ.get('CACHEOPS_DB') == 'postgresql':
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'cacheops',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': ''
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': ''
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
     }
+
+    # Use psycopg2cffi for PyPy
+    try:
+        import psycopg2  # noqa
+    except ImportError:
+        from psycopg2cffi import compat
+        compat.register()
+
 elif os.environ.get('CACHEOPS_DB') == 'postgis':
     POSTGIS_VERSION = (2, 1, 1)
     DATABASES = {
@@ -41,15 +50,15 @@ elif os.environ.get('CACHEOPS_DB') == 'postgis':
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.contrib.gis.db.backends.postgis',
             'NAME': 'cacheops_slave',
             'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('POSTGRES_HOST') or '127.0.0.1',
         },
     }
 elif os.environ.get('CACHEOPS_DB') == 'mysql':
@@ -57,16 +66,16 @@ elif os.environ.get('CACHEOPS_DB') == 'mysql':
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops',
-            'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'USER': 'root',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('MYSQL_HOST') or '127.0.0.1',
         },
         'slave': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'cacheops_slave',
-            'USER': 'cacheops',
-            'PASSWORD': '',
-            'HOST': '',
+            'USER': 'root',
+            'PASSWORD': 'cacheops',
+            'HOST': os.getenv('MYSQL_HOST') or '127.0.0.1',
         },
     }
 else:
@@ -87,7 +96,7 @@ else:
     }
 
 CACHEOPS_REDIS = {
-    'host': 'localhost',
+    'host': os.getenv('REDIS_HOST') or '127.0.0.1',
     'port': 6379,
     'db': 13,
     'socket_timeout': 3,
@@ -102,13 +111,14 @@ CACHEOPS = {
     'tests.*': {},
     'tests.noncachedvideoproxy': None,
     'tests.noncachedmedia': None,
+    'tests.noprofile': None,
     'auth.*': {},
 }
 
 if os.environ.get('CACHEOPS_PREFIX'):
     CACHEOPS_PREFIX = lambda q: 'p:'
 
-CACHEOPS_LRU = bool(os.environ.get('CACHEOPS_LRU'))
+CACHEOPS_INSIDEOUT = bool(os.environ.get('CACHEOPS_INSIDEOUT'))
 CACHEOPS_DEGRADE_ON_FAILURE = bool(os.environ.get('CACHEOPS_DEGRADE_ON_FAILURE'))
 ALLOWED_HOSTS = ['testserver']
 

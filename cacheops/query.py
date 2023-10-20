@@ -1,31 +1,23 @@
 import sys
-import json
 import threading
 from random import random
 
 from funcy import select_keys, cached_property, once, once_per, monkey, wraps, walk, chain
-from funcy import lmap, map, lcat, join_with
+from funcy import lmap, lcat, join_with
 
 from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
-from django.db import DEFAULT_DB_ALIAS
-from django.db import models
+from django.db import DEFAULT_DB_ALIAS, connections, models
 from django.db.models.manager import BaseManager
+from django.db.models.query import MAX_GET_RESULTS
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 from django.db.transaction import atomic
-
-# This thing reappeared in Django 3.0
-try:
-    from django.db.models.query import MAX_GET_RESULTS
-    from django.db import connections
-except ImportError:
-    MAX_GET_RESULTS = None
 
 from .conf import model_profile, settings, ALL_OPS
 from .utils import monkey_mix, stamp_fields, get_cache_key, cached_view_fab, family_has_profile
 from .utils import md5
+from .getset import cache_thing, getting
 from .sharding import get_prefix
-from .redis import redis_client, handle_connection_failure, load_script
 from .tree import dnfs
 from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidation
 from .transaction import transaction_states
@@ -34,27 +26,6 @@ from .signals import cache_read
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
-
-
-@handle_connection_failure
-def cache_thing(prefix, cache_key, data, cond_dnfs, timeout, dbs=(), precall_key=''):
-    """
-    Writes data to cache and creates appropriate invalidators.
-
-    If precall_key is not the empty string, the data will only be cached if the
-    precall_key is set to avoid caching stale data.
-    """
-    # Could have changed after last check, sometimes superficially
-    if transaction_states.is_dirty(dbs):
-        return
-    load_script('cache_thing', settings.CACHEOPS_LRU)(
-        keys=[prefix, cache_key, precall_key],
-        args=[
-            settings.CACHEOPS_SERIALIZER.dumps(data),
-            json.dumps(cond_dnfs, default=str),
-            timeout
-        ]
-    )
 
 
 def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
@@ -88,7 +59,7 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
 
     querysets = lmap(_get_queryset, samples)
     dbs = list({qs.db for qs in querysets})
-    cond_dnfs = join_with(lcat, map(dnfs, querysets))
+    cond_dnfs = join_with(lcat, map(dnfs, querysets))  # TODO: use cached version?
     qs_keys = [qs._cache_key(prefix=False) for qs in querysets]
     if timeout is None:
         timeout = min(qs._cacheprofile['timeout'] for qs in querysets)
@@ -105,12 +76,22 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
             extra_val = extra(*args, **kwargs) if callable(extra) else extra
             cache_key = prefix + 'as:' + get_cache_key(func, args, kwargs, qs_keys, extra_val)
 
-            with redis_client.getting(cache_key, lock=lock) as cache_data:
+            with getting(cache_key, cond_dnfs, prefix, lock=lock) as cache_data:
                 cache_read.send(sender=None, func=func, hit=cache_data is not None)
                 if cache_data is not None:
                     return settings.CACHEOPS_SERIALIZER.loads(cache_data)
                 else:
-                    if keep_fresh:
+                    precall_key = ''
+                    expected_checksum = ''
+                    if keep_fresh and settings.CACHEOPS_INSIDEOUT:
+                        # The conj stamps should not be dropped while we calculate the function.
+                        # But being filled in concurrently is a normal concurrent cache write.
+                        # However, if they are filled in and then dropped, we cannot detect that.
+                        # Unless we fill them ourselves and get expected checksum now. We also need
+                        # to fill in schemes, so we just reuse the cache_thing().
+                        expected_checksum = cache_thing(prefix, cache_key, '', cond_dnfs, timeout,
+                                                        dbs=dbs, expected_checksum='never match')
+                    elif keep_fresh:
                         # We call this "asp" for "as precall" because this key is
                         # cached before the actual function is called. We randomize
                         # the key to prevent falsely thinking the key was not
@@ -123,12 +104,10 @@ def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
                         # only if it remains valid before, during, and after the
                         # call, the result can be cached and returned.
                         cache_thing(prefix, precall_key, 'PRECALL', cond_dnfs, timeout, dbs=dbs)
-                    else:
-                        precall_key = ''
 
                     result = func(*args, **kwargs)
                     cache_thing(prefix, cache_key, result, cond_dnfs, timeout, dbs=dbs,
-                                precall_key=precall_key)
+                                precall_key=precall_key, expected_checksum=expected_checksum)
                     return result
 
         return wrapper
@@ -181,7 +160,7 @@ class QuerySetMixin(object):
         # If query results differ depending on database
         if self._cacheprofile and not self._cacheprofile['db_agnostic']:
             md.update(self.db)
-        # Iterable class pack results diffrently
+        # Iterable class pack results differently
         it_class = self._iterable_class
         md.update('%s.%s' % (it_class.__module__, it_class.__name__))
 
@@ -215,7 +194,7 @@ class QuerySetMixin(object):
             timeout    - override default cache timeout
             lock       - use lock to prevent dog-pile effect
 
-        NOTE: you actually can disable caching by omiting corresponding ops,
+        NOTE: you actually can disable caching by omitting corresponding ops,
               .cache(ops=[]) disables caching for this queryset.
         """
         self._require_cacheprofile()
@@ -273,7 +252,7 @@ class QuerySetMixin(object):
         cache_key = self._cache_key()
         lock = self._cacheprofile['lock']
 
-        with redis_client.getting(cache_key, lock=lock) as cache_data:
+        with getting(cache_key, self._cond_dnfs, self._prefix, lock=lock) as cache_data:
             cache_read.send(sender=self.model, func=None, hit=cache_data is not None)
             if cache_data is not None:
                 self._result_cache = settings.CACHEOPS_SERIALIZER.loads(cache_data)
@@ -285,7 +264,7 @@ class QuerySetMixin(object):
 
     def count(self):
         if self._should_cache('count'):
-            # Optmization borrowed from overriden method:
+            # Optmization borrowed from overridden method:
             # if queryset cache is already filled just return its len
             if self._result_cache is not None:
                 return len(self._result_cache)
@@ -295,17 +274,33 @@ class QuerySetMixin(object):
 
     def aggregate(self, *args, **kwargs):
         if self._should_cache('aggregate'):
-            # Apply all aggregates the same way original .aggregate(), but do not perform sql
-            kwargs = kwargs.copy()
+            # Apply all aggregates the same way original .aggregate() does, but do not perform sql.
+            # This code is mostly taken from QuerySet.aggregate().
+            normalized_kwargs = kwargs.copy()
             for arg in args:
-                kwargs[arg.default_alias] = arg
+                try:
+                    normalized_kwargs[arg.default_alias] = arg
+                except (AttributeError, TypeError):
+                    # Let Django raise a proper error
+                    return self._no_monkey.aggregate(*args, **kwargs)
+
+            # Simulate Query.get_aggregation() preparations, this adds proper joins to qs.query
+            if not normalized_kwargs:
+                return {}
 
             qs = self._clone()
-            for (alias, aggregate_expr) in kwargs.items():
-                qs.query.add_annotation(aggregate_expr, alias, is_summary=True)
+            aggregates = {}
+            for alias, aggregate_expr in normalized_kwargs.items():
+                aggregate = aggregate_expr.resolve_expression(
+                    qs.query, allow_joins=True, reuse=None, summarize=True
+                )
+                if not aggregate.contains_aggregate:
+                    raise TypeError("%s is not an aggregate expression" % alias)
+                aggregates[alias] = aggregate
 
-            # Use resulting qs as a ref
-            return cached_as(qs)(lambda: self._no_monkey.aggregate(self, *args, **kwargs))()
+            # Use resulting qs as a ref, aggregates still contain names, etc
+            func = lambda: self._no_monkey.aggregate(self, *args, **kwargs)
+            return cached_as(qs, extra=aggregates)(func)()
         else:
             return self._no_monkey.aggregate(self, *args, **kwargs)
 
@@ -329,7 +324,7 @@ class QuerySetMixin(object):
                     and not self.query.select_related \
                     and not self.query.where.children:
                 # NOTE: We use simpler way to generate a cache key to cut costs.
-                #       Some day it could produce same key for diffrent requests.
+                #       Some day it could produce same key for different requests.
                 key = (self.__class__, self.model) + tuple(sorted(kwargs.items()))
                 try:
                     return _local_get_cache[key]
@@ -438,12 +433,12 @@ class ManagerMixin(object):
         if not hasattr(module, cls.__name__):
             setattr(module, cls.__name__, cls)
 
-    # This is probably still needed if models are created dynamically
+    # This is probably still needed if models are created dynamically or imported late
     def contribute_to_class(self, cls, name):
         self._no_monkey.contribute_to_class(self, cls, name)
-        # Django migrations create lots of fake models, just skip them
-        # NOTE: we make it here rather then inside _install_cacheops()
-        #       because we don't want @once_per() to hold refs to all of them.
+        # NOTE: we check it here rather then inside _install_cacheops()
+        #       because we don't want @once_per() and family_has_profile() memory to hold refs.
+        #       Otherwise, temporary classes made for migrations might hoard lots of memory.
         if cls.__module__ != '__fake__' and family_has_profile(cls):
             self._install_cacheops(cls)
 
@@ -504,7 +499,7 @@ class ManagerMixin(object):
             key = 'pk' if cache_on_save is True else cache_on_save
             cond = {key: getattr(instance, key)}
             qs = sender.objects.inplace().using(using).filter(**cond).order_by()
-            # Mimic Django 3.0 .get() logic
+            # Mimic Django .get() logic
             if MAX_GET_RESULTS and (
                     not qs.query.select_for_update
                     or connections[qs.db].features.supports_select_for_update_with_limit):
@@ -521,6 +516,9 @@ class ManagerMixin(object):
         # NOTE: this will behave wrong if someone changed object fields
         #       before deletion (why anyone will do that?)
         invalidate_obj(instance, using=using)
+        # NOTE: this is needed because m2m_changed is not sent on such deletion:
+        #       https://code.djangoproject.com/ticket/17688
+        invalidate_m2o(sender, instance, using)
 
     def inplace(self):
         return self.get_queryset().inplace()
@@ -546,6 +544,21 @@ def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
             if old:
                 invalidate_dict(rmodel, {rfield: old_value}, using=using)
             invalidate_dict(rmodel, {rfield: value}, using=using)
+
+
+def invalidate_m2o(sender, instance, using=DEFAULT_DB_ALIAS):
+    """Invoke invalidation for m2o and m2m queries to a deleted instance"""
+    all_fields = sender._meta.get_fields(include_hidden=True, include_parents=True)
+    m2o_fields = [f for f in all_fields if isinstance(f, models.ManyToOneRel)]
+    fk_fields_names_map = {
+        f.name: f.attname
+        for f in all_fields if isinstance(f, models.ForeignKey)
+    }
+    for f in m2o_fields:
+        attr = fk_fields_names_map.get(f.field_name, f.field_name)
+        value = getattr(instance, attr)
+        rmodel, rfield = f.related_model, f.remote_field.attname
+        invalidate_dict(rmodel, {rfield: value}, using=using)
 
 
 def invalidate_m2m(sender=None, instance=None, model=None, action=None, pk_set=None, reverse=None,
@@ -620,12 +633,3 @@ def install_cacheops():
     # Make buffers/memoryviews pickleable to serialize binary field data
     import copyreg
     copyreg.pickle(memoryview, lambda b: (memoryview, (bytes(b),)))
-
-    # Fix random ordered dict keys producing different SQL for same QuerySet
-    if (3, 3) <= sys.version_info < (3, 6):
-        from django.db.models.query_utils import Q
-
-        def Q__init__(self, *args, **kwargs):  # noqa
-            super(Q, self).__init__(children=list(args) + list(sorted(kwargs.items())))
-
-        Q.__init__ = Q__init__

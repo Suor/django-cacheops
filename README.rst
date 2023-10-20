@@ -1,8 +1,8 @@
-Cacheops |Build Status| |Gitter|
+Cacheops |Build Status|
 ========
 
-A slick app that supports automatic or manual queryset caching and automatic
-granular event-driven invalidation.
+A slick app that supports automatic or manual queryset caching and `automatic
+granular event-driven invalidation <http://suor.github.io/blog/2014/03/09/on-orm-cache-invalidation/>`_.
 
 It uses `redis <http://redis.io/>`_ as backend for ORM cache and redis or
 filesystem for simple time-invalidated one.
@@ -15,15 +15,18 @@ And there is more to it:
 - dog-pile prevention mechanism
 - a couple of hacks to make django faster
 
+.. contents:: Contents
+    :local:
+    :backlinks: top
 
 Requirements
-------------
+++++++++++++
 
-Python 3.5+, Django 2.1+ and Redis 4.0+.
+Python 3.7+, Django 3.2+ and Redis 4.0+.
 
 
 Installation
-------------
+++++++++++++
 
 Using pip:
 
@@ -36,7 +39,7 @@ Using pip:
 
 
 Setup
------
++++++
 
 Add ``cacheops`` to your ``INSTALLED_APPS``.
 
@@ -72,8 +75,7 @@ Setup redis connection and enable caching for desired models:
         ...                                  # everything else is passed to Sentinel()
     }
 
-    # To use your own redis client class,
-    # should be compatible or subclass cacheops.redis.CacheopsRedis
+    # Use your own redis client class, should be compatible or subclass redis.Redis
     CACHEOPS_CLIENT_CLASS = 'your.redis.ClientClass'
 
     CACHEOPS = {
@@ -157,7 +159,7 @@ There is also a possibility to make all cacheops methods and decorators no-op, e
 
 
 Usage
------
++++++
 
 | **Automatic caching**
 
@@ -289,7 +291,7 @@ Class based views can also be cached:
 
 
 Invalidation
-------------
+++++++++++++
 
 Cacheops uses both time and event-driven invalidation. The event-driven one
 listens on model signals and invalidates appropriate caches on ``Model.save()``, ``.delete()``
@@ -372,6 +374,9 @@ In the case you actually want to perform the latter cacheops provides a shortcut
     qs.invalidated_update(...)
 
 Note that all the updated objects are fetched twice, prior and post the update.
+
+Components
+++++++++++
 
 
 Simple time-invalidated cache
@@ -584,6 +589,9 @@ or
 Tags work the same way as corresponding decorators.
 
 
+Special topics
+++++++++++++++
+
 Transactions
 ------------
 
@@ -659,14 +667,12 @@ A ``query`` object passed to callback also enables reflection on used databases 
         if query.tables == ['blog_post']:
             return 'blog:'
 
-**NOTE:** prefix is not used in simple and file cache. This might change in future cacheops.
-
 
 Custom serialization
 --------------------
 
 Cacheops uses ``pickle`` by default, employing it's default protocol. But you can specify your own
-it might be any module or a class having `.dumps()` and `.loads()` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
+it might be any module or a class having ``.dumps()`` and ``.loads()`` functions. For example you can use ``dill`` instead, which can serialize more things like anonymous functions:
 
 .. code:: python
 
@@ -686,19 +692,45 @@ One less obvious use is to fix pickle protocol, to use cacheops cache across pyt
 Using memory limit
 ------------------
 
-If your cache never grows too large you may not bother. But if you do you have some options.
-Cacheops stores cached data along with invalidation data,
-so you can't just set ``maxmemory`` and let redis evict at its will.
-For now cacheops offers 2 imperfect strategies, which are considered **experimental**.
-So be careful and consider `leaving feedback <https://github.com/Suor/django-cacheops/issues/143>`_.
+Cacheops offers an "insideout" mode, which idea is instead of conj sets contatining cache keys, cache values contain a checksum of random stamps stored in conj keys, which are checked on each read to stay the same. To use that add to settings:
 
-First strategy is configuring ``maxmemory-policy volatile-ttl``. Invalidation data is guaranteed to have higher TTL than referenced keys.
-Redis however doesn't guarantee perfect TTL eviction order, it selects several keys and removes
-one with the least TTL, thus invalidator could be evicted before cache key it refers leaving it orphan and causing it survive next invalidation.
-You can reduce this chance by increasing ``maxmemory-samples`` redis config option and by reducing cache timeout.
+.. code:: python
 
-Second strategy, probably more efficient one is adding ``CACHEOPS_LRU = True`` to your settings and then using ``maxmemory-policy volatile-lru``.
-However, this makes invalidation structures persistent, they are still removed on associated events, but in absence of them can clutter redis database.
+    CACHEOPS_INSIDEOUT = True  # Might become default in future
+
+And set up ``maxmemory`` and ``maxmemory-policy`` in redis config::
+
+    maxmemory 4gb
+    maxmemory-policy volatile-lru  # or other volatile-*
+
+Note that using any of ``allkeys-*`` policies might drop important invalidation structures of cacheops and lead to stale cache.
+
+
+Memory usage cleanup
+--------------------
+
+**This does not apply to "insideout" mode. This issue doesn't happen there.**
+
+In some cases, cacheops may leave some conjunction keys of expired cache keys in redis without being able to invalidate them. Those will still expire with age, but in the meantime may cause issues like slow invalidation (even "BUSY Redis ...") and extra memory usage. To prevent that it is advised to not cache complex queries, see `Perfomance tips <#performance-tips>`_, 5.
+
+Cacheops ships with a ``cacheops.reap_conjs`` function that can clean up these keys,
+ignoring conjunction sets with some reasonable size. It can be called using the ``reapconjs`` management command::
+
+    ./manage.py reapconjs --chunk-size=100 --min-conj-set-size=10000  # with custom values
+    ./manage.py reapconjs                                             # with default values (chunks=1000, min size=1000)
+
+The command is a small wrapper that calls a function with the main logic. You can also call it from your code, for example from a Celery task:
+
+.. code:: python
+
+    from cacheops import reap_conjs
+
+    @app.task
+    def reap_conjs_task():
+        reap_conjs(
+            chunk_size=2000,
+            min_conj_set_size=100,
+        )
 
 
 Keeping stats
@@ -724,6 +756,9 @@ Here is a simple stats implementation:
 
 Cache invalidation signal is emitted after object, model or global invalidation passing ``sender`` and ``obj_dict`` args. Note that during normal operation cacheops only uses object invalidation, calling it once for each model create/delete and twice for update: passing old and new object dictionary.
 
+
+Troubleshooting
++++++++++++++++
 
 CAVEATS
 -------
@@ -758,13 +793,13 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 1. When you use cache you pickle and unpickle lots of django model instances, which could be slow. You can optimize django models serialization with `django-pickling <http://github.com/Suor/django-pickling>`_.
 
-2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return the clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning::
+2. Constructing querysets is rather slow in django, mainly because most of ``QuerySet`` methods clone self, then change it and return the clone. Original queryset is usually thrown away. Cacheops adds ``.inplace()`` method, which makes queryset mutating, preventing useless cloning:
+
+   .. code:: python
 
     items = Item.objects.inplace().filter(category=12).order_by('-date')[:20]
 
-   You can revert queryset to cloning state using ``.cloning()`` call.
-
-   Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
+   You can revert queryset to cloning state using ``.cloning()`` call. Note that this is a micro-optimization technique. Using it is only desirable in the hottest places, not everywhere.
 
 3. Use template fragment caching when possible, it's way more fast because you don't need to generate anything. Also pickling/unpickling a string is much faster than a list of model instances.
 
@@ -772,7 +807,19 @@ Here come some performance tips to make cacheops and Django ORM faster.
 
 5. If you filter queryset on many different or complex conditions cache could degrade performance (comparing to uncached db calls) in consequence of frequent cache misses. Disable cache in such cases entirely or on some heuristics which detect if this request would be probably hit. E.g. enable cache if only some primary fields are used in filter.
 
-   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model. You can disable caching if more than some amount of fields is used in filter simultaneously.
+   Caching querysets with large amount of filters also slows down all subsequent invalidation on that model (negligable for "insideout" mode). You can disable caching if more than some amount of fields is used in filter simultaneously.
+
+6. Split database queries into smaller ones when you cache them. This goes against usual approach, but this allows invalidation to be more granular: smaller parts will be invalidated independently and each part will invalidate more precisely.
+
+   .. code:: python
+
+    Post.objects.filter(category__slug="foo")
+    # A single database query, but will be invalidated not only on
+    # any Category with .slug == "foo" change, but also for any Post change
+
+    Post.objects.filter(category=Category.objects.get(slug="foo"))
+    # Two queries, each invalidates only on a granular event:
+    # either category.slug == "foo" or Post with .category_id == <whatever is there>
 
 
 Writing a test
@@ -783,16 +830,16 @@ Here is how you do that. I suppose you have some application code causing it.
 
 1. Make a fork.
 2. Install all from ``requirements-test.txt``.
-3. Ensure you can run tests with ``./run_tests.py``.
+3. Ensure you can run tests with ``pytest``.
 4. Copy relevant models code to ``tests/models.py``.
 5. Go to ``tests/tests.py`` and paste code causing exception to ``IssueTests.test_{issue_number}``.
-6. Execute ``./run_tests.py {issue_number}`` and see it failing.
+6. Execute ``pytest -k {issue_number}`` and see it failing.
 7. Cut down model and test code until error disappears and make a step back.
 8. Commit changes and make a pull request.
 
 
 TODO
-----
+++++
 
 - faster .get() handling for simple cases such as get by pk/id, with simple key calculation
 - integrate previous one with prefetch_related()
@@ -807,10 +854,5 @@ TODO
 - cache a string directly (no pickle) for direct serving (custom key function?)
 
 
-.. |Build Status| image:: https://travis-ci.org/Suor/django-cacheops.svg?branch=master
-   :target: https://travis-ci.org/Suor/django-cacheops
-
-
-.. |Gitter| image:: https://badges.gitter.im/JoinChat.svg
-   :alt: Join the chat at https://gitter.im/Suor/django-cacheops
-   :target: https://gitter.im/Suor/django-cacheops?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+.. |Build Status| image:: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml/badge.svg
+   :target: https://github.com/Suor/django-cacheops/actions/workflows/ci.yml?query=branch%3Amaster

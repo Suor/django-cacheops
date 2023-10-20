@@ -4,6 +4,7 @@ from funcy import group_by, join_with, lcat, lmap
 from django.db.models import Subquery
 from django.db.models.query import QuerySet
 from django.db.models.sql import OR
+from django.db.models.sql.datastructures import Join
 from django.db.models.sql.query import Query, ExtraWhere
 from django.db.models.sql.where import NothingNode, SubqueryConstraint
 from django.db.models.lookups import Lookup, Exact, In, IsNull
@@ -106,13 +107,34 @@ def dnfs(qs):
             return [{}]
         return cleaned
 
+    def add_join_conds(dnf, query):
+        from collections import defaultdict
+
+        # A cond on parent (alias, col) means the same cond applies to target and vice a versa
+        join_exts = defaultdict(list)
+        for alias, join in query.alias_map.items():
+            if query.alias_refcount[alias] and isinstance(join, Join):
+                for parent_col, target_col in join.join_cols:
+                    join_exts[join.parent_alias, parent_col].append((join.table_alias, target_col))
+                    join_exts[join.table_alias, target_col].append((join.parent_alias, parent_col))
+
+        if not join_exts:
+            return
+
+        for conj in dnf:
+            # NOTE: using list comprehension over genexp here since we change the thing we iterate
+            conj.extend([
+                (join_alias, join_col, v, negation)
+                for alias, col, v, negation in conj
+                for (join_alias, join_col) in join_exts[alias, col]
+            ])
+
     def query_dnf(query):
         def table_for(alias):
-            if alias == main_alias:
-                return alias
-            return query.alias_map[alias].table_name
+            return alias if alias == main_alias else query.alias_map[alias].table_name
 
         dnf = _dnf(query.where)
+        add_join_conds(dnf, query)
 
         # NOTE: we exclude content_type as it never changes and will hold dead invalidation info
         main_alias = query.model._meta.db_table
@@ -129,12 +151,8 @@ def dnfs(qs):
 
     # Add any subqueries used for annotation
     if qs.query.annotations:
-        subqueries = (
-            # Django 3.0+ sets Subquery.query
-            query_dnf(getattr(q, 'query', None) or getattr(q, 'queryset').query)
-            for q in qs.query.annotations.values()
-            if type(q) is Subquery
-        )
+        subqueries = (query_dnf(getattr(q, 'query', None))
+                      for q in qs.query.annotations.values() if isinstance(q, Subquery))
         dnfs_.update(join_with(lcat, subqueries))
 
     return dnfs_

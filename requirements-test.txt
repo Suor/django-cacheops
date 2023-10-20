@@ -1,7 +1,8 @@
-django>=1.8
+pytest==7.2.1
+pytest-django==4.5.2
+django>=3.2
 redis>=3.0.0
-funcy>=1.8,<2.0
-six>=1.4.0
+funcy>=1.8,<3.0
 before_after==1.0.0
 jinja2>=2.10
 dill
