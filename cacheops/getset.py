@@ -81,7 +81,7 @@ def _read(key, cond_dnfs, prefix):
 
     if None in stamps:
         redis_client.unlink(key)
-        return
+        return None
 
     stamp_checksum, data = coded.split(b':', 1)
     if stamp_checksum.decode() != join_stamps(stamps):
