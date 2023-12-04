@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import re
 import platform
 import unittest
-import mock
+from unittest import mock
 
 import django
 from django.db import connection
