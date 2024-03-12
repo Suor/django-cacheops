@@ -142,7 +142,7 @@ Backwards incompatible changes:
 - .iterator() is never cached now
 - invalidate_all() works immediately even in transaction
 - @cached_as(timeout=0) no longer means timeout is ignored/derived from querysets,
-  user timeout=None instead.
+  use timeout=None instead.
 
 3.2.1
 - fixed CACHEOPS_DEGRADE_ON_FAILURE=True
