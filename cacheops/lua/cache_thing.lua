@@ -47,11 +47,19 @@ for db_table, disj in pairs(dnfs) do
         redis.call('sadd', conj_key, key)
         -- NOTE: an invalidator should live longer than any key it references.
         --       So we update its ttl on every key if needed.
+        local conj_ttl = redis.call('ttl', conj_key)
         -- REDIS_7
-        redis.call('expire', conj_key, timeout, 'gt')
+        -- Removing `redis.call('expire', conj_key, timeout, 'gt')` as ttl is not setting up when its value is -1
+        -- Refer - https://redis.io/docs/latest/commands/expire/
+        if conj_ttl == -1 then
+            -- Use NX when no expiry is present i.e. ttl = -1
+            redis.call('expire', conj_key, timeout, 'nx')
+        elseif conj_ttl < timeout then
+            -- Use XX when current expiration time is less than timeout
+            redis.call('expire', conj_key, timeout, 'xx')
+        end
         -- /REDIS_7
         -- REDIS_4
-        local conj_ttl = redis.call('ttl', conj_key)
         if conj_ttl < timeout then
             -- We set conj_key life with a margin over key life to call expire rarer
             -- And add few extra seconds to be extra safe
