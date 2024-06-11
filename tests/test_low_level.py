@@ -19,4 +19,4 @@ def test_ttl(base, django_assert_num_queries):
     qs = User.objects.cache(timeout=100).filter(pk=user.pk)
     list(qs)
     assert 90 <= redis_client.ttl(qs._cache_key()) <= 100
-    assert redis_client.ttl(f'conj:auth_user:id={user.id}') > 100
+    assert redis_client.ttl(f'{qs._prefix}conj:auth_user:id={user.id}') > 100
