@@ -142,5 +142,5 @@ def dnfs_to_conj_keys(prefix, cond_dnfs):
                                          for conj in disj]
 
 def dnfs_to_schemes(cond_dnfs):
-    return {table: [",".join(sorted(conj)) for conj in disj]
+    return {table: list({",".join(sorted(conj)) for conj in disj})
             for table, disj in cond_dnfs.items() if disj}
