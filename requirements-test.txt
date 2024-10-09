@@ -1,4 +1,4 @@
-pytest==7.2.1
+pytest==8.3.3
 pytest-django==4.5.2
 django>=3.2
 redis>=3.0.0
