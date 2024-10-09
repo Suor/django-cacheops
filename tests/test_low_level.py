@@ -14,7 +14,7 @@ def base(db):
     case.tearDown()
 
 
-def test_ttl(base, django_assert_num_queries):
+def test_ttl(base):
     user = User.objects.create(username='Suor')
     qs = User.objects.cache(timeout=100).filter(pk=user.pk)
     list(qs)
