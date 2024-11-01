@@ -1,3 +1,10 @@
+7.1
+- support and test against Python 3.12 and Django 5.0
+- prevent dups in conjs and disjs by using proper data-structures (thx Sergey Prokopiev for a test)
+- unpin funcy major version
+- fixed conj keys TTL in Redis 7.x
+- updated and cleaned up tests
+
 7.0.2
 - fixed .aggregate()
 - fixed big memory usage during migrations
