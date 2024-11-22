@@ -143,7 +143,7 @@ import hashlib
 
 class md5:
     def __init__(self, s=None):
-        self.md5 = hashlib.md5()
+        self.md5 = hashlib.md5(usedforsecurity=False)
         if s is not None:
             self.update(s)
 
