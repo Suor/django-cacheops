@@ -150,7 +150,7 @@ class md5:
         # usedforsecurity was introduced in 3.9
         # this is for backwards compatibility
         pyversion = sys.version_info
-        if pyversion.major == 3 and pyversion.minor >= 9:
+        if (pyversion.major == 3 and pyversion.minor >= 9) or pyversion.major > 3:
             md5_kwargs["usedforsecuirty"] = False
 
         self.md5 = hashlib.md5(**md5_kwargs)
