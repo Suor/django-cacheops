@@ -1,6 +1,7 @@
 import re
 import json
 import inspect
+import sys
 from funcy import memoize, compose, wraps, any, any_fn, select_values, mapcat
 
 from django.db import models
@@ -143,7 +144,16 @@ import hashlib
 
 class md5:
     def __init__(self, s=None):
-        self.md5 = hashlib.md5(usedforsecurity=False)
+        md5_kwargs = {}
+
+        # set usedforsecurity for FIPS compliance
+        # usedforsecurity was introduced in 3.9
+        # this is for backwards compatibility
+        pyversion = sys.version_info
+        if pyversion.major == 3 and pyversion.minor >= 9:
+            md5_kwargs["usedforsecuirty"] = False
+
+        self.md5 = hashlib.md5(**md5_kwargs)
         if s is not None:
             self.update(s)
 
