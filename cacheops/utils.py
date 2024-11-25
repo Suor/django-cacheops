@@ -151,7 +151,7 @@ class md5:
         # this is for backwards compatibility
         pyversion = sys.version_info
         if (pyversion.major == 3 and pyversion.minor >= 9) or pyversion.major > 3:
-            md5_kwargs["usedforsecuirty"] = False
+            md5_kwargs["usedforsecurity"] = False
 
         self.md5 = hashlib.md5(**md5_kwargs)
         if s is not None:
