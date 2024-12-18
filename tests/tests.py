@@ -730,6 +730,11 @@ class IssueTests(BaseTestCase):
             conditions.append(reduce(operator.or_, queries))
         list(queryset.filter(reduce(operator.and_, conditions)).cache())
 
+    def test_489(self):
+        _ = TaggedPost.objects.create(meta={}, tags=[1, 2, 3])
+        tags = TaggedPost.objects.cache().exclude(tags=[])
+
+        self.assertEqual(tags.count(), 1)
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
