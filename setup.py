@@ -24,7 +24,7 @@ setup(
     ],
     python_requires='>=3.7',
     install_requires=[
-        'django>=3.2',
+        'django>=2.0',
         'redis>=3.0.0',
         'funcy>=1.8',
     ],
