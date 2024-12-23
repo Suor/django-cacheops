@@ -7,9 +7,14 @@ from funcy import lmap, lcat, join_with
 
 from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
-from django.db import DEFAULT_DB_ALIAS, connections, models
+from django.db import DEFAULT_DB_ALIAS, models
 from django.db.models.manager import BaseManager
 from django.db.models.query import MAX_GET_RESULTS
+try:
+    from django.db.models.query import MAX_GET_RESULTS
+    from django.db import connections
+except ImportError:
+    MAX_GET_RESULTS = None
 from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 from django.db.transaction import atomic
 
@@ -27,7 +32,6 @@ from .signals import cache_read
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
-
 
 def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
     """
