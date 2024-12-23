@@ -9,7 +9,6 @@ from django.utils.encoding import force_str
 from django.core.exceptions import ImproperlyConfigured, EmptyResultSet
 from django.db import DEFAULT_DB_ALIAS, models
 from django.db.models.manager import BaseManager
-from django.db.models.query import MAX_GET_RESULTS
 try:
     from django.db.models.query import MAX_GET_RESULTS
     from django.db import connections
