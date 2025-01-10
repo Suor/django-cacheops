@@ -21,7 +21,7 @@ class Defaults:
     CACHEOPS_SENTINEL = {}
     # NOTE: we don't use this fields in invalidator conditions since their values could be very long
     #       and one should not filter by their equality anyway.
-    CACHEOPS_SKIP_FIELDS = "FileField", "TextField", "BinaryField", "JSONField"
+    CACHEOPS_SKIP_FIELDS = "FileField", "TextField", "BinaryField", "JSONField", "ArrayField"
     CACHEOPS_LONG_DISJUNCTION = 8
     CACHEOPS_SERIALIZER = 'pickle'
 

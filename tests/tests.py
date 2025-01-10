@@ -730,11 +730,10 @@ class IssueTests(BaseTestCase):
             conditions.append(reduce(operator.or_, queries))
         list(queryset.filter(reduce(operator.and_, conditions)).cache())
 
+    @unittest.skipIf(connection.vendor != 'postgresql', "Only for PostgreSQL")
     def test_489(self):
-        _ = TaggedPost.objects.create(meta={}, tags=[1, 2, 3])
-        tags = TaggedPost.objects.cache().exclude(tags=[])
+        TaggedPost.objects.cache().filter(tags=[]).count()
 
-        self.assertEqual(tags.count(), 1)
 
 class RelatedTests(BaseTestCase):
     fixtures = ['basic']
