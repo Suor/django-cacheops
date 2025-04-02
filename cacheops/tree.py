@@ -6,12 +6,19 @@ from django.db.models.query import QuerySet
 from django.db.models.sql import OR
 from django.db.models.sql.datastructures import Join
 from django.db.models.sql.query import Query, ExtraWhere
-from django.db.models.sql.where import NothingNode, SubqueryConstraint
+from django.db.models.sql.where import NothingNode
 from django.db.models.lookups import Lookup, Exact, In, IsNull
 from django.db.models.expressions import BaseExpression, Exists
 
 from .conf import settings
 from .invalidation import serializable_fields
+
+# This existed prior to Django 5.2
+try:
+    from django.db.models.sql.where import SubqueryConstraint
+except ImportError:
+    class SubqueryConstraint(object):
+        pass
 
 
 def dnfs(qs):
