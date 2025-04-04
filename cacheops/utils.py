@@ -144,16 +144,9 @@ import hashlib
 
 class md5:
     def __init__(self, s=None):
-        md5_kwargs = {}
-
         # set usedforsecurity for FIPS compliance
-        # usedforsecurity was introduced in 3.9
-        # this is for backwards compatibility
-        pyversion = sys.version_info
-        if (pyversion.major == 3 and pyversion.minor >= 9) or pyversion.major > 3:
-            md5_kwargs["usedforsecurity"] = False
-
-        self.md5 = hashlib.md5(**md5_kwargs)
+        kwargs = {'usedforsecurity': False} if sys.version_info >= (3, 9) else {}
+        self.md5 = hashlib.md5(**kwargs)
         if s is not None:
             self.update(s)
 
