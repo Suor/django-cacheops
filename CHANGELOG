@@ -1,3 +1,8 @@
+7.2
+- support and test against Python 3.13 and Django 5.1/5.2 (thx to Stu Tomlinson)
+- updated md5 to set usedforsecurity for FIPS compliance (Logan Bibby)
+- skip ArrayField in exact conds
+
 7.1
 - support and test against Python 3.12 and Django 5.0
 - prevent dups in conjs and disjs by using proper data-structures (thx Sergey Prokopiev for a test)

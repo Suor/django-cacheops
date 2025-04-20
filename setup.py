@@ -7,7 +7,7 @@ README = open('README.rst').read().replace('|Build Status|', '', 1)
 
 setup(
     name='django-cacheops',
-    version='7.1',
+    version='7.2',
     author='Alexander Schepanovski',
     author_email='suor.web@gmail.com',
 
