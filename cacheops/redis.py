@@ -71,5 +71,5 @@ def load_script(name):
 
 @memoize
 def is_redis_7():
-    redis_version = redis_client.info('server')['redis_version']
+    redis_version = str(redis_client.info('server')['redis_version'])
     return int(redis_version.split('.')[0]) >= 7
