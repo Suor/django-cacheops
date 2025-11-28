@@ -1,3 +1,4 @@
+--!df flags=allow-undeclared-keys
 local prefix = KEYS[1]
 local key = KEYS[2]
 local data = ARGV[1]
