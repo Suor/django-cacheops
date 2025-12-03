@@ -18,17 +18,6 @@ redis.call('setex', key, timeout, data)
 
 -- A pair of funcs
 -- NOTE: we depend here on keys order being stable
-
--- Format value for cache key (integers without .0)
-local format_val = function (val)
-    if type(val) == 'number' then
-        if val == math.floor(val) then
-            return string.format('%.0f', val)
-        end
-    end
-    return tostring(val)
-end
-
 local conj_schema = function (conj)
     local parts = {}
     for field, _ in pairs(conj) do
@@ -41,7 +30,7 @@ end
 local conj_cache_key = function (db_table, conj)
     local parts = {}
     for field, val in pairs(conj) do
-        table.insert(parts, field .. '=' .. format_val(val))
+        table.insert(parts, field .. '=' .. tostring(val))
     end
 
     return prefix .. 'conj:' .. db_table .. ':' .. table.concat(parts, '&')
