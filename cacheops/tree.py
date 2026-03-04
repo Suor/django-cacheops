@@ -165,8 +165,7 @@ def dnfs(qs):
                 sub_dnfs.append(query_dnf(getattr(q, 'query', None)))
             elif isinstance(q, Query):
                 sub_dnfs.append(query_dnf(q))
-        if sub_dnfs:
-            dnfs_.update(join_with(lcat, sub_dnfs))
+        dnfs_.update(join_with(lcat, sub_dnfs) or {})
 
     return dnfs_
 
