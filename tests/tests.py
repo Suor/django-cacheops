@@ -643,6 +643,30 @@ class IssueTests(BaseTestCase):
         categories = Category.objects.cache().annotate(newest_post=Subquery(newest_post[:1]))
         self.assertEqual(categories[0].newest_post, post.pk)
 
+    def test_366(self):
+        """
+        Check that dnfs() detects table dependencies from
+        Subquery annotations.
+
+        Django 6.0+ resolves Subquery into raw Query objects
+        in qs.query.annotations, so this verifies detection
+        works regardless of how the annotation is stored.
+        """
+        from cacheops.tree import dnfs
+
+        newest_post = Post.objects.filter(
+            category=OuterRef('pk')
+        ).order_by('-pk').values('pk')
+        qs = Category.objects.cache().annotate(
+            newest_post=Subquery(newest_post[:1])
+        )
+        result = dnfs(qs)
+
+        self.assertEqual(result, {
+            Category._meta.db_table: [{}],
+            Post._meta.db_table: [{}],
+        })
+
     @unittest.skipIf(platform.python_implementation() == "PyPy", "dill doesn't do that in PyPy")
     def test_385(self):
         Client.objects.create(name='Client Name')

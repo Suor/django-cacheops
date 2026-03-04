@@ -159,9 +159,14 @@ def dnfs(qs):
 
     # Add any subqueries used for annotation
     if qs.query.annotations:
-        subqueries = (query_dnf(getattr(q, 'query', None))
-                      for q in qs.query.annotations.values() if isinstance(q, Subquery))
-        dnfs_.update(join_with(lcat, subqueries))
+        sub_dnfs = []
+        for q in qs.query.annotations.values():
+            if isinstance(q, Subquery):
+                sub_dnfs.append(query_dnf(getattr(q, 'query', None)))
+            elif isinstance(q, Query):
+                sub_dnfs.append(query_dnf(q))
+        if sub_dnfs:
+            dnfs_.update(join_with(lcat, sub_dnfs))
 
     return dnfs_
 
