@@ -1,3 +1,4 @@
+--!df flags=allow-undeclared-keys
 local prefix = KEYS[1]
 local db_table = ARGV[1]
 local obj = cjson.decode(ARGV[2])
