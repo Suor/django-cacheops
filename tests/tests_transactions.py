@@ -2,7 +2,7 @@ from django.db import connection, IntegrityError
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
 
-from cacheops.transaction import queue_when_in_transaction
+from cacheops.transaction import is_sql_dirty, queue_when_in_transaction
 
 from .models import Category, Post
 from .utils import run_in_thread
@@ -120,6 +120,21 @@ class TransactionSupportTests(TransactionTestCase):
             cacheops_commit_handler('default')
 
         self.assertEqual(calls, ['cacheops', 'django'])
+
+    def test_is_sql_dirty_with_non_string_sql(self):
+        """Non-string SQL objects (e.g. psycopg sql.Composed) should not crash is_sql_dirty (#377)."""
+
+        class FakeComposed:
+            """Mimics psycopg2/psycopg3 sql.Composed which has as_string() but no lower()."""
+            def __init__(self, text):
+                self._text = text
+            def as_string(self, context):
+                return self._text
+
+        self.assertTrue(is_sql_dirty(FakeComposed("DELETE FROM some_table")))
+        self.assertTrue(is_sql_dirty(FakeComposed("INSERT INTO foo VALUES (1)")))
+        self.assertTrue(is_sql_dirty(FakeComposed("UPDATE foo SET bar = 1")))
+        self.assertFalse(is_sql_dirty(FakeComposed("SELECT * FROM foo")))
 
     def test_multidb(self):
         try:
