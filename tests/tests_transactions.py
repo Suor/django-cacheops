@@ -1,3 +1,5 @@
+import unittest
+
 from django.db import connection, IntegrityError
 from django.db.transaction import atomic
 from django.test import TransactionTestCase
@@ -6,6 +8,11 @@ from cacheops.transaction import is_sql_dirty, queue_when_in_transaction
 
 from .models import Category, Post
 from .utils import run_in_thread
+
+try:
+    from psycopg2 import sql
+except ImportError:
+    sql = None
 
 
 def get_category():
@@ -121,20 +128,23 @@ class TransactionSupportTests(TransactionTestCase):
 
         self.assertEqual(calls, ['cacheops', 'django'])
 
-    def test_is_sql_dirty_with_non_string_sql(self):
-        """Non-string SQL objects (e.g. psycopg sql.Composed) should not crash is_sql_dirty (#377)."""
+    @unittest.skipUnless(sql, "psycopg2 not installed")
+    def test_is_sql_dirty_with_composed_objects(self):
+        """sql.Composed/sql.SQL objects should not crash is_sql_dirty (#377)."""
+        composed = sql.SQL("DELETE FROM {}").format(sql.Identifier("some_table"))
+        simple = sql.SQL("SELECT * FROM foo")
 
-        class FakeComposed:
-            """Mimics psycopg2/psycopg3 sql.Composed which has as_string() but no lower()."""
-            def __init__(self, text):
-                self._text = text
-            def as_string(self, context):
-                return self._text
+        # These are not strings — calling .lower() on them would raise AttributeError
+        self.assertNotIsInstance(composed, str)
+        self.assertNotIsInstance(simple, str)
+        self.assertFalse(hasattr(composed, "lower"))
+        self.assertFalse(hasattr(simple, "lower"))
 
-        self.assertTrue(is_sql_dirty(FakeComposed("DELETE FROM some_table")))
-        self.assertTrue(is_sql_dirty(FakeComposed("INSERT INTO foo VALUES (1)")))
-        self.assertTrue(is_sql_dirty(FakeComposed("UPDATE foo SET bar = 1")))
-        self.assertFalse(is_sql_dirty(FakeComposed("SELECT * FROM foo")))
+        # is_sql_dirty should handle them without raising
+        self.assertTrue(is_sql_dirty(composed))
+        self.assertTrue(is_sql_dirty(sql.SQL("INSERT INTO foo VALUES (%s)")))
+        self.assertTrue(is_sql_dirty(sql.SQL("UPDATE foo SET bar = %s")))
+        self.assertFalse(is_sql_dirty(simple))
 
     def test_multidb(self):
         try:

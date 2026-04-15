@@ -116,7 +116,7 @@ def is_sql_dirty(sql):
         sql = sql.decode()
     # Handle psycopg2/psycopg3 sql.Composed/sql.SQL objects (see #377)
     elif not isinstance(sql, str):
-        sql = sql.as_string(None) if hasattr(sql, "as_string") else str(sql)
+        sql = str(sql)
     # NOTE: not using regex here for speed
     sql = sql.lower()
     for action in ('update', 'insert', 'delete'):
