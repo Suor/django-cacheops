@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from functools import reduce
 import operator
 import re
+from pickle import PicklingError
 import platform
 import unittest
 from unittest import mock
@@ -659,7 +660,7 @@ class IssueTests(BaseTestCase):
     def test_385(self):
         Client.objects.create(name='Client Name')
 
-        with self.assertRaisesRegex(AttributeError, "local object"):
+        with self.assertRaisesRegex((AttributeError, PicklingError), "local object"):
             Client.objects.filter(name='Client Name').cache().first()
 
         invalidate_model(Client)
