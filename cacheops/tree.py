@@ -20,6 +20,12 @@ except ImportError:
     class SubqueryConstraint(object):
         pass
 
+try:
+    from django.db.models.fields.tuple_lookups import TupleIn
+except ImportError:
+    class TupleIn(object):
+        pass
+
 
 def dnfs(qs):
     """
@@ -46,6 +52,28 @@ def dnfs(qs):
         Any conditions other then eq are dropped.
         """
         if isinstance(where, Lookup):
+            if hasattr(where.lhs, 'targets'):
+                # since django5.2, prefetch_related rely on TupleIn and ColPair
+                if (
+                    isinstance(where, TupleIn)
+                    and len(where.rhs) < settings.CACHEOPS_LONG_DISJUNCTION
+                ):
+                    # return result like AND condition
+                    return {
+                        frozenset(
+                            (
+                                where.lhs.alias,
+                                target.attname,
+                                value,
+                                True,
+                            )
+                            for values in where.rhs
+                            for target, value in zip(where.lhs.targets, values)
+                        )
+                    }
+                else:
+                    # TODO: add other tuple lookup
+                    return SOME_TREE
             # If where.lhs don't refer to a field then don't bother
             if not hasattr(where.lhs, 'target'):
                 return SOME_TREE

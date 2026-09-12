@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import date, time
 
+from django import VERSION as DJANGO_VERSION
 from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models import sql, manager
@@ -308,6 +309,19 @@ class Client(models.Model):
 
     name = models.CharField(max_length=255)
 
+# composite primary keys available for django 5.2+
+if DJANGO_VERSION >= (5, 2):
+    class Product(models.Model):
+        name = models.CharField(max_length=100)
+
+    class Order(models.Model):
+        reference = models.CharField(max_length=20, primary_key=True)
+
+    class OrderLineItem(models.Model):
+        pk = models.CompositePrimaryKey("product_id", "order_id")
+        product = models.ForeignKey(Product, on_delete=models.CASCADE)
+        order = models.ForeignKey(Order, on_delete=models.CASCADE)
+        quantity = models.IntegerField()
 
 # Abstract models
 class Abs(models.Model):

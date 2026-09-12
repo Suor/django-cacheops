@@ -1,3 +1,4 @@
+from cacheops.tree import dnfs
 from contextlib import contextmanager
 from functools import reduce
 import operator
@@ -1101,3 +1102,36 @@ class MultiDBInvalidationTests(BaseTestCase):
         brand = Brand.objects.using('slave').create()
         brand.labels.add(label)
         mock_invalidate_dict.assert_called_with(mock.ANY, mock.ANY, using='slave')
+
+@unittest.skipIf(django.VERSION < (5, 2), 'Feature available for django 5.2+')
+class CompositePrimaryKeysTests(BaseTestCase):
+    """django 5.2 add composite primary key and introduce new Lookup using Tuple."""
+
+    def test_lookup_tuple_in(self):
+        """check that dnf take into account composite primary key research.
+        notes that since django 5.2, prefetch_related query use the tupleIn lookup.
+        """
+        product = Product.objects.create(name='apple')
+        order = Order.objects.create(reference='A75H')
+        item = OrderLineItem.objects.create(product=product, order=order, quantity=1)
+
+        # cache composite primary key filter
+        qs = OrderLineItem.objects.filter(pk__in=[(product.pk, order.pk)]).cache()
+        dnf_cond = dnfs(qs)
+        # the dnf_cond result is like AND
+        model_dnf = dnf_cond[item._meta.db_table][0]
+        assert model_dnf['product_id'] == product.pk
+        assert model_dnf['order_id'] == order.pk
+
+        # run the query to add it in cache
+        list(qs.all())
+        with self.assertNumQueries(0):
+            items = list(qs.all())
+            assert items[0].quantity == 1
+
+        # update the quantity invalidate the cache
+        item.quantity = 2
+        item.save()
+        with self.assertNumQueries(1):
+            items = qs.all()
+            assert items[0].quantity == 2
