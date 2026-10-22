@@ -1,12 +1,12 @@
-from inspect import getfullargspec, unwrap
 from functools import partial
+from inspect import getfullargspec, unwrap
 
-from django.template import Library
+import django
+from django.template import Library, TemplateSyntaxError
 from django.template.library import TagHelperNode, parse_bits
 
 import cacheops
 from cacheops.utils import carefully_strip_whitespace
-
 
 __all__ = ['CacheopsLibrary', 'invalidate_fragment']
 
@@ -26,9 +26,26 @@ class CacheopsLibrary(Library):
 
             # args
             bits = token.split_contents()[1:]
+            parse_params = params
+            if takes_context:
+                if not params or params[0] != "context":
+                    raise TemplateSyntaxError(
+                        f"'{name}' is decorated with takes_context=True so it must "
+                        "have a first argument of 'context'"
+                    )
+                parse_params = params[1:]
+            parse_kwargs = {"takes_context": False} if django.VERSION < (6, 1) else {}
             args, kwargs = parse_bits(
-                parser, bits, params, varargs, varkw, defaults,
-                kwonly, kwonly_defaults, takes_context, name,
+                parser,
+                bits,
+                parse_params,
+                varargs,
+                varkw,
+                defaults,
+                kwonly,
+                kwonly_defaults,
+                name=name,
+                **parse_kwargs,
             )
             return CachedNode(func, takes_context, args, kwargs, nodelist)
 

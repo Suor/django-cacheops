@@ -1,3 +1,8 @@
+Unreleased
+- support and test against Python 3.14 and Django 6.0/6.1
+- preserve Django 6.1 template tag argument validation and fetch mode behavior
+- avoid fetching unchanged deferred one-to-one fields during partial saves
+
 7.2
 - support and test against Python 3.13 and Django 5.1/5.2 (thx to Stu Tomlinson)
 - updated md5 to set usedforsecurity for FIPS compliance (Logan Bibby)

@@ -23,10 +23,10 @@ from .invalidation import invalidate_obj, invalidate_dict, skip_on_no_invalidati
 from .transaction import transaction_states
 from .signals import cache_read
 
-
 __all__ = ('cached_as', 'cached_view_as', 'install_cacheops')
 
 _local_get_cache = {}
+_FETCH_ONE = getattr(models, "FETCH_ONE", None)
 
 
 def cached_as(*samples, timeout=None, extra=None, lock=None, keep_fresh=False):
@@ -181,10 +181,14 @@ class QuerySetMixin(object):
 
     def _should_cache(self, op):
         # If cache and op are enabled and not within write or dirty transaction
-        return settings.CACHEOPS_ENABLED \
-            and self._cacheprofile and op in self._cacheprofile['ops'] \
-            and not self._for_write \
+        return (
+            settings.CACHEOPS_ENABLED
+            and self._cacheprofile
+            and op in self._cacheprofile["ops"]
+            and getattr(self, "_fetch_mode", _FETCH_ONE) is _FETCH_ONE
+            and not self._for_write
             and not transaction_states[self.db].is_dirty()
+        )
 
     def cache(self, ops=None, timeout=None, lock=None):
         """
@@ -432,17 +436,20 @@ class ManagerMixin(object):
                 pass
 
     @skip_on_no_invalidation
-    def _post_save(self, sender, instance, using, **kwargs):
+    def _post_save(self, sender, instance, using, update_fields=None, **kwargs):
         # Invoke invalidations for both old and new versions of saved object
         old = _old_objs.__dict__.pop((sender, instance.pk), None)
         if old:
             invalidate_obj(old, using=using)
         invalidate_obj(instance, using=using)
 
-        invalidate_o2o(sender, old, instance, using=using)
+        invalidate_o2o(sender, old, instance, using=using, update_fields=update_fields)
 
-        # We run invalidations but skip caching if we are dirty
-        if transaction_states[using].is_dirty():
+        # Nondefault fetch modes cannot survive a cache round trip.
+        if (
+            transaction_states[using].is_dirty()
+            or getattr(instance._state, "fetch_mode", _FETCH_ONE) is not _FETCH_ONE
+        ):
             return
 
         # NOTE: it's possible for this to be a subclass, e.g. proxy, without cacheprofile,
@@ -505,10 +512,16 @@ class ManagerMixin(object):
         return self.get_queryset().inplace().invalidated_update(**kwargs)
 
 
-def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS):
+def invalidate_o2o(sender, old, instance, using=DEFAULT_DB_ALIAS, update_fields=None):
     """Invoke invalidation for o2o reverse queries"""
     o2o_fields = [f for f in sender._meta.fields if isinstance(f, models.OneToOneField)]
     for f in o2o_fields:
+        if (
+            update_fields is not None
+            and f.name not in update_fields
+            and f.attname not in update_fields
+        ):
+            continue
         old_value = getattr(old, f.attname, None)
         value = getattr(instance, f.attname)
         if old_value != value:

@@ -6,6 +6,8 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'tests',
 ]
+if os.environ.get("CACHEOPS_DB") in {"postgresql", "postgis"}:
+    INSTALLED_APPS.append("django.contrib.postgres")
 
 ROOT_URLCONF = 'tests.urls'
 

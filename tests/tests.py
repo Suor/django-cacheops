@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from functools import reduce
 import operator
+import pickle
 import re
 import platform
 import unittest
@@ -11,7 +12,7 @@ from django.db import connection
 from django.db import DEFAULT_DB_ALIAS
 from django.test import override_settings
 from django.test.client import RequestFactory
-from django.template import Context, Template
+from django.template import Context, Template, TemplateSyntaxError
 from django.db.models import F, Count, Max, OuterRef, Sum, Subquery, Exists, Q
 from django.db.models.expressions import RawSQL
 
@@ -178,7 +179,7 @@ class BasicTests(BaseTestCase):
             list(Post.objects.filter(category=2).cache())
 
     def test_subquery(self):
-        categories = Category.objects.cache().filter(title='Django').only('id')
+        categories = Category.objects.cache().filter(title='Django').values('pk')
         Post.objects.cache().filter(category__in=Subquery(categories)).count()
 
     def test_rawsql(self):
@@ -435,6 +436,34 @@ class TemplateTests(BaseTestCase):
         self.assertRendersTo(t, {'inc': inc, 'flag': True}, '.1.1')
         self.assertRendersTo(t, {'inc': inc, 'flag': False}, '.2.3')
 
+    def test_decorator_tag_context_arguments(self):
+        @decorator_tag(takes_context=True)
+        def context_cached(context, timeout, *, fragment):
+            return cached(timeout=timeout, extra=(fragment, context['variant']))
+
+        inc = make_inc()
+        for _ in range(2):
+            t = Template("""
+                {% load cacheops %}
+                {% context_cached 60 fragment='context' %}.{{ inc }}{% endcontext_cached %}
+                {% context_cached timeout=60 fragment='context' %}.{{ inc }}{% endcontext_cached %}
+            """)
+            self.assertRendersTo(t, {'inc': inc, 'variant': 1}, '.1.1')
+
+    def test_decorator_tag_invalid_context(self):
+        def missing_context():
+            pass
+
+        def wrong_context(other):
+            pass
+
+        for func in (missing_context, wrong_context):
+            decorator_tag(takes_context=True)(func)
+            source = '{%% load cacheops %%}{%% %s %%}{%% end%s %%}' % (func.__name__, func.__name__)
+            with self.subTest(func=func.__name__):
+                with self.assertRaisesRegex(TemplateSyntaxError, "first argument of 'context'"):
+                    Template(source)
+
     def test_jinja2(self):
         from jinja2 import Environment
         env = Environment(extensions=['cacheops.jinja2.cache'])
@@ -659,7 +688,7 @@ class IssueTests(BaseTestCase):
     def test_385(self):
         Client.objects.create(name='Client Name')
 
-        with self.assertRaisesRegex(AttributeError, "local object"):
+        with self.assertRaisesRegex((AttributeError, pickle.PicklingError), "local object"):
             Client.objects.filter(name='Client Name').cache().first()
 
         invalidate_model(Client)

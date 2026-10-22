@@ -24,6 +24,8 @@ Requirements
 
 Python 3.8+, Django 3.2+ and Redis 4.0+.
 
+Django 6.0 and 6.1 are supported with Python 3.12, 3.13, and 3.14.
+
 
 Installation
 ++++++++++++
@@ -784,6 +786,15 @@ see, however, `.invalidated_update()`. 8 is postponed until it will gain
 more interest or a champion willing to implement it emerges.
 
 All unsupported things could still be used easily enough with the help of ``@cached_as()``.
+
+On Django 6.1, querysets using ``FETCH_PEERS``, ``FETCH_RAISE``, or custom fetch modes
+bypass queryset caching, including ``local_get``. Instances using these modes are
+also excluded from ``cache_on_save``. The default ``FETCH_ONE`` mode caches normally.
+
+Django 6.1's database-level ``DB_CASCADE``, ``DB_SET_NULL``, and ``DB_SET_DEFAULT``
+options do not emit model signals for related rows changed by the database.
+Invalidate affected models explicitly with ``invalidate_model()`` after these
+deletions, including dependencies of any ``@cached_as()`` functions.
 
 
 Performance tips
